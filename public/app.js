@@ -669,6 +669,7 @@ async function startPlayer(mode, onlyIds) {
     mode = ms[0];
   }
 
+  entries = entries.map((e, i) => Object.assign({}, e, { id: e.id || `idx${i}` }));
   const queue = entries.map((e) => {
     const m = MODES[mode];
     let prompt = '';

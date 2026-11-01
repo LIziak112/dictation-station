@@ -133,6 +133,19 @@ function saveDb() {
   }, 120);
 }
 
+
+/* ---------- 词条 id ---------- */
+function ensureEntryIds(entries) {
+  const seen = new Set();
+  return (Array.isArray(entries) ? entries : []).map((e, i) => {
+    let id = String(e.id || '');
+    if (!id || seen.has(id)) id = `e${i + 1}`;
+    while (seen.has(id)) id = `e${i + 1}_${Math.random().toString(36).slice(2, 6)}`;
+    seen.add(id);
+    return Object.assign({}, e, { id });
+  });
+}
+
 /* ---------- TTS 队列 ---------- */
 const ttsQueue = [];
 let ttsRunning = 0;
@@ -272,7 +285,7 @@ const server = http.createServer(async (req, res) => {
         textbook: String(body.textbook || '').slice(0, 60),
         unit: String(body.unit || '').slice(0, 60),
         sourceText: String(body.sourceText || '').slice(0, 20000),
-        entries: Array.isArray(body.entries) ? body.entries.slice(0, 500) : [],
+        entries: ensureEntryIds(body.entries).slice(0, 500),
         createdAt: prev ? prev.createdAt : now,
         updatedAt: now,
       };
@@ -286,7 +299,11 @@ const server = http.createServer(async (req, res) => {
       const id = mBatch[1];
       const b = db.batches[id];
       if (!b) return json(res, 404, { error: '批次不存在' });
-      if (req.method === 'GET') return json(res, 200, { batch: b });
+      if (req.method === 'GET') {
+        const fixed = ensureEntryIds(b.entries);
+        if (fixed.some((e, i) => !b.entries[i] || e.id !== b.entries[i].id)) { b.entries = fixed; saveDb(); }
+        return json(res, 200, { batch: b });
+      }
       if (req.method === 'DELETE') { delete db.batches[id]; saveDb(); return json(res, 200, { ok: true }); }
       if (req.method === 'PUT') {
         const body = await readJson(req);
@@ -296,7 +313,7 @@ const server = http.createServer(async (req, res) => {
           grade: String(body.grade ?? b.grade).slice(0, 40),
           textbook: String(body.textbook ?? b.textbook).slice(0, 60),
           unit: String(body.unit ?? b.unit).slice(0, 60),
-          entries: Array.isArray(body.entries) ? body.entries.slice(0, 500) : b.entries,
+          entries: Array.isArray(body.entries) ? ensureEntryIds(body.entries).slice(0, 500) : b.entries,
           updatedAt: new Date().toISOString(),
         });
         saveDb();
