@@ -167,7 +167,17 @@ function parseList(text) {
 
     let en = '', zh = '', pinyin = '';
     if (parts.length === 1) {
-      if (hasCJK(parts[0])) zh = parts[0]; else en = parts[0];
+      const one = parts[0];
+      const mZhEn = one.match(/^(.*[\u4e00-\u9fff].*?)\s+([A-Za-z][A-Za-z'’.\- ]*)$/);
+      const mEnZh = one.match(/^([A-Za-z][A-Za-z'’.\- ]*?)\s+(.*[\u4e00-\u9fff].*)$/);
+      const mJoin = one.match(/^(.*[\u4e00-\u9fff])([A-Za-z][A-Za-z'’.\- ]*)$/);
+      const mZhPy = one.match(/^(.*[\u4e00-\u9fff].*?)\s+([a-zA-ZüÜāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ\s]+)$/);
+      if (mZhEn) { zh = mZhEn[1].trim(); en = mZhEn[2].trim(); }
+      else if (mEnZh) { en = mEnZh[1].trim(); zh = mEnZh[2].trim(); }
+      else if (mJoin) { zh = mJoin[1].trim(); en = mJoin[2].trim(); }
+      else if (mZhPy) { zh = mZhPy[1].trim(); pinyin = mZhPy[2].trim(); }
+      else if (hasCJK(one)) zh = one;
+      else en = one;
     } else if (parts.length === 2) {
       const [a, b] = parts;
       if (isLatin(a) && hasCJK(b)) { en = a; zh = b; }

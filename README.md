@@ -2,7 +2,12 @@
 
 老师布置的听写任务，家长没空念、或发音不标准时，用网页自动报听写。孩子仍然用纸笔写。
 
-在线地址：<https://www.ownclass.top/tingxie/>
+在线地址：<https://ownclass.top/tingxie/>
+
+> 入口请用 **apex 域名**（不带 www）。`www.ownclass.top` 上注册了学习端主应用的
+> Service Worker（scope=/，Workbox `navigateFallback: index.html`），它会把该 origin
+> 下所有导航兜回主应用，导致 `/tingxie/` 显示「页面不存在」。
+> 根治方案：主应用 `navigateFallbackDenylist` 加入 `/\/tingxie\//`。
 
 ## 做什么
 
