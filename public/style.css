@@ -254,6 +254,7 @@ table.words tr.has-issue td { background: #fdf3ee; }
   word-break: break-word;
 }
 .prompt-main.smallish { font-size: 34px; }
+.prompt-main.icon { font-size: 72px; line-height: 1.1; }
 .prompt-hint { font-size: 17px; color: var(--muted); }
 .prompt-answer { font-size: 22px; color: var(--brand); font-weight: 700; }
 

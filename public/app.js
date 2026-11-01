@@ -771,6 +771,8 @@ async function startPlayer(mode, onlyIds) {
     }
   }
 
+  $('#prompt-card').onclick = () => $('#btn-play').click();
+
   drawPrompt();
   updateBar();
 
@@ -801,13 +803,15 @@ async function startPlayer(mode, onlyIds) {
     const mainEl = $('#prompt-main');
     if (q.prompt) {
       mainEl.textContent = q.prompt;
-      mainEl.classList.remove('hidden');
+      mainEl.classList.remove('hidden', 'icon');
       mainEl.classList.toggle('smallish', q.prompt.length > 10);
     } else {
-      mainEl.textContent = '';
-      mainEl.classList.add('hidden');
+      mainEl.textContent = '🔊';
+      mainEl.classList.remove('hidden', 'smallish');
+      mainEl.classList.add('icon');
     }
-    $('#prompt-hint').textContent = q.entry.hint ? `提示：${q.entry.hint}` : '';
+    const hintText = q.entry.hint ? `提示：${q.entry.hint}` : (q.prompt ? '' : '点下面的「播放」听读音');
+    $('#prompt-hint').textContent = hintText;
     const ansEl = $('#prompt-answer');
     if (P.revealed) {
       ansEl.textContent = q.answer;
