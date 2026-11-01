@@ -144,17 +144,26 @@ function parseList(text) {
 
   // 2) 逐行文本
   const entries = [];
+  let title = '';
   for (const line0 of raw.split('\n')) {
     let line = line0.trim();
     if (!line) continue;
+    const hasSep = /\t|\s{2,}|[|｜]|[，,；;]/.test(line);
+    const looksHeader = !hasSep && /(听写|默写|单词表|词语表|生字表|姓名|班级|日期|得分|^Unit\b|^第[一二三四五六七八九十]+[单元课]|[:：]$)/i.test(line);
+    if (looksHeader) {
+      if (!title && /(听写|默写|单词|词语|^Unit\b|^第)/i.test(line)) title = line.replace(/[:：]\s*$/, '');
+      continue;
+    }
+    if (!hasSep && /^[\s:：。.、]+$/.test(line)) continue;
+
     line = line.replace(/^[\s#>*\-]*/, '').replace(/^[（(]?\d+[)）.、:：]?\s*/, '').trim();
     if (!line) continue;
     const parts = line.split(/\t+|\s*[|｜]\s*|\s{2,}|\s*[，,;；]\s*/).map((x) => x.trim()).filter(Boolean);
     if (!parts.length) continue;
 
-    const hasCJK = (s) => /[一-鿿]/.test(s);
-    const isLatin = (s) => /^[A-Za-z][A-Za-z'’.\- ]*$/.test(s);
-    const isPinyin = (s) => /^[a-zA-ZüÜāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ\s]+$/.test(s) && !isLatin(s);
+    const hasCJK = (s2) => /[一-鿿]/.test(s2);
+    const isLatin = (s2) => /^[A-Za-z][A-Za-z'’.\- ]*$/.test(s2);
+    const isPinyin = (s2) => /^[a-zA-ZüÜāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ\s]+$/.test(s2) && !isLatin(s2);
 
     let en = '', zh = '', pinyin = '';
     if (parts.length === 1) {
@@ -167,16 +176,18 @@ function parseList(text) {
       else if (hasCJK(a) && hasCJK(b)) { zh = a; }
       else { en = a; zh = b; }
     } else {
-      const [a, b, c] = parts;
-      if (isLatin(a) && hasCJK(b)) { en = a; zh = b; pinyin = c; }
-      else if (hasCJK(a) && (isPinyin(b) || !isLatin(b))) { zh = a; pinyin = b; }
-      else { en = a; zh = b; pinyin = c; }
+      const [a, b] = parts;
+      const rest = parts.slice(1);
+      if (isLatin(a) && hasCJK(b)) { en = a; zh = b; pinyin = parts.slice(2).join(' '); }
+      else if (hasCJK(a) && rest.every(isPinyin)) { zh = a; pinyin = rest.join(' '); }
+      else if (hasCJK(a) && isPinyin(b)) { zh = a; pinyin = rest.join(' '); }
+      else { en = a; zh = b; pinyin = parts.slice(2).join(' '); }
     }
     if (!en && !zh) continue;
     entries.push(normalizeEntry({ en, zh, pinyin }, entries.length));
   }
   if (!entries.length) throw new Error('没有解析出词条，请检查格式');
-  return { meta: {}, entries };
+  return { meta: title ? { title } : {}, entries };
 }
 
 /* ---------- 提示词（交给用户自己的 AI） ---------- */

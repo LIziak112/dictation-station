@@ -241,6 +241,23 @@ async function paddleOcr(buffer, filename, mime) {
   throw new Error('OCR 超时（3 分钟）');
 }
 
+
+/* ---------- 简单限流（保护付费 OCR / TTS） ---------- */
+const rateBuckets = new Map();
+function rateLimited(ip, bucket, limit, windowMs) {
+  const key = `${bucket}:${ip}`;
+  const now = Date.now();
+  const arr = (rateBuckets.get(key) || []).filter((x) => now - x < windowMs);
+  if (arr.length >= limit) { rateBuckets.set(key, arr); return true; }
+  arr.push(now);
+  rateBuckets.set(key, arr);
+  if (rateBuckets.size > 5000) rateBuckets.clear();
+  return false;
+}
+function clientIp(req) {
+  return String(req.headers['x-real-ip'] || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+}
+
 /* ---------- 路由 ---------- */
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://localhost');
@@ -322,6 +339,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (p === '/api/tts' && req.method === 'POST') {
+      if (rateLimited(clientIp(req), 'tts', 900, 3600e3)) return json(res, 429, { error: '语音请求太频繁，请稍后再试' });
       const body = await readJson(req, 2 * 1024 * 1024);
       const items = Array.isArray(body.items) ? body.items.slice(0, 200) : [];
       const out = [];
@@ -341,6 +359,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (p === '/api/ocr' && req.method === 'POST') {
+      if (rateLimited(clientIp(req), 'ocr', 40, 3600e3)) return json(res, 429, { error: 'OCR 调用太频繁，请一小时后再试' });
       const body = await readJson(req, 60 * 1024 * 1024);
       const img = body.image || {};
       if (!img.data) return json(res, 400, { error: '缺少图片数据' });
