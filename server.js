@@ -241,12 +241,12 @@ const server = http.createServer(async (req, res) => {
       const f = path.join(AUDIO, path.basename(p));
       return serveStatic(res, f, 'public, max-age=31536000, immutable');
     }
-    if (req.method === 'GET' && (p === '/app.js' || p === '/style.css' || p === '/favicon.svg')) {
+    if (req.method === 'GET' && (p === '/app.js' || p === '/style.css' || p === '/favicon.svg' || p === '/samples.json')) {
       return serveStatic(res, path.join(PUBLIC, path.basename(p)));
     }
 
     if (p === '/api/health') {
-      return json(res, 200, { ok: true, tts: fileExists(path.join(AUDIO, '.ready')), ts: Date.now() });
+      return json(res, 200, { ok: true, ocr: !!CFG.paddleToken, mineru: !!CFG.mineruToken, zh: CFG.voiceZh, en: CFG.voiceEn, ts: Date.now() });
     }
 
     if (p === '/api/batches' && req.method === 'GET') {

@@ -243,11 +243,13 @@ async function renderHome() {
 
   app.innerHTML = `
     <button class="btn-lg" id="new-batch">＋ 新建听写批次</button>
+    <div id="sample-box"></div>
     <div class="mt"></div>
     ${list}
   `;
 
   $('#new-batch').onclick = () => renderImport();
+  loadSamples();
   $$('.batch-card').forEach((el) => {
     el.onclick = (ev) => {
       if (ev.target.dataset.del) return;
@@ -271,6 +273,31 @@ async function openBatch(id) {
     S.batch = batch;
     renderBatch();
   } catch (e) { toast(e.message); }
+}
+
+
+async function loadSamples() {
+  const box = $('#sample-box');
+  if (!box) return;
+  try {
+    const r = await fetch('samples.json');
+    const samples = await r.json();
+    box.innerHTML = `<div class="card mt"><h2>没有照片？先用示例试试</h2>
+      <p class="sub">点一下直接建批次；词表是示例，不是教材原表</p>
+      <div class="row">${samples.map((x, i) => `<button class="btn-ghost" data-sample="${i}">${esc(x.title)}</button>`).join('')}</div></div>`;
+    $$('#sample-box [data-sample]').forEach((b) => {
+      b.onclick = async () => {
+        b.disabled = true;
+        try {
+          const sample = samples[Number(b.dataset.sample)];
+          const { batch } = await api('api/batches', { method: 'POST', body: JSON.stringify(sample) });
+          S.batch = batch;
+          toast('已创建示例批次');
+          renderBatch();
+        } catch (e) { toast(e.message); b.disabled = false; }
+      };
+    });
+  } catch (_) { box.innerHTML = ''; }
 }
 
 /* ---------- 批次详情 ---------- */
@@ -616,13 +643,17 @@ function speakFallback(text, lang) {
   });
 }
 
+const sharedAudio = new Audio();
+sharedAudio.preload = 'auto';
 function playUrl(url) {
   return new Promise((resolve) => {
-    const a = new Audio(url);
-    a.onended = resolve;
-    a.onerror = resolve;
-    a.play().catch(() => resolve());
-    setTimeout(resolve, 15000);
+    let done = false;
+    const finish = () => { if (!done) { done = true; resolve(); } };
+    sharedAudio.onended = finish;
+    sharedAudio.onerror = finish;
+    sharedAudio.src = url;
+    sharedAudio.play().catch(finish);
+    setTimeout(finish, 15000);
   });
 }
 
@@ -846,12 +877,8 @@ function renderResult() {
   $$('#result-list [data-mark]').forEach((btn) => {
     btn.onclick = () => {
       const i = Number(btn.dataset.i);
+      P.results[i] = btn.dataset.mark === 'ok';
       const row = $(`.result-row[data-i="${i}"]`);
-      const isOk = btn.dataset.mark === 'ok';
-      P.results[i] = isOk;
-      $$('#result-list [data-i="' + i + '"]').forEach((x) => {
-        if (x.classList.contains('mark') || x.tagName === 'BUTTON') return;
-      });
       row.querySelectorAll('.mark button').forEach((x) => x.classList.remove('on'));
       btn.classList.add('on');
     };
