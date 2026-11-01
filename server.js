@@ -170,7 +170,7 @@ function runTts(text, voice, rate, out) {
 function enqueueTts(text, voice, rate) {
   const key = ttsKey(text, voice, rate);
   const out = path.join(AUDIO, key + '.mp3');
-  if (fileExists(out)) return Promise.resolve(`/audio/${key}.mp3`);
+  if (fileExists(out)) return Promise.resolve(`audio/${key}.mp3`);
   return new Promise((resolve, reject) => {
     ttsQueue.push({ text, voice, rate, out, key, resolve, reject });
     pumpTts();
@@ -182,7 +182,7 @@ function pumpTts() {
     const job = ttsQueue.shift();
     ttsRunning++;
     runTts(job.text, job.voice, job.rate, job.out)
-      .then(() => job.resolve(`/audio/${job.key}.mp3`))
+      .then(() => job.resolve(`audio/${job.key}.mp3`))
       .catch(job.reject)
       .finally(() => { ttsRunning--; pumpTts(); });
   }
