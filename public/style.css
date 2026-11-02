@@ -269,7 +269,7 @@ table.words tr.has-issue td { background: #fdf3ee; }
 
 .settings {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 10px;
 }
 .settings label { font-size: 13px; color: var(--muted); }
