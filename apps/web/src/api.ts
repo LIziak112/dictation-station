@@ -44,6 +44,11 @@ export const api = {
       : "chinese";
     const { title, grade, unit, stage, textbook } = draft;
     const payload = { title, grade, unit, stage, textbook, subject, entries };
+    if (draft.sourceDraftId)
+      return request(`api/drafts/${draft.sourceDraftId}/publish`, batchResponseSchema, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
     return draft.batchId
       ? request(`api/batches/${draft.batchId}`, batchResponseSchema, {
           method: "PUT",

@@ -212,6 +212,12 @@ export function Editor({
           返回词表
         </button>
       </div>
+      {draft.reviewNotes && (
+        <section className="notice">
+          <strong>AI 整理待核对</strong>
+          <p>{draft.reviewNotes}</p>
+        </section>
+      )}
       <div role="status" aria-atomic="true" className="feedback">
         {message && (
           <div className="notice">

@@ -8,11 +8,13 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
   type Account,
+  agentValidationInputSchema,
   attemptCompleteSchema,
   audioPreparationSchema,
   correctionSchema,
   credentialsSchema,
   examRequestSchema,
+  exportSchema,
   idSchema,
   manualLearningSchema,
   ocrRequestSchema,
@@ -23,13 +25,16 @@ import {
   taskInputSchema,
   ttsRequestSchema,
 } from "../../../packages/contract/src/index";
+import { validateEntries } from "../../../packages/core/src/import";
 import { projectTask } from "../../../packages/core/src/tasks";
 import { Auth } from "./auth";
+import { Drafts } from "./drafts";
 import { Learning } from "./learning";
 import { Pronunciation } from "./pronunciation";
 import type { OcrInput, TtsInput } from "./providers";
 import { Conflict, type Store } from "./store";
 import { Tasks } from "./tasks";
+import { Tokens } from "./tokens";
 
 interface Options {
   allowRegistration?: boolean;
@@ -42,6 +47,8 @@ interface Options {
 export function createApp(store: Store, options: Options) {
   const app = new Hono<{ Variables: { account: Account } }>();
   const auth = new Auth(store);
+  const tokens = new Tokens(store);
+  const drafts = new Drafts(store);
   const tasks = new Tasks(store);
   const learning = new Learning(store);
   const pronunciation =
@@ -132,6 +139,28 @@ export function createApp(store: Store, options: Options) {
       (!c.req.path.startsWith("/api/") && !c.req.path.startsWith("/audio/"))
     )
       return next();
+    if (c.req.path.startsWith("/api/agent/")) {
+      const actor = tokens.authenticate(
+        (c.req.header("Authorization") ?? "").replace(/^Bearer /, ""),
+      );
+      if (!actor) return c.json({ error: "AI 令牌无效或已过期" }, 401);
+      const path = c.req.path,
+        method = c.req.method;
+      const read = method === "GET" && /^\/api\/agent\/wordlists(?:\/[^/]+)?$/.test(path);
+      const writeDraft =
+        method === "POST" && ["/api/agent/validate", "/api/agent/drafts"].includes(path);
+      const schema = method === "GET" && path === "/api/agent/schema";
+      if (
+        !(
+          schema ||
+          (read && actor.scopes.includes("wordlists:read")) ||
+          (writeDraft && actor.scopes.includes("drafts:write"))
+        )
+      )
+        return c.json({ error: "这个 AI 令牌没有此项权限" }, 403);
+      c.set("account", actor.account);
+      return next();
+    }
     const account = auth.current(getCookie(c, "dictation_session") ?? "");
     if (!account) return c.json({ error: "请先登录" }, 401);
     c.set("account", account);
@@ -283,6 +312,66 @@ export function createApp(store: Store, options: Options) {
     );
     return c.json({ audio });
   });
+  app.get("/api/tokens", (c) => c.json({ tokens: tokens.list(c.get("account").id) }));
+  app.post("/api/tokens", async (c) =>
+    c.json(tokens.create(c.get("account").id, await c.req.json()), 201),
+  );
+  app.delete("/api/tokens/:id", (c) => {
+    tokens.revoke(c.get("account").id, c.req.param("id"));
+    return c.json({ ok: true });
+  });
+  app.get("/api/drafts", (c) => c.json({ drafts: drafts.list(c.get("account").id) }));
+  app.get("/api/drafts/:id", (c) =>
+    c.json({ draft: drafts.get(c.get("account").id, c.req.param("id")) }),
+  );
+  app.delete("/api/drafts/:id", (c) => {
+    drafts.remove(c.get("account").id, c.req.param("id"));
+    return c.json({ ok: true });
+  });
+  app.post("/api/drafts/:id/publish", async (c) =>
+    c.json(
+      { batch: drafts.publish(c.get("account").id, c.req.param("id"), await c.req.json()) },
+      201,
+    ),
+  );
+  app.get("/api/agent/schema", (c) => c.json(z.toJSONSchema(exportSchema, { io: "input" })));
+  app.post("/api/agent/validate", async (c) => {
+    const input = agentValidationInputSchema.parse(await c.req.json());
+    const result = exportSchema.safeParse(input.wordlist);
+    return c.json(
+      result.success
+        ? {
+            valid: true,
+            issues: validateEntries(result.data.entries).map((issue) => ({
+              level: issue.level,
+              path: issue.id,
+              message: issue.message,
+            })),
+          }
+        : {
+            valid: false,
+            issues: result.error.issues.map((issue) => ({
+              level: "error",
+              path: issue.path.join("."),
+              message: issue.message,
+            })),
+          },
+    );
+  });
+  app.get("/api/agent/wordlists", (c) =>
+    c.json({
+      batches: store
+        .list(c.get("account").id)
+        .map(({ entries, ...batch }) => ({ ...batch, count: entries.length })),
+    }),
+  );
+  app.get("/api/agent/wordlists/:id", (c) => {
+    const batch = store.get(c.get("account").id, c.req.param("id"));
+    return batch ? c.json({ batch }) : c.json({ error: "词表不存在" }, 404);
+  });
+  app.post("/api/agent/drafts", async (c) =>
+    c.json({ draft: drafts.create(c.get("account").id, await c.req.json()) }, 201),
+  );
   app.get("/api/preferences", (c) =>
     c.json({ preferences: learning.preferences(c.get("account").id) }),
   );

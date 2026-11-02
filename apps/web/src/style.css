@@ -1059,3 +1059,20 @@ button[aria-disabled="true"] {
   margin: 20px auto;
   padding-inline: 16px;
 }
+
+.plain-fields {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  display: grid;
+  gap: 18px;
+}
+.voice-option {
+  padding-block: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.source-audio-list p,
+.notice p {
+  overflow-wrap: anywhere;
+}

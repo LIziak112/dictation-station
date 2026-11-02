@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Account, Batch, Task } from "../../../packages/contract/src/index";
 import { App } from "./App";
+import { Connections } from "./Connections";
 import { History } from "./History";
 import { Learning } from "./Learning";
 import { ParentGate } from "./ParentGate";
@@ -12,7 +13,15 @@ import { TaskReview } from "./TaskReview";
 import { Today } from "./Today";
 import { taskApi } from "./task-api";
 
-type Panel = "today" | "library" | "compose" | "task" | "review" | "learning" | "history";
+type Panel =
+  | "today"
+  | "library"
+  | "compose"
+  | "task"
+  | "review"
+  | "learning"
+  | "history"
+  | "connections";
 export function Portal({ account, onLogout }: { account: Account; onLogout: () => void }) {
   const [child, setChild] = useState(
     () => localStorage.getItem(localKey("childMode", account.id)) === "true",
@@ -33,7 +42,11 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
         setTaskId(id);
         setPanel("task");
       } else
-        setPanel(!child && (params.has("library") || params.has("batch")) ? "library" : "today");
+        setPanel(
+          !child && (params.has("library") || params.has("batch") || params.has("draft"))
+            ? "library"
+            : "today",
+        );
     };
     route();
     window.addEventListener("hashchange", route);
@@ -82,6 +95,9 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
               </button>
               <button type="button" onClick={() => navigate("history")}>
                 记录
+              </button>
+              <button type="button" onClick={() => navigate("connections")}>
+                AI 连接
               </button>
             </nav>
           )}
@@ -144,6 +160,13 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
         />
       ) : (
         <>
+          {panel === "connections" && !child && (
+            <Connections
+              onDraft={(id) => {
+                if (canLeave()) location.hash = `draft=${id}`;
+              }}
+            />
+          )}
           {panel === "learning" && !child && (
             <Learning
               onPublished={(id) => {

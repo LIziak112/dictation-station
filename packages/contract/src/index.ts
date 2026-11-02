@@ -253,6 +253,8 @@ export const draftSchema = z.strictObject({
   version: z.literal(1),
   batchId: idSchema.optional(),
   revision: z.number().int().positive().optional(),
+  sourceDraftId: idSchema.optional(),
+  reviewNotes: z.string().max(2000).optional(),
   title: text(80),
   grade: text(40),
   unit: text(60),
@@ -457,3 +459,42 @@ export const localAudioEntrySchema = z.strictObject({
   licenseUrl: z.url(),
 });
 export type LocalAudioEntry = z.infer<typeof localAudioEntrySchema>;
+export const tokenScopeSchema = z.enum(["wordlists:read", "drafts:write"]);
+export type TokenScope = z.infer<typeof tokenScopeSchema>;
+export const tokenCreateSchema = z.strictObject({
+  name: z.string().trim().min(1).max(60),
+  scopes: z
+    .array(tokenScopeSchema)
+    .min(1)
+    .max(2)
+    .refine((scopes) => new Set(scopes).size === scopes.length, "权限重复"),
+  expiresInDays: z.number().int().min(1).max(365).default(30),
+});
+export const tokenInfoSchema = z.object({
+  id: idSchema,
+  name: z.string(),
+  scopes: z.array(tokenScopeSchema),
+  createdAt: z.iso.datetime(),
+  expiresAt: z.iso.datetime(),
+});
+export type TokenInfo = z.infer<typeof tokenInfoSchema>;
+export const tokenListSchema = z.object({ tokens: z.array(tokenInfoSchema) });
+export const tokenCreatedSchema = z.object({ token: z.string(), info: tokenInfoSchema });
+export const agentDraftInputSchema = z.strictObject({
+  wordlist: exportSchema,
+  notes: z.string().max(2000).default(""),
+});
+export const serverDraftSchema = agentDraftInputSchema.extend({
+  id: idSchema,
+  createdAt: z.iso.datetime(),
+});
+export type ServerDraft = z.infer<typeof serverDraftSchema>;
+export const serverDraftResponseSchema = z.object({ draft: serverDraftSchema });
+export const serverDraftListSchema = z.object({ drafts: z.array(serverDraftSchema) });
+export const agentValidationInputSchema = z.strictObject({ wordlist: z.unknown() });
+export const agentValidationSchema = z.object({
+  valid: z.boolean(),
+  issues: z.array(
+    z.object({ level: z.enum(["error", "warn"]), path: z.string(), message: z.string() }),
+  ),
+});

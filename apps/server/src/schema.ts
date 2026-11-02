@@ -78,3 +78,19 @@ export const learningStates = sqliteTable(
   },
   (table) => [primaryKey({ columns: [table.accountId, table.wordId, table.mode] })],
 );
+export const apiTokens = sqliteTable("api_tokens", {
+  id: text("id").primaryKey(),
+  accountId: text("account_id")
+    .notNull()
+    .references(() => accounts.id),
+  tokenHash: text("token_hash").notNull().unique(),
+  payload: text("payload").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+});
+export const drafts = sqliteTable("drafts", {
+  id: text("id").primaryKey(),
+  accountId: text("account_id")
+    .notNull()
+    .references(() => accounts.id),
+  payload: text("payload").notNull(),
+});

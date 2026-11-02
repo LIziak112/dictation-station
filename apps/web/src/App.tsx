@@ -11,9 +11,10 @@ import {
   type Progress,
   progressSchema,
   type Settings,
+  serverDraftResponseSchema,
 } from "../../../packages/contract/src/index";
 import { createQueue } from "../../../packages/core/src/player";
-import { api, download } from "./api";
+import { api, download, request } from "./api";
 import { BatchDetail } from "./BatchDetail";
 import { blankDraft, Editor } from "./Editor";
 import { Home } from "./Home";
@@ -98,8 +99,46 @@ export function App({
       active = controller;
       setLoading(true);
       setError("");
-      const id = new URLSearchParams(location.hash.slice(1)).get("batch");
-      if (id) {
+      const params = new URLSearchParams(location.hash.slice(1));
+      const draftId = params.get("draft");
+      const id = params.get("batch");
+      if (draftId) {
+        request(`api/drafts/${encodeURIComponent(draftId)}`, serverDraftResponseSchema, {
+          signal: controller.signal,
+        })
+          .then(({ draft: imported }) => {
+            if (controller.signal.aborted) return;
+            const previous = draftRef.current.draft.value;
+            if (previous && previous.sourceDraftId !== imported.id) {
+              setError("本机还有一份草稿，请先返回词库恢复、保存或导出，再打开 AI 草稿。");
+              return;
+            }
+            if (!previous) {
+              const value = imported.wordlist;
+              if (
+                !draftRef.current.draft.write({
+                  ...blankDraft(),
+                  title: value.title,
+                  grade: value.grade,
+                  unit: value.unit,
+                  stage: value.stage,
+                  textbook: value.textbook,
+                  entries: value.entries,
+                  sourceDraftId: imported.id,
+                  reviewNotes: imported.notes,
+                })
+              )
+                return;
+            }
+            setView("editor");
+          })
+          .catch((e: Error) => {
+            if (!controller.signal.aborted) setError(e.message);
+          })
+          .finally(() => {
+            if (!controller.signal.aborted) setLoading(false);
+          });
+      } else if (id) {
         api
           .batch(id, controller.signal)
           .then(({ batch: b }) => {
