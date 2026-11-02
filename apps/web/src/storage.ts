@@ -6,8 +6,9 @@ export function readLocal<T>(
   key: string,
   schema: z.ZodType<T>,
 ): { value: T | null; error: string; raw: string | null } {
+  let raw: string | null = null;
   try {
-    const raw = localStorage.getItem(key);
+    raw = localStorage.getItem(key);
     if (raw === null) return { value: null, error: "", raw: null };
     const result = schema.safeParse(JSON.parse(raw));
     if (!result.success)
@@ -20,8 +21,11 @@ export function readLocal<T>(
   } catch {
     return {
       value: null,
-      error: "本机记录读取失败。请检查浏览器存储权限，原数据不会被覆盖。",
-      raw: null,
+      error:
+        raw === null
+          ? "本机记录读取失败。请检查浏览器存储权限，原数据不会被覆盖。"
+          : "本机记录格式无法读取，已保留原数据。请先导出备份，再显式清理。",
+      raw,
     };
   }
 }

@@ -250,7 +250,8 @@ export function App() {
             <div className="row">
               <button
                 type="button"
-                onClick={() => download("本机草稿备份.json", draft.raw ?? draft.value)}
+                disabled={draft.value === null && draft.raw === null}
+                onClick={() => download("本机草稿备份.json", draft.value ?? draft.raw)}
               >
                 导出本机稿
               </button>
@@ -274,7 +275,8 @@ export function App() {
             <div className="row">
               <button
                 type="button"
-                onClick={() => download("听写进度备份.json", progress.raw ?? progress.value)}
+                disabled={progress.value === null && progress.raw === null}
+                onClick={() => download("听写进度备份.json", progress.value ?? progress.raw)}
               >
                 导出进度备份
               </button>

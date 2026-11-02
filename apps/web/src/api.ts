@@ -77,7 +77,9 @@ export const api = {
 };
 export function download(name: string, value: unknown) {
   const url = URL.createObjectURL(
-    new Blob([JSON.stringify(value, null, 2)], { type: "application/json" }),
+    new Blob([typeof value === "string" ? value : JSON.stringify(value, null, 2)], {
+      type: "application/json",
+    }),
   );
   const a = document.createElement("a");
   a.href = url;

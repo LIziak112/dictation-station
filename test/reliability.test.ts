@@ -7,6 +7,12 @@ import { mergeReview } from "../packages/core/src/review";
 
 afterEach(() => vi.unstubAllGlobals());
 describe("内容与本机稿边界", () => {
+  it("损坏 JSON 仍保留原始字符串用于备份，不导出空值", () => {
+    vi.stubGlobal("localStorage", { getItem: () => "{broken", setItem: vi.fn() });
+    const result = readLocal("draft", draftSchema);
+    expect(result.error).toBeTruthy();
+    expect(result.raw).toBe("{broken");
+  });
   it("逐字输入英文短语与拼音时保留中间的空格", () => {
     let entry = normalizeEntry({ zh: "照顾" }, 0);
     for (const c of "look after") entry = editEntry(entry, "en", entry.en + c);

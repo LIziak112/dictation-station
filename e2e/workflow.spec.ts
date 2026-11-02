@@ -1,4 +1,6 @@
+import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
+import { exportSchema } from "../packages/contract/src/index";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -82,7 +84,12 @@ test("子路径完整流程：导入、草稿恢复、编辑、分享、播放�
   await page.getByText("02 / 词表预览与导出", { exact: true }).click();
   const downloaded = page.waitForEvent("download");
   await page.getByRole("button", { name: "导出词表 JSON" }).click();
-  expect((await downloaded).suggestedFilename()).toBe(`${title} 已修改.json`);
+  const exported = await downloaded;
+  expect(exported.suggestedFilename()).toMatch(/\.json$/);
+  const exportedPath = await exported.path();
+  const content = exportSchema.parse(JSON.parse(await readFile(exportedPath ?? "", "utf8")));
+  expect(content.title).toBe(`${title} 已修改`);
+  expect(content.entries).toHaveLength(2);
   await expect(page.getByRole("button", { name: "管理口令" })).toHaveCount(0);
   expect(errors).toEqual([]);
   expect(external).toEqual([]);
@@ -111,6 +118,11 @@ test("320px、桌面与键盘；坏本机稿不会被空稿覆盖", async ({ pag
       localStorage.getItem(`ownclass:dictation:${location.pathname}:draft`),
     ),
   ).toContain("keep me");
+  const backup = page.waitForEvent("download");
+  await page.getByRole("button", { name: "导出本机稿", exact: true }).click();
+  const file = await (await backup).path();
+  expect(file).toBeTruthy();
+  expect(await readFile(file ?? "", "utf8")).toBe('{"version":999,"words":"keep me"}');
   await page.keyboard.press("Tab");
   expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe("BODY");
 });
