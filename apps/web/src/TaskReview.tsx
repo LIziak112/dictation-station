@@ -99,6 +99,31 @@ function ReviewSession({
         </button>
       </div>
       {message && <p role="alert">{message}</p>}
+      {!!task.audio.length && (
+        <section className="panel">
+          <details>
+            <summary>本次发音来源</summary>
+            {task.audio.map((voice) => (
+              <p key={voice.wordId}>
+                {voice.text} · {voice.source}
+                {voice.kind === "human" && (
+                  <>
+                    {" "}
+                    · {voice.author} ·{" "}
+                    <a href={voice.sourceUrl} target="_blank" rel="noreferrer">
+                      来源
+                    </a>{" "}
+                    ·{" "}
+                    <a href={voice.licenseUrl} target="_blank" rel="noreferrer">
+                      {voice.licenseName}
+                    </a>
+                  </>
+                )}
+              </p>
+            ))}
+          </details>
+        </section>
+      )}
       {local.error && <p role="alert">{local.error}</p>}
       {local.value && (
         <div className="notice">

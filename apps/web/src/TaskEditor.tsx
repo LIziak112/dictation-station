@@ -57,7 +57,7 @@ export function TaskEditor({
           mode: initialBatch?.entries.some((e) => e.modes.includes("en2en"))
             ? "en2en"
             : "zh_dictation",
-          settings: { repeat: 2, interval: 4, speed: 1, auto: false, shuffle: false },
+          settings: { accent: "us", repeat: 2, interval: 4, speed: 1, auto: false, shuffle: false },
           wordIds: [],
           reviewOnly: false,
           selections: initialBatch
@@ -373,6 +373,20 @@ export function TaskEditor({
           <details>
             <summary>播放设置</summary>
             <div className="form-grid">
+              <label className="field">
+                英语口音
+                <select
+                  value={input.settings.accent}
+                  onChange={(e) =>
+                    patch({
+                      settings: { ...input.settings, accent: e.target.value as "us" | "uk" },
+                    })
+                  }
+                >
+                  <option value="us">美音</option>
+                  <option value="uk">英音</option>
+                </select>
+              </label>
               <label className="check">
                 <input
                   type="checkbox"

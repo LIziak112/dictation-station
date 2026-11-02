@@ -134,7 +134,7 @@ export class Learning {
       .where(eq(attempts.accountId, accountId))
       .all()
       .map((row) => {
-        const { items, ...task } = taskSchema.parse(JSON.parse(row.task));
+        const { items, audio: _audio, ...task } = taskSchema.parse(JSON.parse(row.task));
         return {
           task: {
             ...task,

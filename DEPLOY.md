@@ -74,3 +74,33 @@ CLI 不提供账号查询或创建服务；用户名必须已存在，重设后�
 - 不承诺断网刷新后整个应用离线打开；草稿和进度在网络恢复后仍可读取。原图不在服务器或本机持久化。
 - 验证注册开关、登录、退出、修改密码、不同账号隔离，以及 OCR／服务器语音关闭或失败。
 - 尚无自动音频清理或定时备份，需要监控 data 容量。
+
+## 真人发音
+
+默认 PUBLIC_DICTIONARY=true，英文通过 Free Dictionary API 定位 Wikimedia Commons 录音，中文以已确认的带调拼音定位同一录音库。只接受有作者／来源与可用 Creative Commons 许可的录音；不使用词典失效的中转音频。可关闭公开查询，仅用自己的词书索引与合成兜底。
+
+WORD_AUDIO_DIR 指向可选本地词书目录，index.json 为数组，示例（示例并不附带音频）：
+
+```json
+[
+  {
+    "id": "music-zh",
+    "text": "音乐",
+    "lang": "zh",
+    "accent": "zh",
+    "reading": "yīn yuè",
+    "file": "music.mp3",
+    "source": "自己的获准词书",
+    "sourceUrl": "https://example.org/book",
+    "author": "实际录音作者",
+    "licenseName": "实际使用许可",
+    "licenseUrl": "https://example.org/license"
+  }
+]
+```
+
+文件名只使用字母、数字、短横线、下划线，格式为 mp3／ogg／wav，不支持任意路径和用户上传。文件与许可由部署者提供，不把未获准资源加入仓库。
+
+合成兜底仍可选启用 ENABLE_SERVER_TTS；英音使用 VOICE_EN_UK，美音使用 VOICE_EN。每项显示实际采用的真人／服务端／设备来源。准备阶段下载到浏览器并检查解码，不能解码的格式改为合成；设备 TTS 只能检查 API 能力，不能提前保证每个词都能正确发声。指定读音未命中时需家长试听确认。
+
+公开网络与录音覆盖会变化，不承诺每词真人或移动端后台播放。来源实测见 SOURCES.md 与 docs/音频验证记录.md。

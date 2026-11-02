@@ -70,6 +70,21 @@
             "type": "string",
             "maxLength": 120
           },
+          "readings": {
+            "type": "object",
+            "properties": {
+              "en": {
+                "default": "",
+                "type": "string",
+                "maxLength": 120
+              },
+              "zh": {
+                "default": "",
+                "type": "string",
+                "maxLength": 120
+              }
+            }
+          },
           "en": {
             "type": "string",
             "maxLength": 300

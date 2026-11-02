@@ -13,7 +13,7 @@ export function createQueue(entries: Entry[], mode: Mode) {
     }));
 }
 export interface AudioDriver {
-  speak(text: string, lang: "en" | "zh", speed: number): Promise<void>;
+  speak(text: string, lang: "en" | "zh", speed: number, audioKey?: string): Promise<void>;
   cancel(): void;
 }
 export class Playback {
@@ -29,7 +29,7 @@ export class Playback {
     this.state(false);
   }
   async play(
-    queue: { audioText: string; lang: "en" | "zh" | null }[],
+    queue: { audioText: string; lang: "en" | "zh" | null; audioKey?: string }[],
     start: number,
     settings: Settings,
     onIndex: (index: number) => unknown,
@@ -46,7 +46,7 @@ export class Playback {
         if (index !== start) await onIndex(index);
         for (let n = 0; n < settings.repeat; n++) {
           if (!active()) return;
-          if (q.lang) await this.driver.speak(q.audioText, q.lang, settings.speed);
+          if (q.lang) await this.driver.speak(q.audioText, q.lang, settings.speed, q.audioKey);
           if (!active()) return;
           if (n < settings.repeat - 1) await this.wait(320);
         }

@@ -6,12 +6,15 @@ import {
   attemptSchema,
   attemptUpdateSchema,
   entrySchema,
+  MODES,
   type Task,
+  type TaskAudio,
   taskInputSchema,
   taskSchema,
 } from "../../../packages/contract/src/index";
 import { interleaveReview } from "../../../packages/core/src/scheduling";
 import { Learning } from "./learning";
+import type { Pronunciation } from "./pronunciation";
 import { attempts, tasks, words } from "./schema";
 import { Conflict, type Store } from "./store";
 
@@ -175,7 +178,12 @@ export class Tasks {
       if (active) return active;
       if (onlyHomework && task.status !== "pending")
         throw new HTTPException(400, { message: "已经开始的任务请复制后调整范围" });
-      if (onlyHomework) task.items = task.items.filter((item) => item.source === "homework");
+      if (onlyHomework) {
+        task.items = task.items.filter((item) => item.source === "homework");
+        task.audio = task.audio.filter((voice) =>
+          task.items.some((item) => item.wordId === voice.wordId),
+        );
+      }
       if (!task.items.length) throw new HTTPException(400, { message: "任务没有可练内容" });
       this.write(accountId, { ...task, status: "in_progress", revision: task.revision + 1 });
       const attempt: Attempt = {
@@ -257,6 +265,51 @@ export class Tasks {
       };
       this.writeAttempt(accountId, next);
       return next;
+    });
+  }
+  async prepareAudio(
+    accountId: string,
+    taskId: string,
+    provider: Pronunciation,
+    fallbackIds: string[],
+  ) {
+    const task = this.require(accountId, taskId);
+    if (task.status !== "pending") return task.audio;
+    const mode = MODES[task.mode],
+      audio: TaskAudio[] = [];
+    if (!mode.audio) return audio;
+    const lang = mode.audio;
+    for (let offset = 0; offset < task.items.length; offset += 3) {
+      const group = await Promise.all(
+        task.items.slice(offset, offset + 3).map(async ({ entry, wordId }) => {
+          const previous = task.audio.find((voice) => voice.wordId === wordId);
+          if (fallbackIds.length && !fallbackIds.includes(wordId) && previous) return previous;
+          return {
+            ...(await provider.prepare(
+              {
+                text: entry[lang],
+                lang,
+                accent: task.settings.accent,
+                reading: entry.readings[lang] || entry.reading,
+                pinyin: lang === "zh" ? entry.pinyin : undefined,
+              },
+              fallbackIds.includes(wordId),
+            )),
+            wordId,
+            text: entry[lang],
+            lang,
+          };
+        }),
+      );
+      audio.push(...group);
+    }
+    return this.store.db.transaction(() => {
+      const current = this.require(accountId, taskId);
+      if (current.revision !== task.revision) throw new Conflict();
+      this.write(accountId, { ...current, audio, revision: current.revision + 1 });
+      for (const voice of audio)
+        if (voice.url) this.store.grantAudio(accountId, voice.url.slice("audio/".length));
+      return audio;
     });
   }
 }

@@ -30,6 +30,7 @@ export default defineConfig({
       ALLOW_REGISTRATION: "true",
       PADDLEOCR_TOKEN: "",
       ENABLE_SERVER_TTS: "false",
+      PUBLIC_DICTIONARY: "false",
       HOST: "127.0.0.1",
     },
   },

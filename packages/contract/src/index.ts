@@ -49,6 +49,7 @@ const entryInputSchema = z.strictObject({
   wordId: idSchema.optional(),
   kind: z.enum(["character", "word", "phrase", "sentence"]).optional(),
   reading: text(120).optional(),
+  readings: z.object({ en: text(120).default(""), zh: text(120).default("") }).optional(),
   en: text(300).optional(),
   zh: text(300).optional(),
   pinyin: text(300).optional(),
@@ -65,6 +66,7 @@ export function normalizeEntry(value: unknown, index: number) {
     wordId: e.wordId,
     kind: e.kind ?? "word",
     reading: e.reading ?? "",
+    readings: e.readings ?? { en: "", zh: "" },
     en: e.en ?? "",
     zh: e.zh ?? "",
     pinyin: e.pinyin ?? "",
@@ -153,6 +155,7 @@ export const updateSchema = z.strictObject({
 });
 export const exportSchema = z.strictObject(batchFields);
 export const ttsItemSchema = z.strictObject({
+  accent: z.enum(["us", "uk"]).default("us"),
   text: text(300).min(1),
   lang: z.enum(["en", "zh"]),
   rate: z
@@ -208,6 +211,7 @@ export const passwordVerificationSchema = z.strictObject({
   password: credentialsSchema.shape.password,
 });
 export const settingsSchema = z.strictObject({
+  accent: z.enum(["us", "uk"]).default("us"),
   repeat: z.number().int().min(1).max(5),
   interval: z.number().min(1).max(30),
   speed: z.number().min(0.5).max(2),
@@ -216,6 +220,7 @@ export const settingsSchema = z.strictObject({
 });
 export type Settings = z.infer<typeof settingsSchema>;
 export const defaultSettings: Settings = {
+  accent: "us",
   repeat: 2,
   interval: 4,
   speed: 1,
@@ -289,10 +294,11 @@ export const taskSchema = z.object({
   status: z.enum(["pending", "in_progress", "completed"]),
   revision: z.number().int().positive(),
   createdAt: z.iso.datetime(),
+  audio: z.array(z.lazy(() => taskAudioSchema)).default([]),
 });
 export type Task = z.infer<typeof taskSchema>;
 export const taskSummarySchema = taskSchema
-  .omit({ items: true })
+  .omit({ items: true, audio: true })
   .extend({ count: z.number(), reviewCount: z.number() });
 export type TaskSummary = z.infer<typeof taskSummarySchema>;
 export const taskListSchema = z.object({ tasks: z.array(taskSummarySchema) });
@@ -316,9 +322,11 @@ export type AttemptUpdate = z.infer<typeof attemptUpdateSchema>;
 export const attemptResponseSchema = z.object({ attempt: attemptSchema });
 export const taskPlaySchema = taskSummarySchema.omit({ count: true, reviewCount: true }).extend({
   homeworkCount: z.number().int().nonnegative(),
+  audio: z.array(z.lazy(() => taskAudioSchema)).default([]),
   items: z.array(
     z.object({
       wordId: idSchema,
+      audioKey: idSchema,
       prompt: z.string(),
       audioText: z.string(),
       lang: z.enum(["en", "zh"]).nullable(),
@@ -400,3 +408,52 @@ export const manualLearningSchema = z.strictObject({
   mode: modeSchema,
   status: z.enum(["pending", "mastered"]),
 });
+export const pronunciationInputSchema = z.strictObject({
+  pinyin: z.string().max(300).optional(),
+  text: z.string().trim().min(1).max(300),
+  lang: z.enum(["en", "zh"]),
+  accent: z.enum(["us", "uk"]).default("us"),
+  reading: z.string().max(120).default(""),
+});
+export type PronunciationInput = z.infer<typeof pronunciationInputSchema>;
+export const voiceSchema = z.object({
+  id: z.string(),
+  kind: z.enum(["human", "server", "device", "unavailable"]),
+  url: z.string().nullable(),
+  source: z.string(),
+  sourceUrl: z.string(),
+  author: z.string(),
+  licenseName: z.string(),
+  licenseUrl: z.string(),
+  title: z.string(),
+  reading: z.string(),
+  accent: z.string(),
+  warning: z.string(),
+});
+export type Voice = z.infer<typeof voiceSchema>;
+export const taskAudioSchema = voiceSchema.extend({
+  wordId: idSchema,
+  text: z.string(),
+  lang: z.enum(["en", "zh"]),
+});
+export type TaskAudio = z.infer<typeof taskAudioSchema>;
+export const voicesResponseSchema = z.object({ voices: z.array(voiceSchema) });
+export const voiceResponseSchema = z.object({ voice: voiceSchema });
+export const audioManifestSchema = z.object({ audio: z.array(taskAudioSchema) });
+export const audioPreparationSchema = z.strictObject({
+  fallbackIds: z.array(idSchema).max(500).default([]),
+});
+export const localAudioEntrySchema = z.strictObject({
+  id: z.string().min(1).max(120),
+  text: z.string().min(1).max(300),
+  lang: z.enum(["en", "zh"]),
+  accent: z.enum(["us", "uk", "zh"]),
+  reading: z.string().max(120),
+  file: z.string().regex(/^[A-Za-z0-9_-]+\.(?:mp3|ogg|wav)$/),
+  source: z.string().min(1),
+  sourceUrl: z.url(),
+  author: z.string().min(1),
+  licenseName: z.string().min(1),
+  licenseUrl: z.url(),
+});
+export type LocalAudioEntry = z.infer<typeof localAudioEntrySchema>;

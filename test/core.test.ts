@@ -88,7 +88,7 @@ describe("播放生命周期", () => {
     const pending = player.play(
       queue,
       0,
-      { repeat: 1, interval: 0, speed: 1, auto: true, shuffle: false },
+      { accent: "us", repeat: 1, interval: 0, speed: 1, auto: true, shuffle: false },
       () => {},
     );
     player.stop();
@@ -116,7 +116,7 @@ describe("播放生命周期", () => {
     await player.play(
       createQueue(entries, "zh_dictation"),
       0,
-      { repeat: 2, interval: 0, speed: 1, auto: true, shuffle: false },
+      { accent: "us", repeat: 2, interval: 0, speed: 1, auto: true, shuffle: false },
       (i) => changes.push(i),
     );
     expect(spoken).toEqual(["太阳", "太阳", "月亮", "月亮"]);
@@ -124,7 +124,7 @@ describe("播放生命周期", () => {
     await player.play(
       createQueue(entries, "pinyin2hanzi"),
       0,
-      { repeat: 1, interval: 0, speed: 1, auto: true, shuffle: false },
+      { accent: "us", repeat: 1, interval: 0, speed: 1, auto: true, shuffle: false },
       () => {},
     );
     expect(spoken).toHaveLength(4);

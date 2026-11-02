@@ -6,6 +6,7 @@ import {
   type TaskPlayResponse,
 } from "../../../packages/contract/src/index";
 import { Playback } from "../../../packages/core/src/player";
+import { AudioPreparation, type PreparedAudio } from "./AudioPreparation";
 import { download } from "./api";
 import { BrowserAudio } from "./audio";
 import { localKey, useLocal, useUnsavedProtection } from "./storage";
@@ -16,13 +17,17 @@ export function TaskPlayer({
   accountId,
   onReview,
   onBack,
+  child,
 }: {
+  child: boolean;
   taskId: string;
   accountId: string;
   onReview: (id: string) => void;
   onBack: () => void;
 }) {
   const [data, setData] = useState<TaskPlayResponse | null>(null);
+  const [prepared, setPrepared] = useState<PreparedAudio | null>(null);
+  const [confirmedVoice, setConfirmedVoice] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const dirty = useRef(false);
@@ -65,13 +70,32 @@ export function TaskPlayer({
         </button>
       </div>
       {message && <p role="alert">{message}</p>}
+      <AudioPreparation
+        key={data.task.id}
+        task={data.task}
+        compact={child}
+        onPrepared={setPrepared}
+      />
+      {prepared?.needsConfirmation && <p role="alert">有指定读音未命中，请家长试听并确认兜底。</p>}
+      {!child && prepared?.needsConfirmation && (
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={confirmedVoice}
+            onChange={(e) => setConfirmedVoice(e.target.checked)}
+          />
+          我已试听并确认本次兜底发音
+        </label>
+      )}
       {!data.attempt || data.attempt.completedAt ? (
         <section className="panel">
           <p>{data.task.items.length} 项，准备好纸笔。</p>
           <div className="row">
             <button
               className="primary"
-              disabled={busy}
+              disabled={
+                busy || !prepared?.ready || (!!prepared?.needsConfirmation && !confirmedVoice)
+              }
               type="button"
               onClick={async () => {
                 setBusy(true);
@@ -90,7 +114,9 @@ export function TaskPlayer({
             {!data.attempt && data.task.homeworkCount > 0 && (
               <button
                 type="button"
-                disabled={busy}
+                disabled={
+                  busy || !prepared?.ready || (!!prepared?.needsConfirmation && !confirmedVoice)
+                }
                 onClick={async () => {
                   setBusy(true);
                   try {
@@ -113,10 +139,11 @@ export function TaskPlayer({
             )}
           </div>
         </section>
-      ) : (
+      ) : prepared?.ready ? (
         <TaskSession
           key={data.attempt.id}
           task={data.task}
+          clips={prepared.clips}
           attempt={data.attempt}
           accountId={accountId}
           onSaved={(attempt) =>
@@ -128,12 +155,15 @@ export function TaskPlayer({
           }}
           onReload={async () => setData(await taskApi.play(taskId))}
         />
+      ) : (
+        <p role="status">声音准备好后即可继续。</p>
       )}
     </main>
   );
 }
 
 function TaskSession({
+  clips,
   task,
   attempt,
   accountId,
@@ -142,6 +172,7 @@ function TaskSession({
   onDirty,
   onReload,
 }: {
+  clips: PreparedAudio["clips"];
   task: TaskPlay;
   attempt: Attempt;
   accountId: string;
@@ -150,6 +181,7 @@ function TaskSession({
   onDirty: (value: boolean) => void;
   onReload: () => Promise<void>;
 }) {
+  const initialAudio = useRef({ clips, accent: task.settings.accent });
   const local = useLocal(localKey(`attempt:${attempt.id}`, accountId), attemptSchema);
   const current = local.value ?? attempt;
   const latest = useRef(current);
@@ -163,7 +195,9 @@ function TaskSession({
     onDirty(!!local.value || busy);
   }, [local.value, busy, onDirty]);
   useEffect(() => {
-    const audio = new BrowserAudio();
+    const audio = new BrowserAudio(initialAudio.current.accent);
+    for (const clip of initialAudio.current.clips)
+      audio.cache(clip.audio.text, clip.audio.lang, clip.blob, clip.audio.wordId);
     const player = new Playback(audio, (value, error) => {
       setPlaying(value);
       if (error) setMessage(error);
@@ -223,8 +257,12 @@ function TaskSession({
             disabled={busy}
             onClick={async () => {
               if (confirm("放弃本机尚未同步的进度，重新载入服务端？建议先导出备份。")) {
-                await onReload();
-                local.reset();
+                try {
+                  await onReload();
+                  local.reset();
+                } catch (e) {
+                  setMessage(e instanceof Error ? e.message : "重新载入失败，请重试");
+                }
               }
             }}
           >

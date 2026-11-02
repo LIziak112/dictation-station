@@ -4,6 +4,7 @@ import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { createApp } from "./app";
+import { Pronunciation } from "./pronunciation";
 import { createTts, paddleOcr } from "./providers";
 import { Store } from "./store";
 
@@ -14,11 +15,20 @@ const rawBase = process.env.BASE_PATH ?? "/";
 if (!/^\/(?:[A-Za-z0-9_-]+\/)*$/.test(rawBase))
   throw new Error("BASE_PATH 必须为 / 或 /tingxie/ 形式");
 const base = rawBase === "/" ? "" : rawBase.slice(0, -1);
+const tts =
+  process.env.ENABLE_SERVER_TTS === "true" ? createTts(resolve(data, "audio")) : undefined;
+const pronunciation = new Pronunciation({
+  dir: resolve(data, "audio"),
+  publicDictionary: process.env.PUBLIC_DICTIONARY !== "false",
+  localDirectory: process.env.WORD_AUDIO_DIR,
+  tts,
+});
 const api = createApp(store, {
+  pronunciation,
   allowRegistration: process.env.ALLOW_REGISTRATION !== "false",
   trustProxy: process.env.TRUST_PROXY === "true",
   ocr: process.env.PADDLEOCR_TOKEN ? paddleOcr : undefined,
-  tts: process.env.ENABLE_SERVER_TTS === "true" ? createTts(resolve(data, "audio")) : undefined,
+  tts,
 });
 const app = new Hono();
 api.get("*", serveStatic({ root: "dist/web" }));

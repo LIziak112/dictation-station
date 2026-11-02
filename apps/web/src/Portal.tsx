@@ -242,7 +242,9 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
           )}
           {panel === "task" && (
             <TaskPlayer
+              key={taskId}
               taskId={taskId}
+              child={child}
               accountId={account.id}
               onReview={(id) => {
                 if (!canLeave()) return;

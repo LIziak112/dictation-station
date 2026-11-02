@@ -15,8 +15,10 @@ import {
   parseList,
   validateEntries,
 } from "../../../packages/core/src/import";
+import { loadAudio } from "./AudioPreparation";
 import { api, download } from "./api";
 import { BrowserAudio } from "./audio";
+import { VoicePicker } from "./VoicePicker";
 
 export function blankDraft(batch?: Batch): Draft {
   return batch
@@ -468,6 +470,23 @@ export function Editor({
                     </label>
                   ))}
                 </div>
+                <VoicePicker
+                  entry={e}
+                  onSelect={(lang, reading) =>
+                    patch({
+                      entries: entries.map((x) =>
+                        x.id === e.id ? { ...x, readings: { ...x.readings, [lang]: reading } } : x,
+                      ),
+                    })
+                  }
+                  onPreview={async (lang, accent, voice) => {
+                    const blob = voice.url ? await loadAudio(voice.url) : null;
+                    if (!mounted.current) return;
+                    audio.current?.setAccent(accent);
+                    if (blob) audio.current?.cache(e[lang], lang, blob);
+                    await audio.current?.speak(e[lang], lang, 1);
+                  }}
+                />
                 <div className="row">
                   <button
                     type="button"

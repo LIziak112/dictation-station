@@ -16,9 +16,17 @@ export function selectRange<T>(items: T[], range: string): T[] {
 export function contentKey(entry: Entry) {
   const normalize = (value: string) => value.normalize("NFKC").trim().replace(/\s+/g, " ");
   return JSON.stringify(
-    [entry.kind, entry.en, entry.zh, entry.pinyin, entry.hint, entry.reading, ...entry.alt].map(
-      normalize,
-    ),
+    [
+      entry.kind,
+      entry.en,
+      entry.zh,
+      entry.pinyin,
+      entry.hint,
+      entry.reading,
+      entry.readings.en,
+      entry.readings.zh,
+      ...entry.alt,
+    ].map(normalize),
   );
 }
 export function projectTask(task: Task) {
@@ -29,11 +37,12 @@ export function projectTask(task: Task) {
     homeworkCount: items.filter((item) => item.source === "homework").length,
     items: items.map(({ wordId, entry }) => ({
       wordId,
+      audioKey: wordId,
       prompt: mode.show ? entry[mode.show] : "",
       audioText: mode.audio ? entry[mode.audio] : "",
       lang: mode.audio,
       kind: entry.kind,
-      reading: entry.reading,
+      reading: mode.audio ? entry.readings[mode.audio] || entry.reading : "",
     })),
   };
 }

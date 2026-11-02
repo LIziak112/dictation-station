@@ -29,7 +29,7 @@ it("服务器语音显式启用，同请求合并且完成后才发布缓存", a
     return child;
   });
   const tts = createTts(dir);
-  const item = { text: "sun", lang: "en" as const, rate: "+0%" };
+  const item = { accent: "us" as const, text: "sun", lang: "en" as const, rate: "+0%" };
   const one = tts(item);
   const two = tts(item);
   expect(spawn).toHaveBeenCalledTimes(1);
@@ -45,6 +45,8 @@ it("服务器语音显式启用，同请求合并且完成后才发布缓存", a
 it("关闭服务器语音时不启动 Python，也不请求外部服务", async () => {
   vi.stubEnv("ENABLE_SERVER_TTS", "false");
   const tts = createTts(mkdtempSync(join(tmpdir(), "dictation-audio-")));
-  await expect(tts({ text: "sun", lang: "en", rate: "+0%" })).rejects.toThrow("未启用");
+  await expect(tts({ accent: "us", text: "sun", lang: "en", rate: "+0%" })).rejects.toThrow(
+    "未启用",
+  );
   expect(spawn).not.toHaveBeenCalled();
 });

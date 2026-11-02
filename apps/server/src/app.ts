@@ -9,6 +9,7 @@ import { z } from "zod";
 import {
   type Account,
   attemptCompleteSchema,
+  audioPreparationSchema,
   correctionSchema,
   credentialsSchema,
   examRequestSchema,
@@ -17,6 +18,7 @@ import {
   ocrRequestSchema,
   passwordChangeSchema,
   passwordVerificationSchema,
+  pronunciationInputSchema,
   startTaskSchema,
   taskInputSchema,
   ttsRequestSchema,
@@ -24,12 +26,14 @@ import {
 import { projectTask } from "../../../packages/core/src/tasks";
 import { Auth } from "./auth";
 import { Learning } from "./learning";
+import { Pronunciation } from "./pronunciation";
 import type { OcrInput, TtsInput } from "./providers";
 import { Conflict, type Store } from "./store";
 import { Tasks } from "./tasks";
 
 interface Options {
   allowRegistration?: boolean;
+  pronunciation?: Pronunciation;
   audioDir?: string;
   ocr?: (image: OcrInput) => Promise<string>;
   tts?: (item: TtsInput) => Promise<string>;
@@ -40,6 +44,13 @@ export function createApp(store: Store, options: Options) {
   const auth = new Auth(store);
   const tasks = new Tasks(store);
   const learning = new Learning(store);
+  const pronunciation =
+    options.pronunciation ??
+    new Pronunciation({
+      dir: options.audioDir ?? resolve(store.dir, "audio"),
+      publicDictionary: false,
+      tts: options.tts,
+    });
   const buckets = new Map<string, { count: number; expires: number }>();
   function limited(key: string, limit: number, ms: number) {
     const now = Date.now();
@@ -175,7 +186,7 @@ export function createApp(store: Store, options: Options) {
   });
   app.use("/audio/:file", async (c, next) => {
     const file = c.req.param("file");
-    if (!/^[a-f0-9]{40}\.mp3$/.test(file) || !store.hasAudio(c.get("account").id, file))
+    if (!/^[a-f0-9]{40}\.(?:mp3|ogg|wav)$/.test(file) || !store.hasAudio(c.get("account").id, file))
       return c.notFound();
     return serveStatic({
       root: options.audioDir ?? resolve(store.dir, "audio"),
@@ -248,6 +259,30 @@ export function createApp(store: Store, options: Options) {
     }
     return c.json({ items: result });
   });
+  app.post("/api/pronunciation/options", async (c) => {
+    const input = pronunciationInputSchema.parse(await c.req.json());
+    try {
+      return c.json({ voices: await pronunciation.voices(input) });
+    } catch {
+      return c.json({ error: "词典暂不可用，请稍后重试" }, 502);
+    }
+  });
+  app.post("/api/pronunciation/preview", async (c) => {
+    const input = pronunciationInputSchema.parse(await c.req.json());
+    const voice = await pronunciation.prepare(input);
+    if (voice.url) store.grantAudio(c.get("account").id, voice.url.slice("audio/".length));
+    return c.json({ voice });
+  });
+  app.post("/api/tasks/:id/audio", async (c) => {
+    const input = audioPreparationSchema.parse(await c.req.json());
+    const audio = await tasks.prepareAudio(
+      c.get("account").id,
+      c.req.param("id"),
+      pronunciation,
+      input.fallbackIds,
+    );
+    return c.json({ audio });
+  });
   app.get("/api/preferences", (c) =>
     c.json({ preferences: learning.preferences(c.get("account").id) }),
   );
@@ -278,7 +313,7 @@ export function createApp(store: Store, options: Options) {
   });
   app.get("/api/tasks", (c) =>
     c.json({
-      tasks: tasks.list(c.get("account").id).map(({ items, ...task }) => ({
+      tasks: tasks.list(c.get("account").id).map(({ items, audio: _audio, ...task }) => ({
         ...task,
         count: items.length,
         reviewCount: items.filter((item) => item.source === "review").length,
