@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -127,7 +127,6 @@ describe("接口契约与边界", () => {
       ocr: async () => "sun 太阳",
       tts: async () => `audio/${file}`,
     });
-    mkdirSync(join(store.dir, "audio"));
     writeFileSync(join(store.dir, "audio", file), "synthetic audio");
     expect((await req(`/audio/${file}`)).status).toBe(404);
     expect((await req("/api/tts", "POST", { items: [{ text: "sun", lang: "en" }] })).status).toBe(
