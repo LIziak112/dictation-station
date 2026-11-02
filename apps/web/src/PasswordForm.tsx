@@ -5,9 +5,11 @@ import { request } from "./api";
 export function PasswordForm({
   onChanged,
   disabled,
+  beforeChange,
 }: {
   onChanged: () => void;
   disabled: boolean;
+  beforeChange?: () => boolean;
 }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -15,6 +17,7 @@ export function PasswordForm({
     <form
       onSubmit={async (event) => {
         event.preventDefault();
+        if (beforeChange && !beforeChange()) return;
         const data = new FormData(event.currentTarget);
         setBusy(true);
         setMessage("");

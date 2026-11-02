@@ -4,18 +4,25 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
+import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
   type Account,
+  attemptCompleteSchema,
   credentialsSchema,
   idSchema,
   ocrRequestSchema,
   passwordChangeSchema,
+  passwordVerificationSchema,
+  startTaskSchema,
+  taskInputSchema,
   ttsRequestSchema,
 } from "../../../packages/contract/src/index";
+import { projectTask } from "../../../packages/core/src/tasks";
 import { Auth } from "./auth";
 import type { OcrInput, TtsInput } from "./providers";
 import { Conflict, type Store } from "./store";
+import { Tasks } from "./tasks";
 
 interface Options {
   allowRegistration?: boolean;
@@ -27,6 +34,7 @@ interface Options {
 export function createApp(store: Store, options: Options) {
   const app = new Hono<{ Variables: { account: Account } }>();
   const auth = new Auth(store);
+  const tasks = new Tasks(store);
   const buckets = new Map<string, { count: number; expires: number }>();
   function limited(key: string, limit: number, ms: number) {
     const now = Date.now();
@@ -96,6 +104,7 @@ export function createApp(store: Store, options: Options) {
         400,
       );
     if (error instanceof SyntaxError) return c.json({ error: "JSON 格式无效，请检查后重试" }, 400);
+    if (error instanceof HTTPException) return c.json({ error: error.message }, error.status);
     if (error instanceof Conflict) return c.json({ error: error.message }, 409);
     console.error("[dictation]", error instanceof Error ? error.message : "未知错误");
     return c.json({ error: "服务暂时不可用，请保留草稿后重试" }, 500);
@@ -144,6 +153,12 @@ export function createApp(store: Store, options: Options) {
   app.post("/api/auth/logout", (c) => {
     auth.logout(getCookie(c, "dictation_session") ?? "");
     deleteCookie(c, "dictation_session", { path: "/" });
+    return c.json({ ok: true });
+  });
+  app.post("/api/auth/verify-password", async (c) => {
+    const input = passwordVerificationSchema.parse(await c.req.json());
+    if (!(await auth.login(c.get("account").username, input.password)))
+      return c.json({ error: "账号密码不正确" }, 400);
     return c.json({ ok: true });
   });
   app.post("/api/auth/password", async (c) => {
@@ -227,6 +242,59 @@ export function createApp(store: Store, options: Options) {
       }
     }
     return c.json({ items: result });
+  });
+  app.get("/api/tasks", (c) =>
+    c.json({
+      tasks: tasks.list(c.get("account").id).map(({ items, ...task }) => ({
+        ...task,
+        count: items.length,
+        reviewCount: items.filter((item) => item.source === "review").length,
+      })),
+    }),
+  );
+  app.post("/api/tasks", async (c) =>
+    c.json({ task: tasks.create(c.get("account").id, await c.req.json()) }, 201),
+  );
+  app.get("/api/tasks/:id", (c) =>
+    c.json({ task: tasks.require(c.get("account").id, c.req.param("id")) }),
+  );
+  app.put("/api/tasks/:id", async (c) => {
+    const { revision, ...input } = taskInputSchema
+      .extend({ revision: z.number().int().positive() })
+      .parse(await c.req.json());
+    return c.json({ task: tasks.update(c.get("account").id, c.req.param("id"), revision, input) });
+  });
+  app.get("/api/tasks/:id/play", (c) => {
+    const task = tasks.require(c.get("account").id, c.req.param("id"));
+    const attempts = tasks.listAttempts(c.get("account").id, task.id);
+    return c.json({
+      task: projectTask(task),
+      attempt: attempts.find((attempt) => !attempt.completedAt) ?? attempts.at(-1) ?? null,
+    });
+  });
+  app.post("/api/tasks/:id/start", async (c) => {
+    const input = startTaskSchema.parse(await c.req.json());
+    return c.json({
+      attempt: tasks.start(c.get("account").id, c.req.param("id"), input.onlyHomework),
+    });
+  });
+  app.put("/api/attempts/:id", async (c) =>
+    c.json({ attempt: tasks.save(c.get("account").id, c.req.param("id"), await c.req.json()) }),
+  );
+  app.get("/api/attempts/:id", (c) => {
+    const attempt = tasks.attempt(c.get("account").id, c.req.param("id"));
+    return c.json({ attempt, task: tasks.require(c.get("account").id, attempt.taskId) });
+  });
+  app.post("/api/attempts/:id/complete", async (c) => {
+    const input = attemptCompleteSchema.parse(await c.req.json());
+    return c.json({
+      attempt: tasks.complete(
+        c.get("account").id,
+        c.req.param("id"),
+        input.revision,
+        input.confirmRemaining,
+      ),
+    });
   });
   app.notFound((c) => c.json({ error: "入口不存在，请检查地址" }, 404));
   return app;

@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { type Account, accountResponseSchema } from "../../../packages/contract/src/index";
-import { App } from "./App";
 import { ApiError, api, request } from "./api";
+import { Portal } from "./Portal";
 
 export function Session() {
   const [account, setAccount] = useState<Account | null>(null);
@@ -52,7 +52,7 @@ export function Session() {
       </main>
     );
   return account ? (
-    <App key={account.id} account={account} onLogout={() => void logout()} />
+    <Portal key={account.id} account={account} onLogout={() => void logout()} />
   ) : (
     <Login allowRegistration={allowRegistration} onAccount={setAccount} />
   );

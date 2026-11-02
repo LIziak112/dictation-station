@@ -46,6 +46,9 @@ export const idSchema = z
 const text = (max: number) => z.string().trim().max(max);
 const entryInputSchema = z.strictObject({
   id: idSchema.optional(),
+  wordId: idSchema.optional(),
+  kind: z.enum(["character", "word", "phrase", "sentence"]).optional(),
+  reading: text(120).optional(),
   en: text(300).optional(),
   zh: text(300).optional(),
   pinyin: text(300).optional(),
@@ -59,6 +62,9 @@ export function normalizeEntry(value: unknown, index: number) {
   const e = entryInputSchema.parse(value);
   return {
     id: e.id ?? `e${index + 1}`,
+    wordId: e.wordId,
+    kind: e.kind ?? "word",
+    reading: e.reading ?? "",
     en: e.en ?? "",
     zh: e.zh ?? "",
     pinyin: e.pinyin ?? "",
@@ -198,6 +204,9 @@ export const passwordChangeSchema = z.strictObject({
   currentPassword: z.string().min(1).max(128),
   newPassword: credentialsSchema.shape.password,
 });
+export const passwordVerificationSchema = z.strictObject({
+  password: credentialsSchema.shape.password,
+});
 export const settingsSchema = z.strictObject({
   repeat: z.number().int().min(1).max(5),
   interval: z.number().min(1).max(30),
@@ -210,7 +219,7 @@ export const defaultSettings: Settings = {
   repeat: 2,
   interval: 4,
   speed: 1,
-  auto: true,
+  auto: false,
   shuffle: false,
 };
 export const progressSchema = z
@@ -249,3 +258,80 @@ export const draftSchema = z.strictObject({
   entries: z.array(entryInputSchema).max(500),
 });
 export type Draft = z.infer<typeof draftSchema>;
+
+export const taskInputSchema = z.strictObject({
+  title: text(80).min(1),
+  date: z.iso.date(),
+  mode: modeSchema,
+  settings: settingsSchema.default(defaultSettings),
+  selections: z
+    .array(z.strictObject({ batchId: idSchema, entryIds: z.array(idSchema).min(1).max(500) }))
+    .max(50),
+  wordIds: z.array(idSchema).max(500).default([]),
+});
+export type TaskInput = z.infer<typeof taskInputSchema>;
+export const taskItemSchema = z.object({
+  wordId: idSchema,
+  entry: entrySchema,
+  source: z.enum(["homework", "review"]),
+  batchTitle: z.string(),
+});
+export const taskSchema = z.object({
+  id: idSchema,
+  title: z.string(),
+  date: z.iso.date(),
+  mode: modeSchema,
+  settings: settingsSchema,
+  items: z.array(taskItemSchema).min(1).max(500),
+  status: z.enum(["pending", "in_progress", "completed"]),
+  revision: z.number().int().positive(),
+  createdAt: z.iso.datetime(),
+});
+export type Task = z.infer<typeof taskSchema>;
+export const taskSummarySchema = taskSchema
+  .omit({ items: true })
+  .extend({ count: z.number(), reviewCount: z.number() });
+export type TaskSummary = z.infer<typeof taskSummarySchema>;
+export const taskListSchema = z.object({ tasks: z.array(taskSummarySchema) });
+export const taskResponseSchema = z.object({ task: taskSchema });
+export const resultSchema = z.enum(["correct", "wrong", "uncertain", "unchecked"]);
+export const attemptUpdateSchema = z.strictObject({
+  revision: z.number().int().positive(),
+  index: z.number().int().nonnegative(),
+  phase: z.enum(["player", "review"]),
+  results: z.record(idSchema, resultSchema),
+});
+export const attemptSchema = attemptUpdateSchema.extend({
+  id: idSchema,
+  taskId: idSchema,
+  startedAt: z.iso.datetime(),
+  completedAt: z.iso.datetime().nullable(),
+  corrections: z.array(idSchema),
+});
+export type Attempt = z.infer<typeof attemptSchema>;
+export type AttemptUpdate = z.infer<typeof attemptUpdateSchema>;
+export const attemptResponseSchema = z.object({ attempt: attemptSchema });
+export const taskPlaySchema = taskSummarySchema.omit({ count: true, reviewCount: true }).extend({
+  items: z.array(
+    z.object({
+      wordId: idSchema,
+      prompt: z.string(),
+      audioText: z.string(),
+      lang: z.enum(["en", "zh"]).nullable(),
+      kind: z.string(),
+      reading: z.string(),
+    }),
+  ),
+});
+export type TaskPlay = z.infer<typeof taskPlaySchema>;
+export const taskPlayResponseSchema = z.object({
+  task: taskPlaySchema,
+  attempt: attemptSchema.nullable(),
+});
+export type TaskPlayResponse = z.infer<typeof taskPlayResponseSchema>;
+export const attemptCompleteSchema = z.strictObject({
+  revision: z.number().int().positive(),
+  confirmRemaining: z.boolean(),
+});
+export const startTaskSchema = z.strictObject({ onlyHomework: z.boolean().default(false) });
+export const attemptDetailSchema = z.object({ task: taskSchema, attempt: attemptSchema });

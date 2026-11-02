@@ -29,10 +29,10 @@ export class Playback {
     this.state(false);
   }
   async play(
-    queue: ReturnType<typeof createQueue>,
+    queue: { audioText: string; lang: "en" | "zh" | null }[],
     start: number,
     settings: Settings,
-    onIndex: (index: number) => void,
+    onIndex: (index: number) => unknown,
   ) {
     this.stop();
     const generation = this.generation;
@@ -43,7 +43,7 @@ export class Playback {
       for (let index = start; index < queue.length; index++) {
         const q = queue[index];
         if (!active()) return;
-        if (index !== start) onIndex(index);
+        if (index !== start) await onIndex(index);
         for (let n = 0; n < settings.repeat; n++) {
           if (!active()) return;
           if (q.lang) await this.driver.speak(q.audioText, q.lang, settings.speed);

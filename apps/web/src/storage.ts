@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { z } from "zod";
 
 // 不覆盖读取失败或未来版本的本机稿；只有显式清理后才允许重新写入。
@@ -75,3 +75,17 @@ export function useLocal<T>(key: string, schema: z.ZodType<T>) {
 }
 export const localKey = (name: string, accountId: string) =>
   `ownclass:dictation:${location.pathname}:${accountId}:${name}`;
+
+export function useUnsavedProtection(unsaved: boolean) {
+  useEffect(() => {
+    const protect = (event: Event) => {
+      if (unsaved) event.preventDefault();
+    };
+    window.addEventListener("beforeunload", protect);
+    window.addEventListener("dictation:before-leave", protect);
+    return () => {
+      window.removeEventListener("beforeunload", protect);
+      window.removeEventListener("dictation:before-leave", protect);
+    };
+  }, [unsaved]);
+}

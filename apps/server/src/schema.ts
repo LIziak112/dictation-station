@@ -1,4 +1,4 @@
-import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 export const accounts = sqliteTable("accounts", {
   id: text("id").primaryKey(),
   username: text("username").notNull().unique(),
@@ -33,4 +33,33 @@ export const batches = sqliteTable("batches", {
 export const metadata = sqliteTable("metadata", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
+});
+export const words = sqliteTable(
+  "words",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => accounts.id),
+    contentKey: text("content_key").notNull(),
+    payload: text("payload").notNull(),
+  },
+  (table) => [uniqueIndex("words_account_content").on(table.accountId, table.contentKey)],
+);
+export const tasks = sqliteTable("tasks", {
+  id: text("id").primaryKey(),
+  accountId: text("account_id")
+    .notNull()
+    .references(() => accounts.id),
+  payload: text("payload").notNull(),
+});
+export const attempts = sqliteTable("attempts", {
+  id: text("id").primaryKey(),
+  accountId: text("account_id")
+    .notNull()
+    .references(() => accounts.id),
+  taskId: text("task_id")
+    .notNull()
+    .references(() => tasks.id),
+  payload: text("payload").notNull(),
 });

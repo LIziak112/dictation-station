@@ -1000,3 +1000,32 @@ button[aria-disabled="true"] {
   max-width: 100%;
   overflow-wrap: anywhere;
 }
+
+.task-editor fieldset,
+.gate fieldset {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  display: grid;
+  gap: 20px;
+}
+.task-source {
+  padding-block: 20px;
+  border-top: 1px solid var(--border);
+}
+.word-selection {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 12px;
+  padding-block: 16px;
+}
+.task-prompt {
+  margin-block: 40px;
+  font-size: clamp(1.5rem, 4vw, 2.8rem);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.gate {
+  max-width: 560px;
+  margin-inline: auto;
+}

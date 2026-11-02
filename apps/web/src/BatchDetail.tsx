@@ -21,6 +21,7 @@ interface Props {
   compatible: boolean;
   wrongCount: number;
   onEdit: () => void;
+  onTask?: () => void;
   onResume: () => void;
   onStart: (wrong?: boolean) => void;
   onBack: () => void;
@@ -36,6 +37,7 @@ export function BatchDetail({
   compatible,
   wrongCount,
   onEdit,
+  onTask,
   onResume,
   onStart,
   onBack,
@@ -90,8 +92,14 @@ export function BatchDetail({
           </button>
         </p>
       )}
+      {onTask && (
+        <button type="button" className="primary" onClick={onTask}>
+          选择今日范围并安排任务
+        </button>
+      )}
       <section className="panel">
-        <h2>01 / 今天怎么练</h2>
+        <h2>01 / 本机自由练习</h2>
+        <p className="small muted">跨设备接力和核对记录请使用“选择今日范围并安排任务”。</p>
         <div className="mode-grid">
           {(Object.keys(MODES) as Mode[])
             .filter((m) => batch.entries.some((e) => e.modes.includes(m)))

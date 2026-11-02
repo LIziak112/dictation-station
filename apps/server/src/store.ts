@@ -9,9 +9,12 @@ import {
   type Batch,
   batchInputSchema,
   batchSchema,
+  type Entry,
+  entrySchema,
   updateSchema,
 } from "../../../packages/contract/src/index";
-import { audioAccess, batches } from "./schema";
+import { contentKey } from "../../../packages/core/src/tasks";
+import { audioAccess, batches, words } from "./schema";
 
 export class Conflict extends Error {
   constructor() {
@@ -54,22 +57,64 @@ export class Store {
       .get();
     return row ? batchSchema.parse(JSON.parse(row.payload)) : undefined;
   }
+  private canonicalEntries(accountId: string, entries: Entry[]) {
+    return entries.map((entry) => {
+      const key = contentKey(entry);
+      const existing = this.db
+        .select()
+        .from(words)
+        .where(and(eq(words.accountId, accountId), eq(words.contentKey, key)))
+        .get();
+      const wordId = existing?.id ?? randomBytes(12).toString("base64url");
+      if (existing) {
+        const stored = entrySchema.parse(JSON.parse(existing.payload));
+        const modes = [...new Set([...stored.modes, ...entry.modes])];
+        if (modes.length !== stored.modes.length)
+          this.db
+            .update(words)
+            .set({ payload: JSON.stringify({ ...stored, modes }) })
+            .where(eq(words.id, existing.id))
+            .run();
+      }
+      if (!existing)
+        this.db
+          .insert(words)
+          .values({
+            id: wordId,
+            accountId,
+            contentKey: key,
+            payload: JSON.stringify({ ...entry, id: wordId, wordId }),
+          })
+          .run();
+      return { ...entry, wordId };
+    });
+  }
   create(accountId: string, value: unknown) {
     const { sourceText, ...parsed } = batchInputSchema.parse(value);
-    const now = new Date().toISOString();
-    const batch = batchSchema.parse({
-      ...parsed,
-      id: randomBytes(12).toString("base64url"),
-      revision: 1,
-      createdAt: now,
-      updatedAt: now,
+    return this.db.transaction(() => {
+      const now = new Date().toISOString();
+      const batch: Batch = {
+        ...parsed,
+        entries: this.canonicalEntries(accountId, parsed.entries),
+        id: randomBytes(12).toString("base64url"),
+        revision: 1,
+        createdAt: now,
+        updatedAt: now,
+      };
+      this.db
+        .insert(batches)
+        .values({
+          id: batch.id,
+          accountId,
+          payload: JSON.stringify(batch),
+          sourceText,
+          revision: 1,
+        })
+        .run();
+      return batch;
     });
-    this.db
-      .insert(batches)
-      .values({ id: batch.id, accountId, payload: JSON.stringify(batch), sourceText, revision: 1 })
-      .run();
-    return batch;
   }
+
   update(accountId: string, id: string, value: unknown) {
     const patch = updateSchema.parse(value);
     return this.db.transaction((tx) => {
@@ -83,6 +128,7 @@ export class Store {
       const batch = batchSchema.parse({
         ...JSON.parse(old.payload),
         ...patch,
+        ...(patch.entries ? { entries: this.canonicalEntries(accountId, patch.entries) } : {}),
         revision: old.revision + 1,
         updatedAt: new Date().toISOString(),
       });

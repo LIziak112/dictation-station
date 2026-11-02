@@ -412,6 +412,45 @@ export function Editor({
                   </button>
                 </div>
                 <div className="form-grid">
+                  <label className="field">
+                    内容类型
+                    <select
+                      value={e.kind}
+                      onChange={(event) =>
+                        patch({
+                          entries: entries.map((x) =>
+                            x.id === e.id ? { ...x, kind: event.target.value as Entry["kind"] } : x,
+                          ),
+                        })
+                      }
+                    >
+                      {Object.entries({
+                        character: "生字",
+                        word: "词语",
+                        phrase: "短语",
+                        sentence: "句子",
+                      }).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    指定读音
+                    <input
+                      value={e.reading}
+                      maxLength={120}
+                      placeholder="拼音或词典读音标识，需试听确认"
+                      onChange={(event) =>
+                        patch({
+                          entries: entries.map((x) =>
+                            x.id === e.id ? { ...x, reading: event.target.value } : x,
+                          ),
+                        })
+                      }
+                    />
+                  </label>
                   {(["en", "zh", "pinyin", "hint"] as const).map((key) => (
                     <label key={key} className="field">
                       {{ en: "英文", zh: "中文", pinyin: "拼音", hint: "语境提示" }[key]}

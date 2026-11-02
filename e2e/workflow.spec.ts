@@ -39,7 +39,7 @@ test("子路径完整流程：导入、草稿恢复、编辑、分享、播放�
   page.on("request", (r) => {
     if (!r.url().startsWith("http://127.0.0.1:8898")) external.push(r.url());
   });
-  await page.goto("./");
+  await page.goto("./#library");
   await page.getByRole("button", { name: "新建听写", exact: true }).click();
   await page
     .getByRole("textbox", { name: "作业原文", exact: true })
@@ -105,7 +105,7 @@ test("子路径完整流程：导入、草稿恢复、编辑、分享、播放�
 });
 
 test("320px、桌面与键盘；坏本机稿不会被空稿覆盖", async ({ page }) => {
-  await page.goto("./");
+  await page.goto("./#library");
   for (const width of [320, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await page.screenshot({ path: test.info().outputPath(`home-${width}.png`), fullPage: true });

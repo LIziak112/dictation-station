@@ -23,7 +23,17 @@ import { loadSettings, rememberSettings } from "./preferences";
 import { localKey, useLocal } from "./storage";
 
 type View = "home" | "batch" | "editor" | "player";
-export function App({ account, onLogout }: { account: Account; onLogout: () => void }) {
+export function App({
+  account,
+  onLogout,
+  embedded = false,
+  onTask,
+}: {
+  account: Account;
+  onLogout: () => void;
+  embedded?: boolean;
+  onTask?: (batch: Batch) => void;
+}) {
   const [view, setView] = useState<View>("home");
   const [batch, setBatch] = useState<Batch | null>(null);
   const [list, setList] = useState<BatchSummary[]>([]);
@@ -68,13 +78,17 @@ export function App({ account, onLogout }: { account: Account; onLogout: () => v
       .catch(() => {});
   }, []);
   useEffect(() => {
-    function protect(event: BeforeUnloadEvent) {
+    function protect(event: Event) {
       if (draftRef.current.draft.error || draftRef.current.progress.error) {
         event.preventDefault();
       }
     }
     window.addEventListener("beforeunload", protect);
-    return () => window.removeEventListener("beforeunload", protect);
+    window.addEventListener("dictation:before-leave", protect);
+    return () => {
+      window.removeEventListener("beforeunload", protect);
+      window.removeEventListener("dictation:before-leave", protect);
+    };
   }, []);
   useEffect(() => {
     let active: AbortController | null = null;
@@ -130,6 +144,12 @@ export function App({ account, onLogout }: { account: Account; onLogout: () => v
     };
   }, [account.id]);
   function home() {
+    if (embedded) {
+      location.hash = "library";
+      setView("home");
+      window.dispatchEvent(new Event("dictation:refresh"));
+      return;
+    }
     if (location.hash) location.hash = "";
     else {
       setView("home");
@@ -215,37 +235,39 @@ export function App({ account, onLogout }: { account: Account; onLogout: () => v
       >
         跳到正文
       </button>
-      <header className="site-header">
-        <div className="header-inner">
-          <button type="button" className="brand subtle" onClick={home}>
-            <span className="brand-mark">
-              <Headphones size={22} aria-hidden="true" />
-            </span>
-            <span>
-              <strong>OwnClass</strong>
-              <span className="brand-sub">听写小站</span>
-            </span>
-          </button>
-          <span className="header-note">把时间，留给学习。</span>
-          <span className="account-name">{account.username}</span>
-          <details className="access">
-            <summary>账号</summary>
-            <PasswordForm onChanged={onLogout} disabled={!!draft.error || !!progress.error} />
-          </details>
-          <button
-            type="button"
-            onClick={() => {
-              if (draft.error || progress.error) {
-                setNotice("请先导出或恢复保存失败的本机内容，再退出登录");
-                return;
-              }
-              onLogout();
-            }}
-          >
-            退出登录
-          </button>
-        </div>
-      </header>
+      {!embedded && (
+        <header className="site-header">
+          <div className="header-inner">
+            <button type="button" className="brand subtle" onClick={home}>
+              <span className="brand-mark">
+                <Headphones size={22} aria-hidden="true" />
+              </span>
+              <span>
+                <strong>OwnClass</strong>
+                <span className="brand-sub">听写小站</span>
+              </span>
+            </button>
+            <span className="header-note">把时间，留给学习。</span>
+            <span className="account-name">{account.username}</span>
+            <details className="access">
+              <summary>账号</summary>
+              <PasswordForm onChanged={onLogout} disabled={!!draft.error || !!progress.error} />
+            </details>
+            <button
+              type="button"
+              onClick={() => {
+                if (draft.error || progress.error) {
+                  setNotice("请先导出或恢复保存失败的本机内容，再退出登录");
+                  return;
+                }
+                onLogout();
+              }}
+            >
+              退出登录
+            </button>
+          </div>
+        </header>
+      )}
       <main id="main" data-screen={screenKey} tabIndex={-1}>
         {draft.error && (
           <section className="notice error" role="alert">
@@ -357,6 +379,7 @@ export function App({ account, onLogout }: { account: Account; onLogout: () => v
                 compatible={compatible}
                 wrongCount={wrongCount}
                 onEdit={() => edit(batch)}
+                onTask={() => onTask?.(batch)}
                 onResume={() => {
                   setStartImmediately(false);
                   setView("player");
@@ -397,11 +420,13 @@ export function App({ account, onLogout }: { account: Account; onLogout: () => v
           </>
         )}
       </main>
-      <footer>
-        <strong>OwnClass</strong>
-        <span>Your data. Your way. All for learning.</span>
-        <p>纸笔作答 · 自主核对 · 本机保留练习进度</p>
-      </footer>
+      {!embedded && (
+        <footer>
+          <strong>OwnClass</strong>
+          <span>Your data. Your way. All for learning.</span>
+          <p>纸笔作答 · 自主核对 · 本机保留练习进度</p>
+        </footer>
+      )}
     </>
   );
 }
