@@ -417,6 +417,7 @@ export const manualLearningSchema = z.strictObject({
   status: z.enum(["pending", "mastered"]),
 });
 export const pronunciationInputSchema = z.strictObject({
+  synthetic: z.boolean().optional(),
   pinyin: z.string().max(300).optional(),
   text: z.string().trim().min(1).max(300),
   lang: z.enum(["en", "zh"]),

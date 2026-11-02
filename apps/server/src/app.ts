@@ -298,7 +298,7 @@ export function createApp(store: Store, options: Options) {
   });
   app.post("/api/pronunciation/preview", async (c) => {
     const input = pronunciationInputSchema.parse(await c.req.json());
-    const voice = await pronunciation.prepare(input);
+    const voice = await pronunciation.prepare(input, input.synthetic);
     if (voice.url) store.grantAudio(c.get("account").id, voice.url.slice("audio/".length));
     return c.json({ voice });
   });

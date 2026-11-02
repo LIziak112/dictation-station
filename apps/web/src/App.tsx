@@ -29,11 +29,13 @@ export function App({
   onLogout,
   embedded = false,
   onTask,
+  onPractice,
 }: {
   account: Account;
   onLogout: () => void;
   embedded?: boolean;
   onTask?: (batch: Batch) => void;
+  onPractice?: (batch: Batch, follow: boolean) => void;
 }) {
   const [view, setView] = useState<View>("home");
   const [batch, setBatch] = useState<Batch | null>(null);
@@ -419,6 +421,7 @@ export function App({
                 wrongCount={wrongCount}
                 onEdit={() => edit(batch)}
                 onTask={() => onTask?.(batch)}
+                onPractice={onPractice ? (follow) => onPractice(batch, follow) : undefined}
                 onResume={() => {
                   setStartImmediately(false);
                   setView("player");

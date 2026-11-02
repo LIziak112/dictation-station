@@ -31,6 +31,7 @@ export default defineConfig({
       PADDLEOCR_TOKEN: "",
       ENABLE_SERVER_TTS: "false",
       PUBLIC_DICTIONARY: "false",
+      TRUST_PROXY: "true",
       HOST: "127.0.0.1",
     },
   },

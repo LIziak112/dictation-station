@@ -5,6 +5,7 @@ import { Connections } from "./Connections";
 import { FocusControls } from "./FocusControls";
 import { History } from "./History";
 import { Learning } from "./Learning";
+import { ListeningPractice } from "./ListeningPractice";
 import { ParentGate } from "./ParentGate";
 import { PasswordForm } from "./PasswordForm";
 import { PrintView } from "./PrintView";
@@ -24,7 +25,9 @@ type Panel =
   | "learning"
   | "history"
   | "connections"
-  | "print";
+  | "print"
+  | "listen"
+  | "follow";
 export function Portal({ account, onLogout }: { account: Account; onLogout: () => void }) {
   const [child, setChild] = useState(
     () => localStorage.getItem(localKey("childMode", account.id)) === "true",
@@ -164,6 +167,13 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
         />
       ) : (
         <>
+          {(panel === "listen" || panel === "follow") && !child && initialBatch && (
+            <ListeningPractice
+              batch={initialBatch}
+              follow={panel === "follow"}
+              onBack={() => navigate("library")}
+            />
+          )}
           {panel === "print" && !child && initialTask && (
             <main>
               <PrintView task={initialTask} onClose={() => navigate("today")} />
@@ -210,6 +220,10 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
               account={account}
               onLogout={onLogout}
               embedded
+              onPractice={(batch, follow) => {
+                setInitialBatch(batch);
+                navigate(follow ? "follow" : "listen");
+              }}
               onTask={(batch) => {
                 setInitialBatch(batch);
                 setInitialTask(undefined);

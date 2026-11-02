@@ -22,6 +22,7 @@ interface Props {
   wrongCount: number;
   onEdit: () => void;
   onTask?: () => void;
+  onPractice?: (follow: boolean) => void;
   onResume: () => void;
   onStart: (wrong?: boolean) => void;
   onBack: () => void;
@@ -38,6 +39,7 @@ export function BatchDetail({
   wrongCount,
   onEdit,
   onTask,
+  onPractice,
   onResume,
   onStart,
   onBack,
@@ -99,6 +101,16 @@ export function BatchDetail({
       )}
       <section className="panel">
         <h2>01 / 本机自由练习</h2>
+        {onPractice && (
+          <div className="row">
+            <button type="button" onClick={() => onPractice(false)}>
+              纯听这份词表
+            </button>
+            <button type="button" onClick={() => onPractice(true)}>
+              跟读练口语
+            </button>
+          </div>
+        )}
         <p className="small muted">跨设备接力和核对记录请使用“选择今日范围并安排任务”。</p>
         <div className="mode-grid">
           {(Object.keys(MODES) as Mode[])

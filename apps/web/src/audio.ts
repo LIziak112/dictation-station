@@ -24,6 +24,9 @@ export class BrowserAudio implements AudioDriver {
   }
   dispose() {
     this.cancel();
+    this.clearCache();
+  }
+  clearCache() {
     for (const url of this.urls.values()) URL.revokeObjectURL(url);
     this.urls.clear();
   }
