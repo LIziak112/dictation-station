@@ -21,6 +21,16 @@ const MODES = {
 
 const POLYPHONES = new Set('行长征重乐还着得地了数少好发为相间中干空觉落差曲调和会都只种分难当应朝藏血削薄给系载转奔剥喝哄吓劲卷磨宁泡喷强塞散丧刹扇折挣症轴爪扎塞'.split(''));
 
+// 小型、可审阅的词级读音表：只覆盖明确词义，不替代词典或教师校验。
+const WORD_PINYIN = Object.freeze({
+  '勉强': 'miǎn qiǎng',
+  '长大': 'zhǎng dà',
+  '音乐': 'yīn yuè',
+});
+function pinyinKey(value) {
+  return String(value).normalize('NFC').toLowerCase().replace(/[\s’'·-]+/g, '');
+}
+
 const S = {
   view: 'home',
   batches: [],
@@ -111,8 +121,13 @@ function validateEntries(entries) {
     }
     if (!isEnglish) {
       if (!e.pinyin) issues.push({ i, field: 'pinyin', level: 'warn', msg: '没有拼音：看拼音写词语模式不可用' });
-      if (e.zh.length === 1 && POLYPHONES.has(e.zh)) {
-        issues.push({ i, field: 'hint', level: 'warn', msg: '多音字，建议补语境/组词提示' });
+      const expected = WORD_PINYIN[e.zh];
+      if (expected && (!e.pinyin || pinyinKey(e.pinyin) !== pinyinKey(expected))) {
+        issues.push({ i, field: 'pinyin', level: 'warn', msg: `词级读音核对：「${e.zh}」常用读音为 ${expected}，请确认当前拼音与语境（数字声调等其他写法需人工核对）；不会自动覆盖原词表` });
+      }
+      const ambiguous = [...new Set([...e.zh].filter(c => POLYPHONES.has(c)))];
+      if (ambiguous.length) {
+        issues.push({ i, field: 'pinyin', level: 'warn', msg: `含多音字「${ambiguous.join('、')}」：请按整个词语的语境核对拼音${e.pinyin ? `（当前：${e.pinyin}）` : '并补充拼音'}，必要时补语境提示；系统不会自动判定读音` });
       }
       if (!e.hint && e.pinyin && e.pinyin.split(/\s+/).length > 1) {
         // 双字词一般无需提示，不报
@@ -693,22 +708,34 @@ async function ensureAudio(items) {
   }
 }
 
+let cancelPendingAudio = null;
 function speakFallback(text, lang) {
-  return new Promise((resolve) => {
-    if (!('speechSynthesis' in window)) { resolve(); return; }
+  return new Promise((resolve, reject) => {
+    if (!('speechSynthesis' in window)) { reject(new Error('设备不支持朗读')); return; }
     const u = new SpeechSynthesisUtterance(text);
     u.lang = lang === 'en' ? 'en-US' : 'zh-CN';
     u.rate = 0.9;
-    u.onend = resolve;
-    u.onerror = resolve;
+    let done = false;
+    const finish = (error) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (cancelPendingAudio === cancel) cancelPendingAudio = null;
+      if (error) reject(error); else resolve();
+    };
+    const cancel = () => finish();
+    const timer = setTimeout(() => finish(new Error('设备朗读超时')), 30000);
+    cancelPendingAudio = cancel;
+    u.onend = () => finish();
+    u.onerror = (e) => finish(new Error(e.error || '设备朗读失败'));
     speechSynthesis.speak(u);
-    setTimeout(resolve, 8000);
   });
 }
 
 const sharedAudio = new Audio();
 sharedAudio.preload = 'auto';
 function cancelCurrentAudio() {
+  if (cancelPendingAudio) cancelPendingAudio();
   try {
     sharedAudio.pause();
     sharedAudio.currentTime = 0;
@@ -718,14 +745,22 @@ function cancelCurrentAudio() {
   if ('speechSynthesis' in window) speechSynthesis.cancel();
 }
 function playUrl(url) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     let done = false;
-    const finish = () => { if (!done) { done = true; resolve(); } };
-    sharedAudio.onended = finish;
-    sharedAudio.onerror = finish;
+    const finish = (error) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (cancelPendingAudio === cancel) cancelPendingAudio = null;
+      if (error) reject(error); else resolve();
+    };
+    const cancel = () => finish();
+    cancelPendingAudio = cancel;
+    const timer = setTimeout(() => finish(new Error('音频播放超时')), 30000);
+    sharedAudio.onended = () => finish();
+    sharedAudio.onerror = () => finish(new Error('音频加载失败'));
     sharedAudio.src = url;
     sharedAudio.play().catch(finish);
-    setTimeout(finish, 15000);
   });
 }
 
@@ -805,14 +840,15 @@ async function startPlayer(mode, onlyIds) {
   $('#set-interval').onchange = (e) => { P.interval = Math.max(1, Math.min(30, Number(e.target.value) || 4)); };
   $('#set-order').onchange = (e) => {
     P.order = e.target.value;
+    stopPlay();
     if (P.order === 'shuffle') shuffleQueue();
-    P.idx = 0; drawPrompt();
+    P.idx = 0; drawPrompt(); syncPlayButton();
   };
   $('#set-auto').onclick = (e) => { P.auto = !P.auto; e.target.classList.toggle('on', P.auto); };
   $('#set-reveal').onclick = (e) => { P.revealed = !P.revealed; e.target.classList.toggle('on', P.revealed); drawPrompt(); };
 
-  $('#btn-play').onclick = () => playCurrent(true);
-  $('#btn-prev').onclick = () => { stopPlay(); P.idx = Math.max(0, P.idx - 1); drawPrompt(); };
+  $('#btn-play').onclick = () => { if (P.playing) stopPlay(); else playCurrent(true); };
+  $('#btn-prev').onclick = () => { stopPlay(); P.idx = Math.max(0, P.idx - 1); drawPrompt(); syncPlayButton(); };
   $('#btn-next').onclick = () => { stopPlay(); P.idx = Math.min(P.queue.length - 1, P.idx + 1); drawPrompt(); };
   $('#btn-finish').onclick = () => { stopPlay(); renderResult(); };
 
@@ -828,15 +864,10 @@ async function startPlayer(mode, onlyIds) {
   drawPrompt();
   updateBar();
 
-  // 预生成音频
-  const need = [];
-  P.queue.forEach((q) => { if (q.audioLang && q.audioText) need.push({ lang: q.audioLang, text: q.audioText }); });
-  try {
-    await ensureAudio(need);
-    P.progressEl.textContent = '';
-  } catch (e) {
-    P.progressEl.textContent = '语音准备失败，将使用设备朗读：' + e.message;
-  }
+  // 听音模式在模式按钮的用户手势内开始，不等待付费语音准备。
+  // 已缓存音频优先，否则直接设备朗读；无音频模式不启动空播放。
+  syncPlayButton();
+  if (mode === 'en2en' || mode === 'zh_dictation') playCurrent(true);
 
   function drawPrompt() {
     const q = P.queue[P.idx];
@@ -878,38 +909,54 @@ async function startPlayer(mode, onlyIds) {
     $('#bar').style.width = `${((P.idx + 1) / P.queue.length) * 100}%`;
   }
 
+  function syncPlayButton() {
+    if (S.player !== P || S.view !== 'player') return;
+    const button = $('#btn-play');
+    if (!button) return;
+    button.textContent = P.playing ? '播放中…（点击停止）' : '播放';
+    button.setAttribute('aria-pressed', String(P.playing));
+    button.disabled = !P.queue[P.idx]?.audioText;
+    button.setAttribute('aria-label', P.playing ? '播放中，点击停止' : '播放');
+  }
+
   function stopPlay() {
     P.token++;
     P.playing = false;
     cancelCurrentAudio();
+    syncPlayButton();
   }
 
   async function playCurrent(manual) {
-    const P2 = S.player;
-    if (!P2) return;
+    if (S.player !== P || S.view !== 'player') return;
+    const q = P.queue[P.idx];
+    if (!q?.audioText) return;
     cancelCurrentAudio();
-    const token = ++P2.token;
-    P2.playing = true;
-    const q = P2.queue[P2.idx];
-    if (!q) return;
-
-    for (let r = 0; r < P2.repeat; r++) {
-      if (token !== P2.token) return;
-      const url = q.audioLang ? S.audio.get(audioKey(q.audioLang, q.audioText)) : null;
-      if (url) await playUrl(url);
-      else if (q.audioText) await speakFallback(q.audioText, q.audioLang);
-      if (token !== P2.token) return;
-      await sleep(320);
-    }
-
-    if (P2.auto && P2.idx < P2.queue.length - 1) {
-      await sleep(P2.interval * 1000);
-      if (token !== P2.token) return;
-      P2.idx++;
-      drawPrompt();
-      playCurrent(false);
-    } else if (P2.auto) {
-      toast('本批最后一个');
+    const token = ++P.token;
+    const active = () => token === P.token && S.player === P && S.view === 'player';
+    P.playing = true;
+    syncPlayButton();
+    try {
+      for (let r = 0; r < P.repeat; r++) {
+        if (!active()) return;
+        const url = S.audio.get(audioKey(q.audioLang, q.audioText));
+        if (url) await playUrl(url);
+        else await speakFallback(q.audioText, q.audioLang);
+        if (!active()) return;
+        await sleep(320);
+      }
+      if (P.auto && P.idx < P.queue.length - 1) {
+        await sleep(P.interval * 1000);
+        if (!active()) return;
+        P.idx++;
+        drawPrompt();
+        playCurrent(false);
+      } else if (P.auto) {
+        toast('本批最后一个');
+      }
+    } catch (e) {
+      if (active()) toast('无法播放，请点击播放重试：' + e.message);
+    } finally {
+      if (active()) { P.playing = false; syncPlayButton(); }
     }
   }
 }

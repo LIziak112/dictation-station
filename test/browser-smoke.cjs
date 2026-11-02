@@ -25,6 +25,13 @@ const assert = require('node:assert/strict');
     page.on('pageerror',e=>errors.push(e.message));
     page.on('request',r=>{if(!r.url().startsWith(base)) external.push(r.url()); if(r.method()==='POST')writes.push(r.url());});
     page.on('dialog',async d=>{dialogs++;await d.dismiss();});
+    // Deterministic speech events: verifies application lifecycle, not speaker output.
+    await page.addInitScript(() => {
+      window.__spoken = [];
+      window.__utterance = null;
+      window.speechSynthesis.speak = u => { window.__spoken.push(u.text); window.__utterance = u; };
+      window.speechSynthesis.cancel = () => { window.__utterance = null; };
+    });
     await page.goto(base+'/#batch=demo1');
     await page.locator('#share-batch').waitFor({timeout:5000}).catch(async e => { console.error({errors, body:await page.locator('body').innerText()}); throw e; });
     await page.locator('#share-batch').click();
@@ -49,6 +56,70 @@ const assert = require('node:assert/strict');
     await page.locator('#new-batch').waitFor();
     await page.evaluate(()=>location.hash='batch=demo1');
     await page.locator('#share-batch').waitFor();
+    // Issue #1: start immediately in listening modes and expose cancellable state.
+    await page.evaluate(() => startPlayer('en2en'));
+    assert.equal(await page.evaluate(() => window.__spoken.at(-1)), 'sun');
+    assert.equal(await page.locator('#btn-play').getAttribute('aria-pressed'), 'true');
+    await page.locator('#btn-play').click();
+    assert.equal(await page.locator('#btn-play').getAttribute('aria-pressed'), 'false');
+    await page.locator('#btn-play').click();
+    assert.equal(await page.locator('#btn-play').getAttribute('aria-pressed'), 'true');
+    await page.locator('#btn-next').click();
+    assert.equal(await page.locator('#btn-play').getAttribute('aria-pressed'), 'false');
+    // Natural completion resets the button.
+    await page.evaluate(() => { S.player.auto = false; S.player.repeat = 1; });
+    await page.locator('#btn-play').click();
+    await page.evaluate(() => window.__utterance.onend());
+    await page.waitForFunction(() => document.querySelector('#btn-play').getAttribute('aria-pressed') === 'false');
+    // Failure is visible and retryable, not silent success.
+    await page.locator('#btn-play').click();
+    await page.evaluate(() => window.__utterance.onerror({error:'not-allowed'}));
+    await page.waitForFunction(() => document.querySelector('#btn-play').getAttribute('aria-pressed') === 'false');
+    assert.match(await page.locator('#toast').innerText(), /无法播放/);
+    // Auto-next cannot be reset by the preceding item's finally block.
+    await page.evaluate(() => { S.player.idx=0; S.player.auto=true; S.player.repeat=1; S.player.interval=0; });
+    await page.locator('#btn-play').click();
+    await page.evaluate(() => window.__utterance.onend());
+    await page.waitForFunction(() => S.player.idx === 1 && S.player.playing);
+    assert.equal(await page.locator('#btn-play').getAttribute('aria-pressed'),'true');
+    await page.locator('#btn-play').click();
+    // A stale end event after hash navigation cannot resume playback.
+    await page.locator('#btn-play').click();
+    await page.evaluate(() => { window.__staleEnd=window.__utterance.onend; location.hash=''; });
+    await page.waitForFunction(() => S.view === 'home');
+    const afterLeave = await page.evaluate(() => window.__spoken.length);
+    await page.evaluate(() => window.__staleEnd());
+    await page.waitForTimeout(400);
+    assert.equal(await page.evaluate(() => window.__spoken.length),afterLeave);
+    // No audio mode does not speak, while Chinese listening starts in the gesture.
+    await page.evaluate(() => {
+      S.batch.entries = [normalizeEntry({zh:'长大',pinyin:'zhǎng dà'},0)];
+      startPlayer('zh_dictation');
+    });
+    assert.equal(await page.evaluate(() => window.__spoken.at(-1)), '长大');
+    await page.locator('#btn-play').click();
+    const spokenBefore = await page.evaluate(() => window.__spoken.length);
+    await page.evaluate(() => startPlayer('pinyin2hanzi'));
+    assert.equal(await page.evaluate(() => window.__spoken.length), spokenBefore);
+    assert.equal(await page.locator('#btn-play').isDisabled(), true);
+    // Issue #5: word table detects supplied wrong reading, missing reading, preserves data.
+    const validation = await page.evaluate(() => {
+      const entries = [
+        {zh:'勉强',pinyin:'miǎn qiáng'}, {zh:'长大',pinyin:'cháng dà'},
+        {zh:'音乐',pinyin:'yīn lè'}, {zh:'银行',pinyin:'yín háng'},
+        {zh:'长大',pinyin:''}, {zh:'苹果',pinyin:'píng guǒ'},
+        {zh:'音乐',pinyin:'yīn yuè'}, {zh:'长',pinyin:'cháng'}
+      ].map(normalizeEntry);
+      const before = JSON.stringify(entries);
+      const issues = validateEntries(entries);
+      return {issues, unchanged:before === JSON.stringify(entries)};
+    });
+    assert.equal(validation.unchanged,true);
+    for (const i of [0,1,2,4]) assert.ok(validation.issues.some(x => x.i===i && x.msg.includes('词级读音')));
+    assert.ok(validation.issues.some(x => x.i===3 && x.msg.includes('含多音字')));
+    for (const i of [5,6]) assert.ok(!validation.issues.some(x => x.i===i && x.msg.includes('词级读音')));
+    assert.ok(validation.issues.some(x => x.i===7 && x.msg.includes('含多音字')));
+    console.log('PASS issues #1/#5: immediate English/Chinese speech, stop/replay, next cancels, natural completion, speech failure reset, silent pinyin mode, word readings/missing/unknown/single-character validation without mutation.');
     assert.equal(dialogs,0,'public playback must not request a password');
     assert.deepEqual(errors,[]);
     assert.deepEqual(external,[]);
