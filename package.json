@@ -17,6 +17,7 @@
     "e2e": "playwright test",
     "lint": "biome check .",
     "format": "biome check --write .",
+    "account:reset-password": "tsx scripts/reset-password.ts",
     "db:generate": "drizzle-kit generate",
     "schema:export": "tsx scripts/export-schema.ts"
   },

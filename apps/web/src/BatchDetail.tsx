@@ -214,13 +214,13 @@ export function BatchDetail({
             setQr(await QRCode.toDataURL(url.href, { width: 220, margin: 2 }));
           }}
         >
-          分享链接 / 二维码
+          本账号链接 / 二维码
         </button>
         <button
           type="button"
           className="danger subtle"
           onClick={async () => {
-            if (!confirm("确定删除这份词表？删除后分享链接将失效。")) return;
+            if (!confirm("确定删除这份词表？删除后本账号链接将失效。")) return;
             try {
               await api.remove(batch);
               onBack();
@@ -234,11 +234,11 @@ export function BatchDetail({
       </div>
       {share && (
         <section className="panel share-panel">
-          <h2>分享这份听写</h2>
-          <p>任何持有链接的人都能读取完整词表。请勿分享隐私内容。</p>
-          {qr && <img src={qr} width={220} height={220} alt="听写分享二维码" />}
+          <h2>在另一台设备打开</h2>
+          <p>此链接仅当前账号登录后可打开。</p>
+          {qr && <img src={qr} width={220} height={220} alt="本账号听写二维码" />}
           <label className="field">
-            分享链接
+            本账号链接
             <input readOnly value={share} />
           </label>
           <div className="row">
@@ -247,9 +247,9 @@ export function BatchDetail({
               onClick={async () => {
                 try {
                   await navigator.clipboard.writeText(share);
-                  onNotice("分享链接已复制");
+                  onNotice("本账号链接已复制");
                 } catch {
-                  onNotice("复制失败，请手动选择分享链接");
+                  onNotice("复制失败，请手动选择本账号链接");
                 }
               }}
             >
@@ -262,7 +262,7 @@ export function BatchDetail({
                 setQr("");
               }}
             >
-              关闭分享
+              关闭链接
             </button>
           </div>
         </section>

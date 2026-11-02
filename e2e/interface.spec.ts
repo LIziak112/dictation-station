@@ -1,4 +1,22 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test } from "./fixtures";
+
+test("本机落盘失败时保留编辑内容，不允许退出丢稿", async ({ page }) => {
+  await page.goto("./");
+  await page.getByRole("button", { name: "新建听写", exact: true }).click();
+  await page.evaluate(() => {
+    Storage.prototype.setItem = () => {
+      throw new Error("合成存储失败");
+    };
+  });
+  await page.getByRole("textbox", { name: "作业原文", exact: true }).fill("sun 太阳");
+  await page.getByRole("button", { name: "退出登录" }).click();
+  await expect(page.getByRole("textbox", { name: "作业原文", exact: true })).toHaveValue(
+    "sun 太阳",
+  );
+  await expect(page.getByText("请先导出或恢复保存失败的本机内容，再退出登录")).toBeVisible();
+  expect((await page.request.get("api/auth/me")).status()).toBe(200);
+});
 
 test("保存期间保留操作焦点并锁定输入，离开后的迟到回执不改变当前页", async ({ page }) => {
   await page.goto("./");

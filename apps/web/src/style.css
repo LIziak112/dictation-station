@@ -984,3 +984,19 @@ button[aria-disabled="true"] {
   opacity: 0.5;
   cursor: wait;
 }
+
+.login-page {
+  max-width: 520px;
+}
+.login-page fieldset,
+.access fieldset {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+}
+.account-name {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}

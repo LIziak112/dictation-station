@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
 import { exportSchema } from "../packages/contract/src/index";
+import { test } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -58,12 +59,12 @@ test("子路径完整流程：导入、草稿恢复、编辑、分享、播放�
   await page.getByLabel("词表名称").fill(`${title} 已修改`);
   await page.getByRole("button", { name: "保存词表", exact: true }).click();
   await expect(page.getByRole("heading", { name: `${title} 已修改`, exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "分享链接 / 二维码" }).click();
-  await expect(page.getByAltText("听写分享二维码")).toBeVisible();
-  const link = await page.getByLabel("分享链接", { exact: true }).inputValue();
+  await page.getByRole("button", { name: "本账号链接 / 二维码" }).click();
+  await expect(page.getByAltText("本账号听写二维码")).toBeVisible();
+  const link = await page.getByLabel("本账号链接", { exact: true }).inputValue();
   expect(link).toContain("/tingxie/#batch=");
   expect(link).not.toContain("token");
-  await page.getByRole("button", { name: "关闭分享" }).click();
+  await page.getByRole("button", { name: "关闭链接" }).click();
   await page.getByRole("button", { name: /读英语写英语/ }).click();
   await page.getByRole("button", { name: "开始听写", exact: true }).click();
   await expect(page.getByRole("button", { name: "停止播放" })).toBeVisible();
@@ -112,18 +113,23 @@ test("320px、桌面与键盘；坏本机稿不会被空稿覆盖", async ({ pag
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
   }
-  await page.evaluate(() =>
-    localStorage.setItem(
-      `ownclass:dictation:${location.pathname}:draft`,
-      '{"version":999,"words":"keep me"}',
-    ),
+  const { account } = await (await page.request.get("api/auth/me")).json();
+  await page.evaluate(
+    (accountId) =>
+      localStorage.setItem(
+        `ownclass:dictation:${location.pathname}:${accountId}:draft`,
+        '{"version":999,"words":"keep me"}',
+      ),
+    account.id,
   );
   await page.reload();
   await expect(page.getByRole("alert").filter({ hasText: "本机记录格式无法读取" })).toBeVisible();
   await page.getByRole("button", { name: "新建听写", exact: true }).click();
   expect(
-    await page.evaluate(() =>
-      localStorage.getItem(`ownclass:dictation:${location.pathname}:draft`),
+    await page.evaluate(
+      (accountId) =>
+        localStorage.getItem(`ownclass:dictation:${location.pathname}:${accountId}:draft`),
+      account.id,
     ),
   ).toContain("keep me");
   const backup = page.waitForEvent("download");
@@ -135,8 +141,8 @@ test("320px、桌面与键盘；坏本机稿不会被空稿覆盖", async ({ pag
   expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe("BODY");
 });
 
-test("网络失败保留编辑草稿，错误可重试；拼音模式不朗读", async ({ page, request }) => {
-  const r = await request.post("api/batches", {
+test("网络失败保留编辑草稿，错误可重试；拼音模式不朗读", async ({ page }) => {
+  const r = await page.request.post("api/batches", {
     data: { title: "拼音测试", entries: [{ zh: "太阳", pinyin: "tài yáng" }] },
   });
   const { batch } = await r.json();

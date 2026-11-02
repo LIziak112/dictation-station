@@ -1,7 +1,7 @@
 import { createRoot } from "react-dom/client";
-import { App } from "./App";
+import { Session } from "./Session";
 import "./style.css";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("找不到应用挂载点");
-createRoot(root).render(<App />);
+createRoot(root).render(<Session />);

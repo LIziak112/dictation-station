@@ -1,26 +1,32 @@
-import { timingSafeEqual } from "node:crypto";
+import { resolve } from "node:path";
 import { getConnInfo } from "@hono/node-server/conninfo";
+import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { z } from "zod";
 import {
-  batchInputSchema,
+  type Account,
+  credentialsSchema,
   idSchema,
   ocrRequestSchema,
+  passwordChangeSchema,
   ttsRequestSchema,
-  updateSchema,
 } from "../../../packages/contract/src/index";
+import { Auth } from "./auth";
 import type { OcrInput, TtsInput } from "./providers";
 import { Conflict, type Store } from "./store";
 
 interface Options {
-  writeToken: string;
+  allowRegistration?: boolean;
+  audioDir?: string;
   ocr?: (image: OcrInput) => Promise<string>;
   tts?: (item: TtsInput) => Promise<string>;
   trustProxy?: boolean;
 }
 export function createApp(store: Store, options: Options) {
-  const app = new Hono();
+  const app = new Hono<{ Variables: { account: Account } }>();
+  const auth = new Auth(store);
   const buckets = new Map<string, { count: number; expires: number }>();
   function limited(key: string, limit: number, ms: number) {
     const now = Date.now();
@@ -66,12 +72,6 @@ export function createApp(store: Store, options: Options) {
       const ip = options.trustProxy ? (c.req.header("x-real-ip") ?? remote) : remote;
       if (limited(`write:${ip}`, 120, 60000))
         return c.json({ error: "操作太频繁，请稍后重试" }, 429);
-      if (options.writeToken) {
-        const supplied = Buffer.from(c.req.header("Authorization") ?? "");
-        const expected = Buffer.from(`Bearer ${options.writeToken}`);
-        if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected))
-          return c.json({ error: "请输入正确的管理口令" }, 401);
-      }
       if (c.req.path.includes("/ocr") && limited(`ocr:${ip}`, 40, 3600000))
         return c.json({ error: "图片识别次数过多，请稍后重试" }, 429);
       if (c.req.path.includes("/tts") && limited(`tts:${ip}`, 120, 3600000))
@@ -100,36 +100,101 @@ export function createApp(store: Store, options: Options) {
     console.error("[dictation]", error instanceof Error ? error.message : "未知错误");
     return c.json({ error: "服务暂时不可用，请保留草稿后重试" }, 500);
   });
+  const publicPaths = new Set(["/api/health", "/api/auth/register", "/api/auth/login"]);
+  app.use("*", async (c, next) => {
+    if (
+      publicPaths.has(c.req.path) ||
+      (!c.req.path.startsWith("/api/") && !c.req.path.startsWith("/audio/"))
+    )
+      return next();
+    const account = auth.current(getCookie(c, "dictation_session") ?? "");
+    if (!account) return c.json({ error: "请先登录" }, 401);
+    c.set("account", account);
+    await next();
+  });
+  app.post("/api/auth/register", async (c) => {
+    if (options.allowRegistration === false)
+      return c.json({ error: "本站已关闭注册，请联系部署者" }, 403);
+    const input = credentialsSchema.parse(await c.req.json());
+    const account = await auth.register(input.username, input.password);
+    if (!account) return c.json({ error: "用户名已存在" }, 409);
+    setCookie(c, "dictation_session", auth.createSession(account.id), {
+      httpOnly: true,
+      sameSite: "Lax",
+      path: "/",
+      maxAge: 30 * 86400,
+      secure: c.req.url.startsWith("https:") || (c.req.header("Origin") ?? "").startsWith("https:"),
+    });
+    return c.json({ account }, 201);
+  });
+  app.post("/api/auth/login", async (c) => {
+    const input = credentialsSchema.parse(await c.req.json());
+    const account = await auth.login(input.username, input.password);
+    if (!account) return c.json({ error: "用户名或密码不正确" }, 401);
+    setCookie(c, "dictation_session", auth.createSession(account.id), {
+      httpOnly: true,
+      sameSite: "Lax",
+      path: "/",
+      maxAge: 30 * 86400,
+      secure: c.req.url.startsWith("https:") || (c.req.header("Origin") ?? "").startsWith("https:"),
+    });
+    return c.json({ account });
+  });
+  app.get("/api/auth/me", (c) => c.json({ account: c.get("account") }));
+  app.post("/api/auth/logout", (c) => {
+    auth.logout(getCookie(c, "dictation_session") ?? "");
+    deleteCookie(c, "dictation_session", { path: "/" });
+    return c.json({ ok: true });
+  });
+  app.post("/api/auth/password", async (c) => {
+    const input = passwordChangeSchema.parse(await c.req.json());
+    if (!(await auth.changePassword(c.get("account").id, input.currentPassword, input.newPassword)))
+      return c.json({ error: "当前密码不正确" }, 400);
+    deleteCookie(c, "dictation_session", { path: "/" });
+    return c.json({ ok: true });
+  });
+  app.use("/audio/:file", async (c, next) => {
+    const file = c.req.param("file");
+    if (!/^[a-f0-9]{40}\.mp3$/.test(file) || !store.hasAudio(c.get("account").id, file))
+      return c.notFound();
+    return serveStatic({
+      root: options.audioDir ?? resolve(store.dir, "audio"),
+      rewriteRequestPath: () => file,
+    })(c, next);
+  });
   app.get("/api/health", (c) =>
     c.json({
       ok: true,
       ocr: !!options.ocr,
       tts: !!options.tts,
-      writeProtected: !!options.writeToken,
+      allowRegistration: options.allowRegistration !== false,
     }),
   );
   app.get("/api/batches", (c) =>
     c.json({
-      batches: store.list().map(({ entries, ...batch }) => ({ ...batch, count: entries.length })),
+      batches: store
+        .list(c.get("account").id)
+        .map(({ entries, ...batch }) => ({ ...batch, count: entries.length })),
     }),
   );
   app.post("/api/batches", async (c) =>
-    c.json({ batch: store.create(batchInputSchema.parse(await c.req.json())) }, 201),
+    c.json({ batch: store.create(c.get("account").id, await c.req.json()) }, 201),
   );
   app.get("/api/batches/:id", (c) => {
-    const b = store.get(idSchema.parse(c.req.param("id")));
-    return b ? c.json({ batch: b }) : c.json({ error: "词表不存在，请检查分享链接" }, 404);
+    const b = store.get(c.get("account").id, idSchema.parse(c.req.param("id")));
+    return b ? c.json({ batch: b }) : c.json({ error: "词表不存在，请检查本账号链接" }, 404);
   });
   app.put("/api/batches/:id", async (c) => {
     const b = store.update(
+      c.get("account").id,
       idSchema.parse(c.req.param("id")),
-      updateSchema.parse(await c.req.json()),
+      await c.req.json(),
     );
     return b ? c.json({ batch: b }) : c.json({ error: "词表不存在，草稿仍在本机" }, 404);
   });
   app.delete("/api/batches/:id", (c) => {
     const revision = z.coerce.number().int().positive().parse(c.req.query("revision"));
-    return store.delete(idSchema.parse(c.req.param("id")), revision)
+    return store.delete(c.get("account").id, idSchema.parse(c.req.param("id")), revision)
       ? c.json({ ok: true })
       : c.json({ error: "词表不存在" }, 404);
   });
@@ -149,7 +214,9 @@ export function createApp(store: Store, options: Options) {
     const result = [];
     for (const item of items) {
       try {
-        result.push({ text: item.text, lang: item.lang, url: await tts(item) });
+        const url = await tts(item);
+        store.grantAudio(c.get("account").id, url.slice("audio/".length));
+        result.push({ text: item.text, lang: item.lang, url });
       } catch {
         result.push({
           text: item.text,

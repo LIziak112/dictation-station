@@ -1,6 +1,7 @@
 import { Headphones } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
+  type Account,
   type Batch,
   type BatchSummary,
   defaultSettings,
@@ -16,26 +17,26 @@ import { api, download } from "./api";
 import { BatchDetail } from "./BatchDetail";
 import { blankDraft, Editor } from "./Editor";
 import { Home } from "./Home";
+import { PasswordForm } from "./PasswordForm";
 import { Player } from "./Player";
 import { loadSettings, rememberSettings } from "./preferences";
 import { localKey, useLocal } from "./storage";
 
 type View = "home" | "batch" | "editor" | "player";
-export function App() {
+export function App({ account, onLogout }: { account: Account; onLogout: () => void }) {
   const [view, setView] = useState<View>("home");
   const [batch, setBatch] = useState<Batch | null>(null);
   const [list, setList] = useState<BatchSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
-  const [health, setHealth] = useState({ ocr: false, tts: false, writeProtected: false });
-  const [token, setToken] = useState("");
+  const [health, setHealth] = useState({ ocr: false, tts: false, allowRegistration: false });
   const [notice, setNotice] = useState("");
   const [mode, setMode] = useState<Mode>("en2en");
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [startImmediately, setStartImmediately] = useState(false);
-  const draft = useLocal(localKey("draft"), draftSchema);
-  const progress = useLocal(localKey("progress"), progressSchema);
+  const draft = useLocal(localKey("draft", account.id), draftSchema);
+  const progress = useLocal(localKey("progress", account.id), progressSchema);
   const draftRef = useRef({ draft, progress });
   draftRef.current = { draft, progress };
   const screenKey = view === "player" ? `${view}-${progress.value?.phase ?? "player"}` : view;
@@ -90,7 +91,7 @@ export function App() {
           .then(({ batch: b }) => {
             if (controller.signal.aborted) return;
             setBatch(b);
-            setSettings(loadSettings(b.id));
+            setSettings(loadSettings(b.id, account.id));
             setView("batch");
             const first = (Object.keys(MODES) as Mode[]).find((m) =>
               b.entries.some((e) => e.modes.includes(m)),
@@ -127,7 +128,7 @@ export function App() {
       window.removeEventListener("hashchange", route);
       window.removeEventListener("dictation:refresh", route);
     };
-  }, []);
+  }, [account.id]);
   function home() {
     if (location.hash) location.hash = "";
     else {
@@ -226,43 +227,23 @@ export function App() {
             </span>
           </button>
           <span className="header-note">把时间，留给学习。</span>
-          {health.writeProtected && (
-            <details className="access">
-              <summary>管理口令</summary>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  try {
-                    sessionStorage.setItem("writeToken", token);
-                    setToken("");
-                    setNotice("口令已暂存，仅当前标签页使用；下次写操作验证是否正确");
-                  } catch {
-                    setNotice("口令暂存失败，请检查浏览器存储权限");
-                  }
-                }}
-              >
-                <label className="field">
-                  管理口令
-                  <input
-                    type="password"
-                    autoComplete="off"
-                    value={token}
-                    onChange={(e) => setToken(e.target.value)}
-                  />
-                </label>
-                <button type="submit">暂存口令</button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    sessionStorage.removeItem("writeToken");
-                    setNotice("已清除当前标签页口令");
-                  }}
-                >
-                  清除
-                </button>
-              </form>
-            </details>
-          )}
+          <span className="account-name">{account.username}</span>
+          <details className="access">
+            <summary>账号</summary>
+            <PasswordForm onChanged={onLogout} disabled={!!draft.error || !!progress.error} />
+          </details>
+          <button
+            type="button"
+            onClick={() => {
+              if (draft.error || progress.error) {
+                setNotice("请先导出或恢复保存失败的本机内容，再退出登录");
+                return;
+              }
+              onLogout();
+            }}
+          >
+            退出登录
+          </button>
         </div>
       </header>
       <main id="main" data-screen={screenKey} tabIndex={-1}>
@@ -370,7 +351,7 @@ export function App() {
                 settings={settings}
                 setSettings={(s) => {
                   setSettings(s);
-                  rememberSettings(batch.id, s);
+                  rememberSettings(batch.id, s, account.id);
                 }}
                 progress={progress.value}
                 compatible={compatible}
@@ -405,7 +386,7 @@ export function App() {
                 batch={batch}
                 progress={progress.value}
                 onChange={(p) => {
-                  rememberSettings(p.batchId, p.settings);
+                  rememberSettings(p.batchId, p.settings, account.id);
                   return progress.write(p);
                 }}
                 onBack={() => setView("batch")}

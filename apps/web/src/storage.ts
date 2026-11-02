@@ -73,4 +73,5 @@ export function useLocal<T>(key: string, schema: z.ZodType<T>) {
   }
   return { value, write, retry, error, blocked, reset, raw: initial.raw };
 }
-export const localKey = (name: string) => `ownclass:dictation:${location.pathname}:${name}`;
+export const localKey = (name: string, accountId: string) =>
+  `ownclass:dictation:${location.pathname}:${accountId}:${name}`;

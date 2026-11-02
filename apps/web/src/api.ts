@@ -18,18 +18,14 @@ export class ApiError extends Error {
   }
 }
 export async function request<T>(path: string, schema: z.ZodType<T>, options: RequestInit = {}) {
-  const write = !!options.method && !["GET", "HEAD"].includes(options.method);
   const headers = new Headers(options.headers);
   if (options.body) headers.set("Content-Type", "application/json");
-  if (write) {
-    const token = sessionStorage.getItem("writeToken");
-    if (token) headers.set("Authorization", `Bearer ${token}`);
-  }
   const r = await fetch(path, { ...options, headers });
   const body: unknown = await r.json().catch(() => null);
   if (!r.ok) {
     const parsed = z.object({ error: z.string() }).safeParse(body);
-    if (r.status === 401) sessionStorage.removeItem("writeToken");
+    if (r.status === 401 && !path.startsWith("api/auth/"))
+      window.dispatchEvent(new Event("dictation:session-expired"));
     throw new ApiError(parsed.success ? parsed.data.error : "请求失败，请保留草稿后重试", r.status);
   }
   return schema.parse(body);

@@ -27,7 +27,7 @@ export default defineConfig({
       PORT: "8898",
       BASE_PATH: "/tingxie/",
       DATA_DIR: data,
-      WRITE_TOKEN: "",
+      ALLOW_REGISTRATION: "true",
       PADDLEOCR_TOKEN: "",
       ENABLE_SERVER_TTS: "false",
       HOST: "127.0.0.1",

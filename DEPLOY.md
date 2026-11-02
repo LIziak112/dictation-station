@@ -19,7 +19,7 @@ pnpm start
 | PORT / HOST                           | 8083 / 127.0.0.1                                 |
 | DATA_DIR                              | 根目录 data；可使用绝对路径                      |
 | BASE_PATH                             | `/`；保留前缀转发时设 `/tingxie/`                |
-| WRITE_TOKEN                           | 空值为开放写入；设置后所有写接口要求 Bearer 口令 |
+| ALLOW_REGISTRATION                    | true；设 false 关闭注册，已有账号仍可登录        |
 | TRUST_PROXY                           | false；仅当可信反代覆盖 x-real-ip 时启用         |
 | PADDLEOCR_TOKEN                       | 留空不启用图片识别                               |
 | PADDLEOCR_URL / PADDLEOCR_MODEL       | 参见 .env.example；端点由部署者配置              |
@@ -49,20 +49,28 @@ location /tingxie/ {
 
 同域主应用若有 scope=/ 的 Service Worker，需要在主应用 navigateFallbackDenylist 中排除 `/tingxie/` 并等待旧 SW 更新，或使用独立子域。本仓库不会修改线上主应用 SW。
 
-## 首次迁移与备份
+## 首次启用账号与备份
 
-1. 停止旧服务，备份整个 data 目录，包含 batches.json 和 audio。
-2. 先用备份副本作为 DATA_DIR 启动新程序，核对词表数量、内容、旧分享链接和已有音频。
-3. 新程序创建 dictation.db，运行生成的迁移，在一个事务中一次性导入 batches.json。原 JSON 不修改；坏 JSON、坏词条或重复 ID 会阻止启动，需要修复副本后再迁移。
-4. 确认后切换新服务，不将两个版本同时指向同一份旧数据运行。
-5. 停服务后备份整个 data（含 SQLite db/wal/shm 文件），或使用 SQLite 在线备份工具。不能在运行时只复制 db 而忽略 WAL。
+本版本不提供旧记录迁移。使用新的空 DATA_DIR；旧数据由部署者自行保留，不自动删除或分配给新账号。不要直接把已有词表的旧数据库作为账号版本的数据目录。
 
-回退需停止新服务，恢复旧程序及升级前对应数据备份。新版本写入 SQLite 的内容不会自动回写 batches.json；回退前先导出新增/变更词表，避免丢失升级后的业务数据。
+首次启动保持 ALLOW_REGISTRATION=true，在页面创建账号；需要限制注册时之后改为 false 并重启。网页使用同源 Cookie，生产部署采用 HTTPS。会话有效期 30 天；修改密码会退出该账号全部设备。一个站点实例建议独立主机名，避免和另一套同名 Cookie 冲突。
+
+忘记密码时，在同一 DATA_DIR、同一 .env 下执行（PowerShell）：
+
+```powershell
+$env:RESET_PASSWORD = Read-Host '输入新密码（至少 8 字符）' -MaskInput
+pnpm account:reset-password 用户名
+Remove-Item Env:RESET_PASSWORD
+```
+
+CLI 不提供账号查询或创建服务；用户名必须已存在，重设后全部会话失效。密码不作为命令行参数或日志输出。
+
+部署后停服务备份整个 data（包含 db/wal/shm 文件和 audio），或使用 SQLite 在线备份工具；不能在运行时只复制 db 而忽略 WAL。回退时恢复对应程序与数据备份，不编写旧版回填逻辑。
 
 ## 人工验收
 
 - 在目标手机、iPad、电脑上确认五种模式、实际声音、多音字、0.5×/2×语速、自动下一词、暂停与系统后台行为。
 - 手机竖屏、横屏及键盘弹出后编辑长词、中文、拼音；页面可缩放，按钮可达。
 - 不承诺断网刷新后整个应用离线打开；草稿和进度在网络恢复后仍可读取。原图不在服务器或本机持久化。
-- 验证口令有无配置、OCR 缺配置/失败、服务器语音关闭/失败，提示应可恢复。
+- 验证注册开关、登录、退出、修改密码、不同账号隔离，以及 OCR／服务器语音关闭或失败。
 - 尚无自动音频清理或定时备份，需要监控 data 容量。

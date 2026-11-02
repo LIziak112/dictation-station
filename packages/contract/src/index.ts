@@ -180,7 +180,23 @@ export const healthSchema = z.object({
   ok: z.boolean(),
   ocr: z.boolean(),
   tts: z.boolean(),
-  writeProtected: z.boolean(),
+  allowRegistration: z.boolean(),
+});
+export const accountSchema = z.object({ id: idSchema, username: z.string() });
+export type Account = z.infer<typeof accountSchema>;
+export const accountResponseSchema = z.object({ account: accountSchema });
+export const credentialsSchema = z.strictObject({
+  username: z
+    .string()
+    .trim()
+    .min(2)
+    .max(40)
+    .regex(/^[A-Za-z0-9_-]+$/, "用户名使用字母、数字、下划线或短横线"),
+  password: z.string().min(8).max(128),
+});
+export const passwordChangeSchema = z.strictObject({
+  currentPassword: z.string().min(1).max(128),
+  newPassword: credentialsSchema.shape.password,
 });
 export const settingsSchema = z.strictObject({
   repeat: z.number().int().min(1).max(5),
