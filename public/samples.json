@@ -40,7 +40,12 @@
       { "zh": "崎岖", "pinyin": "qí qū", "modes": ["zh_dictation", "pinyin2hanzi"] },
       { "zh": "斑驳", "pinyin": "bān bó", "modes": ["zh_dictation", "pinyin2hanzi"] },
       { "zh": "蜿蜒", "pinyin": "wān yán", "modes": ["zh_dictation", "pinyin2hanzi"] },
-      { "zh": "勉强", "pinyin": "miǎn qiǎng", "hint": "勉强答应", "modes": ["zh_dictation", "pinyin2hanzi"] },
+      {
+        "zh": "勉强",
+        "pinyin": "miǎn qiǎng",
+        "hint": "勉强答应",
+        "modes": ["zh_dictation", "pinyin2hanzi"]
+      },
       { "zh": "徘徊", "pinyin": "pái huái", "modes": ["zh_dictation", "pinyin2hanzi"] },
       { "zh": "恍惚", "pinyin": "huǎng hū", "modes": ["zh_dictation", "pinyin2hanzi"] },
       { "zh": "憧憬", "pinyin": "chōng jǐng", "modes": ["zh_dictation", "pinyin2hanzi"] },
