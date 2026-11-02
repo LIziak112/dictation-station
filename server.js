@@ -283,6 +283,9 @@ const server = http.createServer(async (req, res) => {
           return json(res, 401, { error: '请输入正确的管理口令' });
       }
     }
+    if (req.method === 'GET' && p === '/vendor/qrcode.js') {
+      return serveStatic(res, path.join(PUBLIC, 'vendor', 'qrcode.js'));
+    }
     if (req.method === 'GET' && (p === '/' || p === '/index.html')) {
       return serveStatic(res, path.join(PUBLIC, 'index.html'));
     }
