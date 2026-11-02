@@ -22,7 +22,7 @@ const PUBLIC = path.join(ROOT, 'public');
 const DATA = path.join(ROOT, 'data');
 const AUDIO = path.join(DATA, 'audio');
 const DB_FILE = path.join(DATA, 'batches.json');
-const PORT = Number(process.env.PORT || 8083);
+
 
 /* ---------- .env ---------- */
 function loadEnv(file) {
@@ -41,6 +41,9 @@ function loadEnv(file) {
   } catch (_) { /* no .env is fine */ }
 }
 loadEnv(path.join(ROOT, '.env'));
+const PORT = Number(process.env.PORT || 8083);
+const WRITE_TOKEN = process.env.WRITE_TOKEN || '';
+const ALLOW_UNSAFE_WRITES = process.env.ALLOW_UNSAFE_WRITES === 'true';
 
 const CFG = {
   paddleUrl: process.env.PADDLEOCR_URL || 'https://paddleocr.aistudio-app.com/api/v2/ocr/jobs',
@@ -255,15 +258,31 @@ function rateLimited(ip, bucket, limit, windowMs) {
   return false;
 }
 function clientIp(req) {
-  return String(req.headers['x-real-ip'] || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+  return String((process.env.TRUST_PROXY === 'true' && (req.headers['x-real-ip'] || req.headers['x-forwarded-for'])) || req.socket.remoteAddress || '').split(',')[0].trim();
 }
 
 /* ---------- 路由 ---------- */
 const server = http.createServer(async (req, res) => {
-  const u = new URL(req.url, 'http://localhost');
-  const p = decodeURIComponent(u.pathname);
-
+  let p = '';
   try {
+    const u = new URL(req.url, 'http://localhost');
+    try { p = decodeURIComponent(u.pathname); }
+    catch (_) { return json(res, 400, { error: '无效 URL 编码' }); }
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    const protectedWrite = p.startsWith('/api/') && !['GET', 'HEAD', 'OPTIONS'].includes(req.method);
+    if (protectedWrite) {
+      if (rateLimited(clientIp(req), 'write', 120, 60000))
+        return json(res, 429, { error: '操作太频繁，请稍后再试' });
+      if (!WRITE_TOKEN && !ALLOW_UNSAFE_WRITES)
+        return json(res, 503, { error: '服务端尚未配置管理口令，写操作已关闭' });
+      if (WRITE_TOKEN) {
+        const supplied = Buffer.from(String(req.headers.authorization || ''));
+        const expected = Buffer.from(`Bearer ${WRITE_TOKEN}`);
+        if (supplied.length !== expected.length || !crypto.timingSafeEqual(supplied, expected))
+          return json(res, 401, { error: '请输入正确的管理口令' });
+      }
+    }
     if (req.method === 'GET' && (p === '/' || p === '/index.html')) {
       return serveStatic(res, path.join(PUBLIC, 'index.html'));
     }
@@ -291,6 +310,12 @@ const server = http.createServer(async (req, res) => {
 
     if (p === '/api/batches' && req.method === 'POST') {
       const body = await readJson(req);
+      if (!body || typeof body !== 'object' || Array.isArray(body))
+        return json(res, 400, { error: '批次必须为对象' });
+      if (body.id !== undefined && (typeof body.id !== 'string' || !/^[A-Za-z0-9_-]{4,20}$/.test(body.id) || ['__proto__', 'constructor', 'prototype'].includes(body.id)))
+        return json(res, 400, { error: '无效批次 ID' });
+      if (body.entries !== undefined && (!Array.isArray(body.entries) || body.entries.some(e => !e || typeof e !== 'object' || Array.isArray(e))))
+        return json(res, 400, { error: '词条必须为对象数组' });
       const id = body.id || newId();
       const now = new Date().toISOString();
       const prev = db.batches[id];
@@ -315,7 +340,7 @@ const server = http.createServer(async (req, res) => {
     const mBatch = p.match(/^\/api\/batches\/([A-Za-z0-9_-]{4,20})$/);
     if (mBatch) {
       const id = mBatch[1];
-      const b = db.batches[id];
+      const b = Object.hasOwn(db.batches, id) ? db.batches[id] : null;
       if (!b) return json(res, 404, { error: '批次不存在' });
       if (req.method === 'GET') {
         const fixed = ensureEntryIds(b.entries);
@@ -325,6 +350,9 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'DELETE') { delete db.batches[id]; saveDb(); return json(res, 200, { ok: true }); }
       if (req.method === 'PUT') {
         const body = await readJson(req);
+        if (!body || typeof body !== 'object' || Array.isArray(body) ||
+            (body.entries !== undefined && (!Array.isArray(body.entries) || body.entries.some(e => !e || typeof e !== 'object' || Array.isArray(e)))))
+          return json(res, 400, { error: '无效批次或词条数据' });
         Object.assign(b, {
           title: String(body.title ?? b.title).slice(0, 80),
           subject: body.subject ?? b.subject,
@@ -389,10 +417,10 @@ const server = http.createServer(async (req, res) => {
     res.end('Not found');
   } catch (e) {
     console.error('[error]', req.method, p, e && e.message);
-    json(res, 500, { error: String((e && e.message) || e) });
+    json(res, e instanceof SyntaxError ? 400 : 500, { error: e instanceof SyntaxError ? '无效 JSON' : '服务暂时不可用，请稍后重试' });
   }
 });
 
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`[dictation] listening on 127.0.0.1:${PORT}`);
+  console.log(`[dictation] listening on 127.0.0.1:${server.address().port}`);
 });

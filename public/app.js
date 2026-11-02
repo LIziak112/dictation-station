@@ -43,7 +43,18 @@ function toast(msg, ms = 2200) {
   toast._h = setTimeout(() => t.classList.remove('show'), ms);
 }
 async function api(path, opts = {}) {
-  const r = await fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts));
+  const headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers);
+  if (!['GET', 'HEAD'].includes((opts.method || 'GET').toUpperCase())) {
+    let token = sessionStorage.getItem('writeToken');
+    if (!token) {
+      token = prompt('请输入管理口令（仅当前标签页保存，不会放入分享链接）');
+      if (!token) throw new Error('已取消操作');
+      sessionStorage.setItem('writeToken', token);
+    }
+    headers.Authorization = `Bearer ${token}`;
+  }
+  const r = await fetch(path, Object.assign({}, opts, { headers }));
+  if (r.status === 401) sessionStorage.removeItem('writeToken');
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || `请求失败 (${r.status})`);
   return j;
@@ -281,9 +292,11 @@ async function renderHome() {
     b.onclick = async (ev) => {
       ev.stopPropagation();
       if (!confirm('删除这个批次？词表和音频缓存不会被恢复。')) return;
-      await api(`api/batches/${b.dataset.del}`, { method: 'DELETE' });
-      toast('已删除');
-      renderHome();
+      try {
+        await api(`api/batches/${b.dataset.del}`, { method: 'DELETE' });
+        toast('已删除');
+        renderHome();
+      } catch (e) { toast(e.message); }
     };
   });
 }
