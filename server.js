@@ -298,6 +298,7 @@ const server = http.createServer(async (req, res) => {
         id,
         title: String(body.title || '未命名听写').slice(0, 80),
         subject: body.subject || 'mixed',
+        stage: String(body.stage || '').slice(0, 20),
         grade: String(body.grade || '').slice(0, 40),
         textbook: String(body.textbook || '').slice(0, 60),
         unit: String(body.unit || '').slice(0, 60),
@@ -327,6 +328,7 @@ const server = http.createServer(async (req, res) => {
         Object.assign(b, {
           title: String(body.title ?? b.title).slice(0, 80),
           subject: body.subject ?? b.subject,
+          stage: String(body.stage ?? b.stage ?? '').slice(0, 20),
           grade: String(body.grade ?? b.grade).slice(0, 40),
           textbook: String(body.textbook ?? b.textbook).slice(0, 60),
           unit: String(body.unit ?? b.unit).slice(0, 60),

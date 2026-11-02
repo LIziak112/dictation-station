@@ -137,7 +137,7 @@ function parseList(text) {
     const arr = Array.isArray(obj) ? obj : (obj.entries || obj.words || obj.list);
     if (!Array.isArray(arr)) throw new Error('JSON 里没有 entries 数组');
     return {
-      meta: Array.isArray(obj) ? {} : { title: obj.title, grade: obj.grade, subject: obj.subject, unit: obj.unit },
+      meta: Array.isArray(obj) ? {} : { title: obj.title, stage: obj.stage, grade: obj.grade, textbook: obj.textbook, subject: obj.subject, unit: obj.unit },
       entries: arr.map(normalizeEntry),
     };
   }
@@ -491,6 +491,10 @@ function renderImport() {
           <label class="field" style="flex:1"><span>学段/年级</span><input type="text" id="batch-grade" value="${esc(d.meta.grade || '')}" placeholder="例：小学三年级"></label>
           <label class="field" style="flex:1"><span>单元</span><input type="text" id="batch-unit" value="${esc(d.meta.unit || '')}" placeholder="例：Unit 3"></label>
         </div>
+        <div class="row">
+          <label class="field" style="flex:1"><span>学段</span><input id="batch-stage" value="${esc(d.meta.stage || '')}" placeholder="小学 / 初中"></label>
+          <label class="field" style="flex:1"><span>教材 / 来源</span><input id="batch-textbook" value="${esc(d.meta.textbook || '')}" placeholder="自建词表或教材名称"></label>
+        </div>
         <table class="words">
           <thead><tr><th>#</th><th>英文</th><th>中文</th><th>拼音</th><th>提示</th><th></th></tr></thead>
           <tbody>
@@ -555,6 +559,8 @@ async function saveBatch(d) {
     grade: ($('#batch-grade') && $('#batch-grade').value.trim()) || d.meta.grade || '',
     unit: ($('#batch-unit') && $('#batch-unit').value.trim()) || d.meta.unit || '',
     subject,
+    stage: ($('#batch-stage') && $('#batch-stage').value.trim()) || d.meta.stage || '',
+    textbook: ($('#batch-textbook') && $('#batch-textbook').value.trim()) || d.meta.textbook || '',
     sourceText: d.raw || '',
     entries,
   };
@@ -666,6 +672,15 @@ function speakFallback(text, lang) {
 
 const sharedAudio = new Audio();
 sharedAudio.preload = 'auto';
+function cancelCurrentAudio() {
+  try {
+    sharedAudio.pause();
+    sharedAudio.currentTime = 0;
+    sharedAudio.removeAttribute('src');
+    sharedAudio.load();
+  } catch (_) {}
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+}
 function playUrl(url) {
   return new Promise((resolve) => {
     let done = false;
@@ -690,8 +705,9 @@ async function startPlayer(mode, onlyIds) {
     mode = ms[0];
   }
 
+  if (!MODES[mode]) { toast('没有可用的听写模式'); return; }
   entries = entries.map((e, i) => Object.assign({}, e, { id: e.id || `idx${i}` }));
-  const queue = entries.map((e) => {
+  const queue = entries.filter((e) => Array.isArray(e.modes) && e.modes.includes(mode)).map((e) => {
     const m = MODES[mode];
     let prompt = '';
     if (m.show === 'zh') prompt = e.zh;
@@ -705,7 +721,7 @@ async function startPlayer(mode, onlyIds) {
   if (!queue.length) { toast('这个模式下没有可用词条'); return; }
 
   S.view = 'player';
-  setTop(MODES[mode].label, `${queue.length} 个`, () => renderBatch());
+  setTop(MODES[mode].label, `${queue.length} 个`, () => { stopPlay(); renderBatch(); });
 
   S.player = {
     mode, queue, idx: 0, repeat: 2, interval: 4, auto: true, order: 'seq',
@@ -829,11 +845,13 @@ async function startPlayer(mode, onlyIds) {
   function stopPlay() {
     P.token++;
     P.playing = false;
+    cancelCurrentAudio();
   }
 
   async function playCurrent(manual) {
     const P2 = S.player;
     if (!P2) return;
+    cancelCurrentAudio();
     const token = ++P2.token;
     P2.playing = true;
     const q = P2.queue[P2.idx];
