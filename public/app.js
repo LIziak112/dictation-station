@@ -715,6 +715,22 @@ function renderEditor(entries, isNew) {
 /* ---------- 播放器 ---------- */
 function audioKey(lang, text) { return `${lang}|${text}`; }
 
+/* 语速调节：0.5×–2×，按批次记住；新批次沿用上次选择。 */
+const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+let playbackSpeed = 1;
+function loadSpeed(batchId) {
+  const own = Number(localStorage.getItem(`dictation.speed.${batchId}`));
+  if (SPEEDS.includes(own)) return own;
+  const last = Number(localStorage.getItem('dictation.speed'));
+  return SPEEDS.includes(last) ? last : 1;
+}
+function saveSpeed(batchId, value) {
+  try {
+    localStorage.setItem(`dictation.speed.${batchId}`, String(value));
+    localStorage.setItem('dictation.speed', String(value));
+  } catch (_) {}
+}
+
 async function ensureAudio(items) {
   const need = [];
   const seen = new Set();
@@ -752,7 +768,7 @@ function speakFallback(text, lang) {
     if (!('speechSynthesis' in window)) { reject(new Error('设备不支持朗读')); return; }
     const u = new SpeechSynthesisUtterance(text);
     u.lang = lang === 'en' ? 'en-US' : 'zh-CN';
-    u.rate = 0.9;
+    u.rate = Math.max(0.1, Math.min(3, 0.9 * playbackSpeed));
     let done = false;
     const finish = (error) => {
       if (done) return;
@@ -797,6 +813,7 @@ function playUrl(url) {
     const timer = setTimeout(() => finish(new Error('音频播放超时')), 30000);
     sharedAudio.onended = () => finish();
     sharedAudio.onerror = () => finish(new Error('音频加载失败'));
+    sharedAudio.playbackRate = playbackSpeed;
     sharedAudio.src = url;
     sharedAudio.play().catch(finish);
   });
@@ -835,7 +852,9 @@ async function startPlayer(mode, onlyIds) {
   S.player = {
     mode, queue, idx: 0, repeat: 2, interval: 4, auto: true, order: 'seq',
     revealed: false, results: {}, token: 0, playing: false, progressEl: null,
+    speed: loadSpeed(b.id),
   };
+  playbackSpeed = S.player.speed;
 
   app.innerHTML = `
     <div class="player-wrap">
@@ -856,6 +875,7 @@ async function startPlayer(mode, onlyIds) {
           <label>重复次数<input type="number" id="set-repeat" min="1" max="5" value="2"></label>
           <label>间隔(秒)<input type="number" id="set-interval" min="1" max="30" value="4"></label>
           <label>顺序<select id="set-order"><option value="seq">按顺序</option><option value="shuffle">打乱</option></select></label>
+          <label>语速<select id="set-speed">${SPEEDS.map((v) => `<option value="${v}"${v === S.player.speed ? ' selected' : ''}>${v}×</option>`).join('')}</select></label>
         </div>
         <div class="switch-row">
           <span>自动播放（播完自动下一个）</span>
@@ -881,6 +901,14 @@ async function startPlayer(mode, onlyIds) {
     stopPlay();
     if (P.order === 'shuffle') shuffleQueue();
     P.idx = 0; drawPrompt(); syncPlayButton();
+  };
+  $('#set-speed').onchange = (e) => {
+    const v = Number(e.target.value);
+    if (!SPEEDS.includes(v)) return;
+    P.speed = v;
+    playbackSpeed = v;
+    sharedAudio.playbackRate = v;
+    saveSpeed(b.id, v);
   };
   $('#set-auto').onclick = (e) => { P.auto = !P.auto; e.target.classList.toggle('on', P.auto); };
   $('#set-reveal').onclick = (e) => { P.revealed = !P.revealed; e.target.classList.toggle('on', P.revealed); drawPrompt(); };
