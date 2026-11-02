@@ -1,54 +1,68 @@
-# 部署说明
+# 部署与回退
 
-## 生产环境
+## 构建与启动
 
-| 项 | 值 |
-|---|---|
-| 目录 | `/opt/dictation/app` |
-| 服务 | `dictation.service`（systemd） |
-| 监听 | `127.0.0.1:8083` |
-| 入口 | `https://ownclass.top/tingxie/`（nginx 反代） |
-| 凭据 | `/etc/dictation.env`（root:root 600，通过 systemd `EnvironmentFile` 注入） |
+需要 Node.js 24+、pnpm 12.6.0。先安装再构建，不能再只上传旧的 server.js/public。
 
-## 发布
-
-```bash
-tar -czf /tmp/app.tgz server.js public WORDLIST-SPEC.md
-scp /tmp/app.tgz luyou@47.116.99.166:/tmp/
-ssh luyou@47.116.99.166 'cd /opt/dictation/app && tar -xzf /tmp/app.tgz && sudo systemctl restart dictation'
-curl -s https://ownclass.top/tingxie/api/health
+```sh
+pnpm install --frozen-lockfile
+pnpm build
+pnpm start
 ```
 
-上传偶发断流时用 `rsync --partial --inplace --append-verify --timeout=15` 重试，传完比对 md5。
+运行时须保留 `dist/`、`apps/server/drizzle/`、`package.json`、`server.js`、锁文件、依赖和数据目录。systemd 的 WorkingDirectory 指向项目根目录，入口可以继续 `node server.js`。凭据放在受限读取的 EnvironmentFile 中，不提交真实值。
 
-## 回滚
+## 环境变量
 
-```bash
-sudo systemctl stop dictation
-# 用上一版文件覆盖 /opt/dictation/app
-sudo systemctl start dictation
+| 变量                                  | 缺省值与用途                                     |
+| ------------------------------------- | ------------------------------------------------ |
+| PORT / HOST                           | 8083 / 127.0.0.1                                 |
+| DATA_DIR                              | 根目录 data；可使用绝对路径                      |
+| BASE_PATH                             | `/`；保留前缀转发时设 `/tingxie/`                |
+| WRITE_TOKEN                           | 空值为开放写入；设置后所有写接口要求 Bearer 口令 |
+| TRUST_PROXY                           | false；仅当可信反代覆盖 x-real-ip 时启用         |
+| PADDLEOCR_TOKEN                       | 留空不启用图片识别                               |
+| PADDLEOCR_URL / PADDLEOCR_MODEL       | 参见 .env.example；端点由部署者配置              |
+| ENABLE_SERVER_TTS                     | false；默认仅设备朗读，无需 Python               |
+| EDGE_TTS_PYTHON / EDGE_TTS_PYTHONPATH | 可选服务器语音使用的 Python 可执行文件及模块路径 |
+| VOICE_ZH / VOICE_EN                   | 服务器语音中文/英文声音                          |
+
+服务器语音启用时，在对应 Python 环境安装 edge-tts，并先验证网络和实际发音。相同文本/声音/速率复用原有 SHA-1 文件名；最多三个生成任务并发，相同任务合并，完整生成后才发布文件。队列有上限，失败可重试。页面显式点击“准备服务器语音”才调用生成接口，下载完后本次播放使用内存音频；刷新后需要重新准备，服务端复用缓存。
+
+## nginx 子路径
+
+两种配置择一：nginx 将 `/tingxie/` 剥离后转发到上游 `/` 时，应用设 `BASE_PATH=/`（兼容旧配置）；保留前缀时设 `BASE_PATH=/tingxie/`。
+
+保留前缀示例：
+
+```nginx
+location /tingxie/ {
+    proxy_pass http://127.0.0.1:8083;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    client_max_body_size 29m;
+    proxy_read_timeout 240s;
+}
 ```
 
-## 权限边界
+要启用 TRUST_PROXY，反代必须覆盖用户提供的 x-real-ip。多用户部署应在反代另设 IP 限流、连接数/超时及磁盘配额；应用不信任客户端任意转发头。
 
-- 受限账号 `luyou`：只写 `/opt/dictation/app`，只能操作 `dictation` 服务。
-- nginx 与主应用 `/opt/simple-tutor-tool` 不在这个账号的权限内。
+同域主应用若有 scope=/ 的 Service Worker，需要在主应用 navigateFallbackDenylist 中排除 `/tingxie/` 并等待旧 SW 更新，或使用独立子域。本仓库不会修改线上主应用 SW。
 
-## 已知坑
+## 首次迁移与备份
 
-`www.ownclass.top` 上注册了主应用 Workbox SW（scope=`/`，`navigateFallback: index.html`），
-会把同 origin 的 `/tingxie/` 导航兜回主应用。线上已热修 `sw.js` 的 denylist；
-代码级修复见 simple-tutor-tool PR #53。部署新路径前先确认这一点。
+1. 停止旧服务，备份整个 data 目录，包含 batches.json 和 audio。
+2. 先用备份副本作为 DATA_DIR 启动新程序，核对词表数量、内容、旧分享链接和已有音频。
+3. 新程序创建 dictation.db，运行生成的迁移，在一个事务中一次性导入 batches.json。原 JSON 不修改；坏 JSON、坏词条或重复 ID 会阻止启动，需要修复副本后再迁移。
+4. 确认后切换新服务，不将两个版本同时指向同一份旧数据运行。
+5. 停服务后备份整个 data（含 SQLite db/wal/shm 文件），或使用 SQLite 在线备份工具。不能在运行时只复制 db 而忽略 WAL。
 
-## 管理口令与迁移
+回退需停止新服务，恢复旧程序及升级前对应数据备份。新版本写入 SQLite 的内容不会自动回写 batches.json；回退前先导出新增/变更词表，避免丢失升级后的业务数据。
 
-`WRITE_TOKEN` 为空时写操作直接放行（2026-11-02 起，按主人要求去掉使用期口令），读取始终公开。配置了 `WRITE_TOKEN` 时，新建/修改/删除、OCR 和 TTS 需要 Bearer 管理口令：前端不再预先弹框，服务端返回 401 后才询问一次，口令仅保存在当前标签页 sessionStorage，错误口令会被清除。不要把口令放入链接、截图或提交。
+## 人工验收
 
-安全提示：未配置口令时任何拿到站点地址的人都能修改词表，公开批次含原文，勿导入隐私材料；需要恢复保护时在 `/etc/dictation.env` 写回 `WRITE_TOKEN=<随机串>` 并重启 service 即可，前端无需改动。该方案为单管理员口令，不是多用户账户隔离。`ALLOW_UNSAFE_WRITES` 已不再使用。默认忽略客户端转发 IP；仅可信反向代理覆盖这些头时设 `TRUST_PROXY=true`。
-
-测试：Node 18+ 执行 `node --test test/*.test.js`。上线前备份 data，设置口令并重启，验证未认证写入被拒、认证新建及删除成功；回滚时保留数据与口令配置。
-
-## 分享与核对（第二轮）
-词表详情页可生成当前站点的 `#batch=<id>` 分享链接与本地二维码，无第三方二维码请求。链接公开词表，不含管理口令；收到链接的人用设备语音播放，未登录不会请求收费 TTS。分享不等于访问控制，敏感词表不可公开导入。二维码依赖 qrcode-generator 1.4.4（MIT，许可头保留于 public/vendor/qrcode.js）。
-结果页支持全部正确、全部错误、清空标记，逐项按钮显示 aria-pressed 状态；错词仅在当前浏览器 localStorage 保存，不跨设备同步。
-浏览器测试：安装 playwright-core 后设置 PLAYWRIGHT_CORE 与 CHROMIUM_PATH，运行 `node test/browser-smoke.cjs`。测试采用合成数据和本地临时服务器；不代表 iOS/Android 真机语音质量、真实 OCR 或生产部署已验收。
+- 在目标手机、iPad、电脑上确认五种模式、实际声音、多音字、0.5×/2×语速、自动下一词、暂停与系统后台行为。
+- 手机竖屏、横屏及键盘弹出后编辑长词、中文、拼音；页面可缩放，按钮可达。
+- 不承诺断网刷新后整个应用离线打开；草稿和进度在网络恢复后仍可读取。原图不在服务器或本机持久化。
+- 验证口令有无配置、OCR 缺配置/失败、服务器语音关闭/失败，提示应可恢复。
+- 尚无自动音频清理或定时备份，需要监控 data 容量。

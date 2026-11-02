@@ -1,0 +1,57 @@
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+import { serve } from "@hono/node-server";
+import { serveStatic } from "@hono/node-server/serve-static";
+import { Hono } from "hono";
+import { createApp } from "./app";
+import { createTts, paddleOcr } from "./providers";
+import { Store } from "./store";
+
+if (existsSync(resolve(".env"))) process.loadEnvFile(resolve(".env"));
+const data = resolve(process.env.DATA_DIR ?? "data");
+const store = new Store(data);
+const rawBase = process.env.BASE_PATH ?? "/";
+if (!/^\/(?:[A-Za-z0-9_-]+\/)*$/.test(rawBase))
+  throw new Error("BASE_PATH 必须为 / 或 /tingxie/ 形式");
+const base = rawBase === "/" ? "" : rawBase.slice(0, -1);
+const api = createApp(store, {
+  writeToken: process.env.WRITE_TOKEN ?? "",
+  trustProxy: process.env.TRUST_PROXY === "true",
+  ocr: process.env.PADDLEOCR_TOKEN ? paddleOcr : undefined,
+  tts: process.env.ENABLE_SERVER_TTS === "true" ? createTts(resolve(data, "audio")) : undefined,
+});
+const app = new Hono();
+// 静态资源同源托管；URL 只映射音频哈希，不能读取其他 data 文件。
+api.get("/audio/:file", async (c, next) => {
+  if (!/^[a-f0-9]{40}\.mp3$/.test(c.req.param("file"))) return c.notFound();
+  c.header("Cache-Control", "public,max-age=31536000,immutable");
+  return serveStatic({
+    root: resolve(data, "audio"),
+    rewriteRequestPath: (p) => p.slice("/audio/".length),
+  })(c, next);
+});
+api.get("*", serveStatic({ root: "dist/web" }));
+if (base) {
+  app.get(base, (c) => c.redirect(`${base}/`));
+  app.all(`${base}/*`, (c) => {
+    const url = new URL(c.req.url);
+    url.pathname = url.pathname.slice(base.length) || "/";
+    return api.fetch(new Request(url, c.req.raw));
+  });
+} else app.route("/", api);
+// 旧 nginx 可能已剥离 /tingxie 前缀；BASE_PATH=/ 时保持原部署行为。
+const server = serve(
+  {
+    fetch: app.fetch,
+    port: Number(process.env.PORT ?? 8083),
+    hostname: process.env.HOST ?? "127.0.0.1",
+  },
+  (info) => console.log(`[dictation] listening on 127.0.0.1:${info.port}`),
+);
+for (const signal of ["SIGTERM", "SIGINT"] as const)
+  process.on(signal, () => {
+    server.close(() => {
+      store.close();
+      process.exit(0);
+    });
+  });

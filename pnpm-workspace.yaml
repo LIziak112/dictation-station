@@ -1,0 +1,6 @@
+packages:
+  - .
+allowBuilds:
+  # v13 随包提供二进制，禁用 pnpm 的隐式 node-gyp，Windows 无需 C++ 工具链。
+  better-sqlite3: false
+  esbuild: true
