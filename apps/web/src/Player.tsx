@@ -98,6 +98,7 @@ export function Player({
   }
   useEffect(() => {
     function key(event: KeyboardEvent) {
+      if (ref.current.phase !== "player") return;
       if (
         event.isComposing ||
         event.ctrlKey ||
@@ -232,17 +233,17 @@ export function Player({
                     type="button"
                     aria-pressed={results[item.entry.id] === true}
                     onClick={() => update({ results: { ...results, [item.entry.id]: true } })}
-                    aria-label={`第 ${i + 1} 词正确`}
+                    aria-label={`第 ${i + 1} 词${results[item.entry.id] === true ? "已标正确" : "正确"}`}
                   >
-                    ✓ 正确
+                    {results[item.entry.id] === true ? "✓ 已标正确" : "✓ 正确"}
                   </button>
                   <button
                     type="button"
                     aria-pressed={results[item.entry.id] === false}
                     onClick={() => update({ results: { ...results, [item.entry.id]: false } })}
-                    aria-label={`第 ${i + 1} 词错误`}
+                    aria-label={`第 ${i + 1} 词${results[item.entry.id] === false ? "已标错误" : "错误"}`}
                   >
-                    × 错误
+                    {results[item.entry.id] === false ? "× 已标错误" : "× 错误"}
                   </button>
                 </div>
               </article>
@@ -419,11 +420,9 @@ export function Player({
           </button>
         )}
       </details>
-      {message && (
-        <p role="status" className="notice">
-          {message}
-        </p>
-      )}
+      <div role="status" aria-atomic="true">
+        {message && <p className="notice">{message}</p>}
+      </div>
     </>
   );
 }

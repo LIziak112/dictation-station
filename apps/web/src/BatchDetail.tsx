@@ -104,6 +104,7 @@ export function BatchDetail({
                 onClick={() => setMode(m)}
               >
                 <strong>{MODES[m].label}</strong>
+                {mode === m && <span className="selected-label">✓ 已选择</span>}
                 <span>
                   {MODES[m].description} · {createQueue(batch.entries, m).length} 词
                 </span>

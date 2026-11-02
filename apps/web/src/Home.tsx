@@ -137,6 +137,11 @@ export function Home({
         <section className="panel empty">
           <h3>{query ? "没有找到这份词表" : "从第一份词表开始"}</h3>
           <p>{query ? "换个关键词试试。" : "粘贴几行词语，或导入作业照片。"}</p>
+          {query && (
+            <button type="button" onClick={() => setQuery("")}>
+              清除搜索
+            </button>
+          )}
           {!query && (
             <button
               type="button"

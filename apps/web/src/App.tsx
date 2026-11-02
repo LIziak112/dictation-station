@@ -1,5 +1,5 @@
 import { Headphones } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   type Batch,
   type BatchSummary,
@@ -38,6 +38,28 @@ export function App() {
   const progress = useLocal(localKey("progress"), progressSchema);
   const draftRef = useRef({ draft, progress });
   draftRef.current = { draft, progress };
+  const screenKey = view === "player" ? `${view}-${progress.value?.phase ?? "player"}` : view;
+  const screenTitle =
+    view === "editor"
+      ? draft.value?.batchId
+        ? "编辑词表"
+        : "新建听写"
+      : view === "player"
+        ? progress.value?.phase === "result"
+          ? "核对答案"
+          : MODES[progress.value?.mode ?? mode].label
+        : view === "batch"
+          ? (batch?.title ?? "听写词表")
+          : "听写词表";
+  useEffect(() => {
+    document.title = `${screenTitle} · 听写小站 · OwnClass`;
+  }, [screenTitle]);
+  useLayoutEffect(() => {
+    if (loading) return;
+    const target = document.querySelector<HTMLElement>(`[data-screen="${screenKey}"]`);
+    target?.focus({ preventScroll: true });
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [screenKey, loading]);
   useEffect(() => {
     api
       .health()
@@ -243,7 +265,7 @@ export function App() {
           )}
         </div>
       </header>
-      <main id="main" tabIndex={-1}>
+      <main id="main" data-screen={screenKey} tabIndex={-1}>
         {draft.error && (
           <section className="notice error" role="alert">
             <p>{draft.error}</p>
@@ -294,14 +316,16 @@ export function App() {
             </div>
           </section>
         )}
-        {notice && (
-          <p className="notice" role="status">
-            {notice}
-            <button type="button" className="subtle" onClick={() => setNotice("")}>
-              关闭提示
-            </button>
-          </p>
-        )}
+        <div role="status" aria-atomic="true">
+          {notice && (
+            <p className="notice">
+              {notice}
+              <button type="button" className="subtle" onClick={() => setNotice("")}>
+                关闭提示
+              </button>
+            </p>
+          )}
+        </div>
         {loading ? (
           <div className="empty" role="status">
             正在读取词表…

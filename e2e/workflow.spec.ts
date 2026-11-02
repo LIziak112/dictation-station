@@ -78,6 +78,14 @@ test("子路径完整流程：导入、草稿恢复、编辑、分享、播放�
   await page.getByRole("button", { name: "第 1 词错误", exact: true }).click();
   await page.getByRole("button", { name: "第 2 词正确", exact: true }).click();
   await expect(page.getByRole("status").filter({ hasText: "已核对 2/2" })).toBeVisible();
+  const spoken = await page.evaluate(
+    () => (window as unknown as { spoken?: string[] }).spoken?.length ?? 0,
+  );
+  await page.locator("main").focus();
+  await page.keyboard.press("Space");
+  expect(
+    await page.evaluate(() => (window as unknown as { spoken?: string[] }).spoken?.length ?? 0),
+  ).toBe(spoken);
   await page.getByRole("button", { name: "只练错词（1）", exact: true }).click();
   await expect(page.getByText("第 1 / 1 词", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "暂存并返回" }).click();

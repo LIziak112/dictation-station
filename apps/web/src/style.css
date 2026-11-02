@@ -1,15 +1,22 @@
 :root {
   font-family:
     -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-  color: #282f2b;
-  background: #f8f7f3;
-  font-synthesis: none;
+  color: var(--text);
+  background: var(--page);
   --muted: #606b63;
   --brand: #28634e;
   --line: #d8ddd5;
   --soft: #edf2e9;
   --error: #a13229;
   --radius: 20px;
+  --text: #282f2b;
+  --page: #f8f7f3;
+  --surface: #fffefa;
+  --control-border: #879488;
+  --control-text: #303d34;
+  --label: #455246;
+  --selected: #e5efdf;
+  --warning: #80511f;
 }
 * {
   box-sizing: border-box;
@@ -28,7 +35,7 @@ input,
 textarea,
 select {
   font: inherit;
-  font-size: 16px;
+  font-size: 1rem;
 }
 button,
 a,
@@ -39,7 +46,11 @@ summary {
   outline-offset: 4px;
 }
 :focus-visible {
-  outline: 3px solid #28634e;
+  outline: 3px solid var(--brand);
+}
+/* 正文仅作为切页播报目标；交互控件继续显示统一的键盘焦点环。 */
+main:focus {
+  outline: none;
 }
 button {
   display: inline-flex;
@@ -48,10 +59,10 @@ button {
   gap: 8px;
   min-height: 44px;
   padding: 10px 18px;
-  border: 1px solid #8c988d;
+  border: 1px solid var(--control-border);
   border-radius: 10px;
-  background: #fffefa;
-  color: #303d34;
+  background: var(--surface);
+  color: var(--control-text);
   cursor: pointer;
   touch-action: manipulation;
   user-select: none;
@@ -75,7 +86,7 @@ button.danger {
   color: var(--error);
 }
 button[aria-pressed="true"] {
-  background: #e5efdf;
+  background: var(--selected);
   border-color: var(--brand);
   box-shadow: inset 0 0 0 1px var(--brand);
 }
@@ -89,10 +100,10 @@ select {
   width: 100%;
   min-height: 44px;
   padding: 10px 12px;
-  border: 1px solid #879488;
+  border: 1px solid var(--control-border);
   border-radius: 8px;
   color: inherit;
-  background: #fffefa;
+  background: var(--surface);
 }
 textarea {
   resize: vertical;
@@ -107,7 +118,7 @@ input[type="checkbox"] {
 }
 input[type="file"] {
   padding: 8px;
-  font-size: 14px;
+  font-size: 1rem;
 }
 h1,
 h2,
@@ -116,22 +127,23 @@ p {
   margin: 0;
 }
 h1 {
-  font-size: clamp(27px, 4vw, 40px);
+  font-size: clamp(1.6875rem, 4vw, 2.5rem);
   letter-spacing: -0.035em;
   line-height: 1.3;
   text-wrap: balance;
   overflow-wrap: anywhere;
 }
 h2 {
-  font-size: 20px;
+  font-size: 1.25rem;
   line-height: 1.45;
 }
 h3 {
-  font-size: 18px;
+  font-size: 1.125rem;
   line-height: 1.5;
 }
 p {
   overflow-wrap: anywhere;
+  text-wrap: pretty;
 }
 svg {
   flex-shrink: 0;
@@ -167,7 +179,7 @@ a {
 }
 .brand {
   padding: 0;
-  text-align: left;
+  text-align: start;
   gap: 12px;
 }
 .brand-mark {
@@ -182,16 +194,16 @@ a {
 :where(.brand) strong {
   display: block;
   line-height: 1.15;
-  font-size: 20px;
+  font-size: 1.25rem;
   letter-spacing: -0.04em;
 }
 .brand-sub {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--muted);
   letter-spacing: 0.14em;
 }
 .header-note {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted);
 }
 .access {
@@ -199,7 +211,7 @@ a {
 }
 .access form {
   position: absolute;
-  right: 0;
+  inset-inline-end: 0;
   top: 50px;
   width: min(300px, 85vw);
   background: #fff;
@@ -209,7 +221,7 @@ a {
   box-shadow: 0 8px 32px #20282012;
 }
 .access summary {
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 main {
   max-width: 1140px;
@@ -218,7 +230,7 @@ main {
   min-height: 65svh;
 }
 .eyebrow {
-  font-size: 12px;
+  font-size: 0.75rem;
   letter-spacing: 0.12em;
   font-weight: 650;
   color: var(--brand);
@@ -228,7 +240,7 @@ main {
   color: var(--muted);
 }
 .small {
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .row {
   display: flex;
@@ -251,7 +263,7 @@ main {
   padding: 28px 20px 56px;
 }
 .hero h1 {
-  font-size: clamp(32px, 5vw, 52px);
+  font-size: clamp(2rem, 5vw, 3.25rem);
   line-height: 1.35;
   letter-spacing: -0.04em;
 }
@@ -270,7 +282,7 @@ main {
   padding: 24px 20px;
 }
 .word-paper {
-  background: #fffefa;
+  background: var(--surface);
   border: 1px solid #e7e7d8;
   padding: 30px;
   border-radius: 16px;
@@ -283,12 +295,12 @@ main {
   gap: 14px;
 }
 :where(.word-paper) > span {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted);
 }
 :where(.word-paper) strong {
   font-family: Georgia, serif;
-  font-size: 42px;
+  font-size: 2.625rem;
   line-height: 1.4;
   color: var(--brand);
 }
@@ -302,13 +314,13 @@ main {
   );
 }
 .word-paper .paper-note {
-  font-size: 11px;
+  font-size: 0.75rem;
   letter-spacing: 0.08em;
 }
 .audio-badge {
   position: absolute;
   bottom: 9px;
-  right: -2px;
+  inset-inline-end: -2px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -317,7 +329,7 @@ main {
   padding: 14px 20px;
   border-radius: 14px;
   box-shadow: 0 5px 15px #263e2920;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .resume-banner {
   display: flex;
@@ -332,7 +344,7 @@ main {
 }
 :where(.resume-banner) p {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .library-heading {
   display: flex;
@@ -345,10 +357,10 @@ main {
   margin-bottom: 6px;
 }
 .count {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted);
   font-weight: 400;
-  margin-left: 6px;
+  margin-inline-start: 6px;
 }
 .search {
   display: flex;
@@ -360,10 +372,10 @@ main {
 }
 .search svg {
   position: absolute;
-  left: 12px;
+  inset-inline-start: 12px;
 }
 .search input {
-  padding-left: 38px;
+  padding-inline-start: 38px;
   background: transparent;
 }
 .batch-grid {
@@ -373,7 +385,7 @@ main {
 }
 .batch-card {
   padding: 24px;
-  background: #fffefa;
+  background: var(--surface);
   border: 1px solid #e2e6dd;
   border-radius: var(--radius);
   min-width: 0;
@@ -390,7 +402,7 @@ main {
 }
 .batch-title {
   padding: 0;
-  text-align: left;
+  text-align: start;
   justify-content: start;
   max-width: 100%;
   min-height: 36px;
@@ -400,17 +412,17 @@ main {
 }
 :where(.batch-card) > p {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
   margin: 8px 0 22px;
 }
 :where(.batch-card .row) button {
   padding: 8px 10px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .panel {
   border: 1px solid #e0e5db;
   border-radius: var(--radius);
-  background: #fffefa;
+  background: var(--surface);
   padding: 28px;
   margin-bottom: 20px;
   min-width: 0;
@@ -439,24 +451,24 @@ main {
   background: #fff4f0;
 }
 .notice > button {
-  margin-left: 12px;
+  margin-inline-start: 12px;
 }
 .notice .row {
   margin-top: 12px;
 }
 .error-text {
   color: var(--error);
-  font-size: 13px;
+  font-size: 0.8125rem;
   margin-top: 8px;
 }
 .warning-text {
-  color: #80511f;
-  font-size: 13px;
+  color: var(--warning);
+  font-size: 0.8125rem;
   margin-top: 8px;
 }
 .back-link {
-  font-size: 14px;
-  padding-left: 0;
+  font-size: 0.875rem;
+  padding-inline-start: 0;
   margin-bottom: 20px;
 }
 .page-heading {
@@ -479,11 +491,11 @@ main {
   align-items: start;
   flex-direction: column;
   padding: 18px;
-  text-align: left;
+  text-align: start;
   border-color: #bbc6b5;
 }
 :where(.mode-card) span {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--muted);
 }
 .setup-settings {
@@ -503,15 +515,15 @@ main {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 13px;
-  color: #455246;
+  font-size: 0.8125rem;
+  color: var(--label);
   margin: 12px 0;
 }
 .check {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 14px;
+  font-size: 0.875rem;
   min-height: 44px;
 }
 .word-list {
@@ -575,7 +587,7 @@ main {
   padding: 20px 0;
 }
 .entry-editor h3 {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--muted);
 }
 .entry-editor .field {
@@ -585,7 +597,7 @@ main {
   margin: 12px 0;
 }
 .entry-editor summary {
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .mode-checks {
   display: grid;
@@ -595,7 +607,7 @@ main {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .save-bar {
   border-top: 1px solid var(--line);
@@ -637,7 +649,7 @@ progress::-webkit-progress-value {
   margin-bottom: 0;
 }
 .prompt h2 {
-  font-size: clamp(28px, 5vw, 48px);
+  font-size: clamp(1.75rem, 5vw, 3rem);
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
@@ -646,7 +658,7 @@ progress::-webkit-progress-value {
 }
 .prompt p.answer {
   color: var(--brand);
-  font-size: 26px;
+  font-size: 1.625rem;
   font-weight: 650;
 }
 .play-controls {
@@ -659,7 +671,7 @@ progress::-webkit-progress-value {
 .play-button {
   min-width: 180px;
   min-height: 60px;
-  font-size: 18px;
+  font-size: 1.125rem;
 }
 .playback-settings {
   max-width: 850px;
@@ -693,44 +705,44 @@ progress::-webkit-progress-value {
 }
 .result-item h2 {
   overflow-wrap: anywhere;
-  font-size: 24px;
+  font-size: 1.5rem;
 }
 :where(.result-item) p {
   color: var(--muted);
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 footer {
   text-align: center;
   padding: 26px 20px calc(26px + env(safe-area-inset-bottom, 0px));
   color: var(--muted);
-  font-size: 11px;
+  font-size: 0.75rem;
   border-top: 1px solid #e4e6de;
 }
 footer > strong {
   display: block;
   color: var(--brand);
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 footer > span {
   display: block;
   margin: 4px 0 10px;
 }
 footer > p {
-  font-size: 11px;
+  font-size: 0.75rem;
 }
 .skip-link {
   position: fixed;
-  top: -100px;
-  left: 10px;
+  top: 10px;
+  inset-inline-start: -9999px;
   z-index: 100;
   background: white;
   padding: 10px;
 }
 .skip-link:focus {
-  top: 10px;
+  inset-inline-start: 10px;
 }
 @media (hover: hover) and (pointer: fine) {
-  button:not(:disabled):hover {
+  button:not(:disabled):not([aria-disabled="true"]):hover {
     background: #edf2e9;
   }
   button.primary:not(:disabled):hover {
@@ -746,7 +758,7 @@ footer > p {
       transform 150ms ease-out,
       background-color 150ms ease-out;
   }
-  button:not(:disabled):active {
+  button:not(:disabled):not([aria-disabled="true"]):active {
     transform: scale(0.96);
   }
 }
@@ -765,8 +777,8 @@ footer > p {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .hero {
-    padding-left: 0;
-    padding-right: 0;
+    padding-inline-start: 0;
+    padding-inline-end: 0;
     gap: 20px;
   }
   .hero-illustration {
@@ -792,7 +804,7 @@ footer > p {
     gap: 16px;
   }
   .hero h1 {
-    font-size: 36px;
+    font-size: 2.25rem;
   }
   .hero p:not(.eyebrow) {
     margin: 14px 0 22px;
@@ -815,7 +827,7 @@ footer > p {
     max-width: none;
   }
   .library-heading h2 {
-    font-size: 20px;
+    font-size: 1.25rem;
   }
   .batch-card {
     padding: 22px;
@@ -832,7 +844,7 @@ footer > p {
     gap: 16px;
   }
   .page-heading h1 {
-    font-size: 28px;
+    font-size: 1.75rem;
   }
   .panel {
     padding: 20px;
@@ -857,7 +869,7 @@ footer > p {
   }
   .play-controls > .play-button {
     flex: 2;
-    font-size: 16px;
+    font-size: 1rem;
   }
   .prompt {
     min-height: 240px;
@@ -878,10 +890,10 @@ footer > p {
     margin-top: 20px;
   }
   .header-inner :where(.brand) strong {
-    font-size: 18px;
+    font-size: 1.125rem;
   }
   .access summary {
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
   .notice > button {
     margin: 10px 0 0;
@@ -894,4 +906,81 @@ footer > p {
   .brand-mark {
     border: 1px solid ButtonText;
   }
+}
+
+/* 控件随浏览器字体设置放大，长文与数字使用各自的排版规则。 */
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+.count,
+.result-stats,
+.player-panel > .row:first-child {
+  font-variant-numeric: tabular-nums;
+}
+.selected-label {
+  color: var(--brand);
+  font-weight: 600;
+}
+fieldset.editor-layout {
+  min-inline-size: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.sr-only {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.feedback .notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.source-panel > p,
+.playback-settings > p,
+.notice p {
+  max-inline-size: 70ch;
+}
+input[aria-invalid="true"] {
+  border-color: var(--error);
+  border-width: 2px;
+}
+@media (max-width: 580px) {
+  .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .header-inner {
+    flex-wrap: wrap;
+  }
+}
+@media (forced-colors: active) {
+  :focus-visible {
+    outline-color: Highlight;
+  }
+}
+
+@media (max-width: 360px) {
+  .play-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.mode-checks label {
+  min-block-size: 2.75rem;
+}
+
+button[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: wait;
 }

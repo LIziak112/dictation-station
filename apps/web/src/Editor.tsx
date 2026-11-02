@@ -3,6 +3,7 @@ import {
   type Batch,
   batchInputSchema,
   type Draft,
+  type Entry,
   MODES,
   type Mode,
   normalizeEntry,
@@ -44,6 +45,15 @@ export function blankDraft(batch?: Batch): Draft {
         entries: [],
       };
 }
+function missingFields(entry: Entry) {
+  const fields = new Set<keyof Entry>();
+  if (!entry.en && !entry.zh) fields.add("zh");
+  for (const mode of entry.modes) {
+    const m = MODES[mode];
+    for (const field of [m.show, m.answer, m.audio]) if (field && !entry[field]) fields.add(field);
+  }
+  return fields;
+}
 function base64(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -69,15 +79,22 @@ export function Editor({
 }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+  const [removed, setRemoved] = useState<{ entry: Entry; index: number } | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [images, setImages] = useState<string[]>([]);
   const controller = useRef<AbortController | null>(null);
   const audio = useRef<BrowserAudio | null>(null);
+  const mounted = useRef(true);
+  const undoButton = useRef<HTMLButtonElement | null>(null);
   const current = useRef(draft);
   current.current = draft;
   useEffect(() => {
+    mounted.current = true;
     audio.current = new BrowserAudio();
     return () => {
+      mounted.current = false;
       controller.current?.abort();
       audio.current?.dispose();
     };
@@ -136,6 +153,15 @@ export function Editor({
     }
   }
   async function save() {
+    if (busy) return;
+    setAttempted(true);
+    const invalid = entries.find((e) => missingFields(e).size > 0);
+    if (invalid) {
+      const field = [...missingFields(invalid)][0];
+      setMessage("词表还没保存。请补充标出的词条内容，再保存。");
+      requestAnimationFrame(() => document.getElementById(`entry-${invalid.id}-${field}`)?.focus());
+      return;
+    }
     const checked = batchInputSchema.safeParse({
       title: draft.title || "未命名听写",
       grade: draft.grade,
@@ -146,7 +172,12 @@ export function Editor({
       sourceText: draft.raw,
     });
     if (!checked.success) {
-      setMessage("词表尚不能保存，请检查空词条、模式要求或字段长度");
+      setMessage(
+        entries.length
+          ? "词表还没保存。每条最多 30 个其他写法，请检查字段长度后重试。"
+          : "先粘贴并整理原文，或手动添加一个词，再保存。",
+      );
+      if (!entries.length) document.getElementById("source-text")?.focus();
       return;
     }
     if (!onChange({ ...draft, title: checked.data.title })) {
@@ -154,13 +185,17 @@ export function Editor({
       return;
     }
     setBusy(true);
+    setSaving(true);
     try {
       const { batch } = await api.save({ ...draft, title: checked.data.title });
+      if (!mounted.current) return;
       onSaved(batch);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "保存失败，草稿仍保留");
+      if (mounted.current)
+        setMessage(error instanceof Error ? error.message : "保存失败，草稿仍保留");
     } finally {
       setBusy(false);
+      setSaving(false);
     }
   }
   return (
@@ -175,13 +210,44 @@ export function Editor({
           返回词表
         </button>
       </div>
-      <div className="editor-layout">
+      <div role="status" aria-atomic="true" className="feedback">
+        {message && (
+          <div className="notice">
+            <p>{message}</p>
+            {removed && (
+              <button
+                ref={undoButton}
+                type="button"
+                disabled={saving}
+                onClick={() => {
+                  const restored = [...entries];
+                  if (!restored.some((e) => e.id === removed.entry.id))
+                    restored.splice(Math.min(removed.index, restored.length), 0, removed.entry);
+                  patch({ entries: restored });
+                  const field = removed.entry.en ? "en" : "zh";
+                  const id = removed.entry.id;
+                  setRemoved(null);
+                  setMessage("词条已恢复");
+                  requestAnimationFrame(() =>
+                    document.getElementById(`entry-${id}-${field}`)?.focus(),
+                  );
+                }}
+              >
+                撤销删除
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      <fieldset className="editor-layout" aria-busy={saving}>
+        <legend className="sr-only">准备听写词表</legend>
         <section className="panel source-panel" aria-labelledby="source-title">
           <h2 id="source-title">01 / 导入原文</h2>
-          <p className="muted">直接粘贴文字或 JSON 就能开始，AI 整理是可选步骤。</p>
+          <p className="muted">粘贴文字或 JSON 后整理词表，也可以选择图片识别。</p>
           <label className="field">
             选择作业图片
             <input
+              disabled={saving}
               type="file"
               accept="image/png,image/jpeg,image/webp"
               multiple
@@ -205,6 +271,8 @@ export function Editor({
           <label className="field">
             作业原文
             <textarea
+              disabled={saving}
+              id="source-text"
               rows={7}
               maxLength={20000}
               value={draft.raw}
@@ -229,6 +297,7 @@ export function Editor({
               复制整理提示词
             </button>
             <textarea
+              disabled={saving}
               aria-label="整理提示词"
               readOnly
               rows={4}
@@ -238,6 +307,7 @@ export function Editor({
           <label className="field">
             整理后的文字或 JSON
             <textarea
+              disabled={saving}
               rows={5}
               value={draft.input}
               maxLength={1000000}
@@ -248,6 +318,7 @@ export function Editor({
           <label className="field">
             导入 JSON 文件
             <input
+              disabled={saving}
               type="file"
               accept=".json,application/json"
               onChange={async (e) => {
@@ -266,7 +337,7 @@ export function Editor({
               }}
             />
           </label>
-          <button type="button" className="primary" disabled={busy} onClick={parse}>
+          <button type="button" disabled={busy} onClick={parse}>
             整理并预览词表
           </button>
         </section>
@@ -278,6 +349,7 @@ export function Editor({
             <label className="field">
               词表名称
               <input
+                disabled={saving}
                 value={draft.title}
                 maxLength={80}
                 onChange={(e) => patch({ title: e.target.value })}
@@ -287,6 +359,7 @@ export function Editor({
             <label className="field">
               年级
               <input
+                disabled={saving}
                 value={draft.grade}
                 maxLength={40}
                 onChange={(e) => patch({ grade: e.target.value })}
@@ -296,6 +369,7 @@ export function Editor({
             <label className="field">
               单元
               <input
+                disabled={saving}
                 value={draft.unit}
                 maxLength={60}
                 onChange={(e) => patch({ unit: e.target.value })}
@@ -304,6 +378,7 @@ export function Editor({
             <label className="field">
               教材或来源
               <input
+                disabled={saving}
                 value={draft.textbook}
                 maxLength={60}
                 onChange={(e) => patch({ textbook: e.target.value })}
@@ -325,7 +400,12 @@ export function Editor({
                     type="button"
                     className="danger subtle"
                     disabled={busy}
-                    onClick={() => patch({ entries: entries.filter((x) => x.id !== e.id) })}
+                    onClick={() => {
+                      setRemoved({ entry: e, index: i });
+                      patch({ entries: entries.filter((x) => x.id !== e.id) });
+                      setMessage(`已删除第 ${i + 1} 词，可以撤销。`);
+                      requestAnimationFrame(() => undoButton.current?.focus());
+                    }}
                     aria-label={`删除第 ${i + 1} 词`}
                   >
                     删除
@@ -336,6 +416,11 @@ export function Editor({
                     <label key={key} className="field">
                       {{ en: "英文", zh: "中文", pinyin: "拼音", hint: "语境提示" }[key]}
                       <input
+                        disabled={saving}
+                        id={`entry-${e.id}-${key}`}
+                        lang={key === "en" ? "en" : key === "pinyin" ? "zh-Latn-pinyin" : undefined}
+                        aria-invalid={(attempted && missingFields(e).has(key)) || undefined}
+                        aria-describedby={`entry-${e.id}-issues`}
                         value={e[key]}
                         maxLength={key === "hint" ? 500 : 300}
                         onChange={(event) => changeEntry(e.id, key, event.target.value)}
@@ -362,6 +447,7 @@ export function Editor({
                       {(Object.keys(MODES) as Mode[]).map((mode) => (
                         <label key={mode}>
                           <input
+                            disabled={saving}
                             type="checkbox"
                             checked={e.modes.includes(mode)}
                             onChange={(event) => {
@@ -384,6 +470,7 @@ export function Editor({
                     <label className="field">
                       其他可接受写法（每行一项）
                       <textarea
+                        disabled={saving}
                         rows={2}
                         value={e.alt.join("\n")}
                         onChange={(event) =>
@@ -397,17 +484,19 @@ export function Editor({
                     </label>
                   </details>
                 </div>
-                {issues
-                  .filter((x) => x.id === e.id)
-                  .map((x) => (
-                    <p
-                      key={x.message}
-                      className={x.level === "error" ? "error-text" : "warning-text"}
-                    >
-                      {x.level === "error" ? "需修改：" : "请核对："}
-                      {x.message}
-                    </p>
-                  ))}
+                <div id={`entry-${e.id}-issues`}>
+                  {issues
+                    .filter((x) => x.id === e.id && (x.level === "warn" || attempted))
+                    .map((x) => (
+                      <p
+                        key={x.message}
+                        className={x.level === "error" ? "error-text" : "warning-text"}
+                      >
+                        {x.level === "error" ? "需修改：" : "请核对："}
+                        {x.message}
+                      </p>
+                    ))}
+                </div>
               </article>
             ))}
           </div>
@@ -424,7 +513,7 @@ export function Editor({
           </button>
           <div className="save-bar">
             <p className="small muted">
-              {errors.length
+              {attempted && errors.length
                 ? `${errors.length} 处内容需要修改`
                 : "读音和词义请人工确认；提醒不会自动改写内容。"}
             </p>
@@ -435,20 +524,17 @@ export function Editor({
               <button
                 type="button"
                 className="primary"
-                disabled={busy || blocked || !entries.length || !!errors.length}
+                disabled={blocked}
+                aria-disabled={busy}
+                aria-busy={saving}
                 onClick={save}
               >
-                {busy ? "保存中…" : "保存词表"}
+                {saving ? "正在保存词表…" : "保存词表"}
               </button>
             </div>
           </div>
         </section>
-      </div>
-      {message && (
-        <p className="notice" role="status">
-          {message}
-        </p>
-      )}
+      </fieldset>
     </>
   );
 }
