@@ -182,6 +182,9 @@ a {
 }
 .brand {
   flex-shrink: 0;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
   padding: 0;
   text-align: start;
   gap: 12px;
@@ -1199,7 +1202,6 @@ button[aria-disabled="true"] {
   gap: 12px;
   margin-inline-start: auto;
 }
-.brand,
 .header-tools summary {
   white-space: nowrap;
 }
