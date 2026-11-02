@@ -11,7 +11,7 @@ async function start(t, env = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dictation-test-'));
   fs.copyFileSync(path.join(__dirname, '..', 'server.js'), path.join(dir, 'server.js'));
   const child = spawn(process.execPath, ['server.js'], {
-    cwd: dir, env: { ...process.env, PORT: '0', WRITE_TOKEN: '', ALLOW_UNSAFE_WRITES: 'false', ...env },
+    cwd: dir, env: { ...process.env, PORT: '0', WRITE_TOKEN: '', ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   t.after(async () => {
@@ -35,13 +35,14 @@ async function start(t, env = {}) {
   });
 }
 
-test('unconfigured deployment fails closed but public reads work', async t => {
+test('unconfigured deployment allows writes and public reads', async t => {
   const req = await start(t);
   assert.equal((await req('/api/health')).status, 200);
   assert.equal((await req('/api/batches')).status, 200);
-  for (const route of ['/api/batches', '/api/ocr', '/api/ocr/url', '/api/tts']) {
-    assert.equal((await req(route, 'POST', {})).status, 503, route);
-  }
+  assert.equal((await req('/api/batches', 'POST', { id: 'open1', title: '无口令写入', entries: [] })).status, 200);
+  assert.equal((await req('/api/batches/open1', 'PUT', { title: '改一下' })).status, 200);
+  assert.equal((await req('/api/batches/open1', 'DELETE')).status, 200);
+  assert.equal((await req('/api/batches', 'POST', { id: '__proto__' })).status, 400);
 });
 
 test('configured authentication protects every mutation; authorized CRUD works', async t => {
@@ -71,11 +72,6 @@ test('malformed input returns client errors and server remains healthy', async t
   }
   assert.equal((await req('/api/batches/constructor')).status, 404);
   assert.equal((await req('/api/health')).status, 200);
-});
-
-test('explicit local demonstration opt-in works', async t => {
-  const req = await start(t, { ALLOW_UNSAFE_WRITES: 'true' });
-  assert.equal((await req('/api/batches', 'POST', { entries: [] })).status, 200);
 });
 
 test('write rate limit cannot be bypassed by spoofing forwarded IP', async t => {

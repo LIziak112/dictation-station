@@ -43,7 +43,7 @@ function loadEnv(file) {
 loadEnv(path.join(ROOT, '.env'));
 const PORT = Number(process.env.PORT || 8083);
 const WRITE_TOKEN = process.env.WRITE_TOKEN || '';
-const ALLOW_UNSAFE_WRITES = process.env.ALLOW_UNSAFE_WRITES === 'true';
+if (!WRITE_TOKEN) console.warn('[dictation] WRITE_TOKEN 未配置：写操作开放，任何拿到地址的人都能修改词表');
 
 const CFG = {
   paddleUrl: process.env.PADDLEOCR_URL || 'https://paddleocr.aistudio-app.com/api/v2/ocr/jobs',
@@ -274,8 +274,6 @@ const server = http.createServer(async (req, res) => {
     if (protectedWrite) {
       if (rateLimited(clientIp(req), 'write', 120, 60000))
         return json(res, 429, { error: '操作太频繁，请稍后再试' });
-      if (!WRITE_TOKEN && !ALLOW_UNSAFE_WRITES)
-        return json(res, 503, { error: '服务端尚未配置管理口令，写操作已关闭' });
       if (WRITE_TOKEN) {
         const supplied = Buffer.from(String(req.headers.authorization || ''));
         const expected = Buffer.from(`Bearer ${WRITE_TOKEN}`);

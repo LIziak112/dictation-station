@@ -53,21 +53,30 @@ function toast(msg, ms = 2200) {
   toast._h = setTimeout(() => t.classList.remove('show'), ms);
 }
 async function api(path, opts = {}) {
-  const headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers);
-  if (!['GET', 'HEAD'].includes((opts.method || 'GET').toUpperCase())) {
-    let token = sessionStorage.getItem('writeToken');
-    if (!token) {
-      token = prompt('请输入管理口令（仅当前标签页保存，不会放入分享链接）');
-      if (!token) throw new Error('已取消操作');
-      sessionStorage.setItem('writeToken', token);
+  const write = !['GET', 'HEAD'].includes((opts.method || 'GET').toUpperCase());
+  const baseHeaders = Object.assign({ 'Content-Type': 'application/json' }, opts.headers);
+  let retriedAuth = false;
+  for (;;) {
+    const headers = Object.assign({}, baseHeaders);
+    if (write) {
+      const token = sessionStorage.getItem('writeToken');
+      if (token) headers.Authorization = `Bearer ${token}`;
     }
-    headers.Authorization = `Bearer ${token}`;
+    const r = await fetch(path, Object.assign({}, opts, { headers }));
+    // 仅当服务端确实要求口令（401）时才询问一次；未配置口令的服务端直接放行，不打扰用户。
+    if (r.status === 401 && write && !retriedAuth) {
+      sessionStorage.removeItem('writeToken');
+      const entered = prompt('请输入管理口令（仅当前标签页保存，不会放入分享链接）');
+      if (!entered) throw new Error('已取消操作');
+      sessionStorage.setItem('writeToken', entered);
+      retriedAuth = true;
+      continue;
+    }
+    if (r.status === 401) sessionStorage.removeItem('writeToken');
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || `请求失败 (${r.status})`);
+    return j;
   }
-  const r = await fetch(path, Object.assign({}, opts, { headers }));
-  if (r.status === 401) sessionStorage.removeItem('writeToken');
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || `请求失败 (${r.status})`);
-  return j;
 }
 function fmtDate(iso) {
   if (!iso) return '';
