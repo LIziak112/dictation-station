@@ -8,6 +8,8 @@ import {
   type Task,
 } from "../../../packages/contract/src/index";
 import { download, request } from "./api";
+import { PrintView } from "./PrintView";
+import { ReportCard } from "./ReportCard";
 import { localKey, useLocal, useUnsavedProtection } from "./storage";
 import { taskApi } from "./task-api";
 
@@ -63,6 +65,7 @@ function ReviewSession({
   const [saved, setSaved] = useState(initial);
   const local = useLocal(localKey(`attempt:${initial.id}`, accountId), attemptSchema);
   const attempt = local.value ?? saved;
+  const [printing, setPrinting] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -147,6 +150,10 @@ function ReviewSession({
           </button>
         </div>
       )}
+      {printing && <PrintView task={task} attempt={attempt} onClose={() => setPrinting(false)} />}
+      <button className="print-controls" type="button" onClick={() => setPrinting(true)}>
+        打印练习纸
+      </button>
       <div className="results">
         {task.items.map((item, index) => (
           <article key={item.wordId} className="panel result-item">
@@ -264,6 +271,7 @@ function ReviewSession({
           </button>
         </section>
       )}
+      {attempt.completedAt && <ReportCard task={task} attempt={attempt} />}
     </>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { batchInputSchema, normalizeEntry } from "../packages/contract/src/index";
+import { batchInputSchema, defaultSettings, normalizeEntry } from "../packages/contract/src/index";
 import { parseList, validateEntries } from "../packages/core/src/import";
 import { createQueue, Playback } from "../packages/core/src/player";
 import samples from "../public/samples.json";
@@ -88,7 +88,15 @@ describe("播放生命周期", () => {
     const pending = player.play(
       queue,
       0,
-      { accent: "us", repeat: 1, interval: 0, speed: 1, auto: true, shuffle: false },
+      {
+        ...defaultSettings,
+        accent: "us",
+        repeat: 1,
+        interval: 0,
+        speed: 1,
+        auto: true,
+        shuffle: false,
+      },
       () => {},
     );
     player.stop();
@@ -116,7 +124,15 @@ describe("播放生命周期", () => {
     await player.play(
       createQueue(entries, "zh_dictation"),
       0,
-      { accent: "us", repeat: 2, interval: 0, speed: 1, auto: true, shuffle: false },
+      {
+        ...defaultSettings,
+        accent: "us",
+        repeat: 2,
+        interval: 0,
+        speed: 1,
+        auto: true,
+        shuffle: false,
+      },
       (i) => changes.push(i),
     );
     expect(spoken).toEqual(["太阳", "太阳", "月亮", "月亮"]);
@@ -124,7 +140,15 @@ describe("播放生命周期", () => {
     await player.play(
       createQueue(entries, "pinyin2hanzi"),
       0,
-      { accent: "us", repeat: 1, interval: 0, speed: 1, auto: true, shuffle: false },
+      {
+        ...defaultSettings,
+        accent: "us",
+        repeat: 1,
+        interval: 0,
+        speed: 1,
+        auto: true,
+        shuffle: false,
+      },
       () => {},
     );
     expect(spoken).toHaveLength(4);

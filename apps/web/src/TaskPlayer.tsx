@@ -5,6 +5,7 @@ import {
   type TaskPlay,
   type TaskPlayResponse,
 } from "../../../packages/contract/src/index";
+import { ActiveTime } from "../../../packages/core/src/pacing";
 import { Playback } from "../../../packages/core/src/player";
 import { AudioPreparation, type PreparedAudio } from "./AudioPreparation";
 import { download } from "./api";
@@ -190,6 +191,30 @@ function TaskSession({
   const [playing, setPlaying] = useState(false);
   const [message, setMessage] = useState("");
   const playback = useRef<Playback | null>(null);
+  const clock = useRef(new ActiveTime());
+  const guided = useRef(false);
+  const [rest, setRest] = useState<{
+    next: number;
+    remaining: number;
+    reason: "group" | "time";
+  } | null>(null);
+  const finishRest = useRef<() => void>(() => {});
+  useEffect(() => {
+    if (current.phase === "player") clock.current.resume();
+    else clock.current.pause();
+  }, [current.phase]);
+  useEffect(() => {
+    if (rest?.reason !== "group") return;
+    if (rest.remaining === 0) {
+      finishRest.current();
+      return;
+    }
+    const timer = setTimeout(
+      () => setRest((value) => (value ? { ...value, remaining: value.remaining - 1 } : null)),
+      1000,
+    );
+    return () => clearTimeout(timer);
+  }, [rest]);
   useUnsavedProtection(!!local.value || !!local.error);
   useEffect(() => {
     onDirty(!!local.value || busy);
@@ -206,6 +231,8 @@ function TaskSession({
     const hide = () => {
       if (document.hidden) {
         player.stop();
+        clock.current.pause();
+        setRest(null);
         setMessage("已暂停，回来后点播放继续");
       }
     };
@@ -234,6 +261,60 @@ function TaskSession({
     } finally {
       setBusy(false);
     }
+  }
+  function play(index = latest.current.index) {
+    clock.current.resume();
+    setMessage("");
+    const guidance = task.settings.guidance && "speechSynthesis" in window;
+    const intro = guidance && !guided.current ? "准备好纸笔，写好了点下一项。" : undefined;
+    guided.current = true;
+    void playback.current?.play(
+      task.items,
+      index,
+      task.settings,
+      async (next) => {
+        if (!(await save({ index: next }))) throw new Error("尚未同步，已暂停");
+        if (clock.current.shouldRest()) {
+          playback.current?.stop();
+          clock.current.pause();
+          setRest({ next, remaining: 0, reason: "time" });
+        }
+      },
+      {
+        intro,
+        groupGuide: guidance ? "这组写完了，休息一下。" : undefined,
+        onBreak: (next) => {
+          clock.current.pause();
+          setRest({ next, remaining: 10, reason: "group" });
+        },
+      },
+    );
+  }
+  finishRest.current = () => {
+    if (!rest) return;
+    if (rest.reason === "time") clock.current.reset();
+    clock.current.resume();
+    const next = rest.next;
+    setRest(null);
+    if (task.items[next].lang) play(next);
+  };
+  async function next() {
+    playback.current?.stop();
+    clock.current.resume();
+    const next = latest.current.index + 1;
+    if (next >= task.items.length) {
+      clock.current.pause();
+      await save({ phase: "review" });
+      return;
+    }
+    if (!(await save({ index: next }))) return;
+    if (clock.current.shouldRest()) {
+      clock.current.pause();
+      setRest({ next, remaining: 0, reason: "time" });
+    } else if (task.settings.groupSize && next % task.settings.groupSize === 0) {
+      clock.current.pause();
+      setRest({ next, remaining: 10, reason: "group" });
+    } else if (task.items[next].lang) play(next);
   }
   const item = task.items[current.index];
   return (
@@ -283,6 +364,16 @@ function TaskSession({
             请家长核对
           </button>
         </>
+      ) : rest ? (
+        <section className="rest-panel">
+          <h2>
+            {rest.reason === "time" ? "已经练习二十分钟，休息一下" : "上一组写完了，歇一会儿"}
+          </h2>
+          {rest.reason === "group" && <p role="status">{rest.remaining} 秒后继续</p>}
+          <button className="primary" type="button" onClick={() => finishRest.current()}>
+            准备好了，继续
+          </button>
+        </section>
       ) : (
         <>
           <p className="eyebrow">
@@ -298,36 +389,35 @@ function TaskSession({
               onClick={() => {
                 if (playing) {
                   playback.current?.stop();
+                  clock.current.pause();
                   void save({});
-                  return;
-                }
-                void playback.current?.play(
-                  task.items,
-                  current.index,
-                  task.settings,
-                  async (index) => {
-                    if (!(await save({ index }))) throw new Error("尚未同步，已暂停");
-                  },
-                );
+                } else play();
               }}
             >
               {playing ? "暂停" : "播放 / 再听一次"}
             </button>
+            <button type="button" disabled={busy || !!local.value} onClick={() => void next()}>
+              {current.index + 1 < task.items.length ? "我写好了，下一个" : "写完了，去核对"}
+            </button>
             <button
               type="button"
               disabled={busy || !!local.value}
-              onClick={async () => {
+              onClick={() => {
                 playback.current?.stop();
-                await save(
-                  current.index + 1 < task.items.length
-                    ? { index: current.index + 1 }
-                    : { phase: "review" },
-                );
+                clock.current.pause();
+                setMessage("已暂停练习，回来后点播放或下一项继续");
+                void save({});
               }}
             >
-              {current.index + 1 < task.items.length ? "我写好了，下一个" : "写完了，去核对"}
+              暂停练习
             </button>
           </div>
+          {task.settings.groupSize > 0 && (
+            <p className="small muted">
+              第 {Math.floor(current.index / task.settings.groupSize) + 1} /{" "}
+              {Math.ceil(task.items.length / task.settings.groupSize)} 组
+            </p>
+          )}
         </>
       )}
     </section>

@@ -4,6 +4,7 @@ import {
   accountPreferencesSchema,
   type Batch,
   type BatchSummary,
+  defaultSettings,
   MODES,
   preferencesResponseSchema,
   type Task,
@@ -57,7 +58,7 @@ export function TaskEditor({
           mode: initialBatch?.entries.some((e) => e.modes.includes("en2en"))
             ? "en2en"
             : "zh_dictation",
-          settings: { accent: "us", repeat: 2, interval: 4, speed: 1, auto: false, shuffle: false },
+          settings: { ...defaultSettings },
           wordIds: [],
           reviewOnly: false,
           selections: initialBatch
@@ -373,6 +374,83 @@ export function TaskEditor({
           <details>
             <summary>播放设置</summary>
             <div className="form-grid">
+              <label className="field">
+                重复次数
+                <input
+                  type="number"
+                  min={1}
+                  max={5}
+                  value={input.settings.repeat}
+                  onChange={(e) =>
+                    patch({ settings: { ...input.settings, repeat: Number(e.target.value) } })
+                  }
+                />
+              </label>
+              <label className="field">
+                基础写字间隔（秒）
+                <input
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={input.settings.interval}
+                  onChange={(e) =>
+                    patch({ settings: { ...input.settings, interval: Number(e.target.value) } })
+                  }
+                />
+              </label>
+              <label className="field">
+                朗读速度
+                <select
+                  value={input.settings.speed}
+                  onChange={(e) =>
+                    patch({ settings: { ...input.settings, speed: Number(e.target.value) } })
+                  }
+                >
+                  {[0.5, 0.75, 1, 1.25, 1.5, 2].map((speed) => (
+                    <option key={speed} value={speed}>
+                      {speed} 倍
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                每组项数
+                <select
+                  value={input.settings.groupSize}
+                  onChange={(e) =>
+                    patch({
+                      settings: {
+                        ...input.settings,
+                        groupSize: Number(e.target.value) as 0 | 5 | 10,
+                      },
+                    })
+                  }
+                >
+                  <option value={5}>五项一组</option>
+                  <option value={10}>十项一组</option>
+                  <option value={0}>不分组</option>
+                </select>
+              </label>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={input.settings.adaptiveInterval}
+                  onChange={(e) =>
+                    patch({ settings: { ...input.settings, adaptiveInterval: e.target.checked } })
+                  }
+                />
+                长词和句子多留写字时间
+              </label>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={input.settings.guidance}
+                  onChange={(e) =>
+                    patch({ settings: { ...input.settings, guidance: e.target.checked } })
+                  }
+                />
+                语音操作提示
+              </label>
               <label className="field">
                 英语口音
                 <select

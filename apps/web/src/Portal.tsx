@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import type { Account, Batch, Task } from "../../../packages/contract/src/index";
 import { App } from "./App";
 import { Connections } from "./Connections";
+import { FocusControls } from "./FocusControls";
 import { History } from "./History";
 import { Learning } from "./Learning";
 import { ParentGate } from "./ParentGate";
 import { PasswordForm } from "./PasswordForm";
+import { PrintView } from "./PrintView";
 import { localKey } from "./storage";
 import { TaskEditor } from "./TaskEditor";
 import { TaskPlayer } from "./TaskPlayer";
@@ -21,7 +23,8 @@ type Panel =
   | "review"
   | "learning"
   | "history"
-  | "connections";
+  | "connections"
+  | "print";
 export function Portal({ account, onLogout }: { account: Account; onLogout: () => void }) {
   const [child, setChild] = useState(
     () => localStorage.getItem(localKey("childMode", account.id)) === "true",
@@ -116,6 +119,7 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
           >
             {child ? "家长区" : "进入孩子区"}
           </button>
+          <FocusControls accountId={account.id} />
           {!child && (
             <>
               <span className="account-name">{account.username}</span>
@@ -160,6 +164,11 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
         />
       ) : (
         <>
+          {panel === "print" && !child && initialTask && (
+            <main>
+              <PrintView task={initialTask} onClose={() => navigate("today")} />
+            </main>
+          )}
           {panel === "connections" && !child && (
             <Connections
               onDraft={(id) => {
@@ -225,6 +234,21 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
           )}
           {panel === "task" && !child && (
             <div className="row task-actions">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!canLeave()) return;
+                  try {
+                    const { task } = await taskApi.get(taskId);
+                    setInitialTask(task);
+                    setPanel("print");
+                  } catch (e) {
+                    setMessage(e instanceof Error ? e.message : "读取失败");
+                  }
+                }}
+              >
+                打印准备纸
+              </button>
               <button
                 type="button"
                 onClick={async () => {

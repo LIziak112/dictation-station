@@ -212,6 +212,9 @@ export const passwordVerificationSchema = z.strictObject({
 });
 export const settingsSchema = z.strictObject({
   accent: z.enum(["us", "uk"]).default("us"),
+  groupSize: z.union([z.literal(0), z.literal(5), z.literal(10)]).default(5),
+  adaptiveInterval: z.boolean().default(true),
+  guidance: z.boolean().default(false),
   repeat: z.number().int().min(1).max(5),
   interval: z.number().min(1).max(30),
   speed: z.number().min(0.5).max(2),
@@ -221,6 +224,9 @@ export const settingsSchema = z.strictObject({
 export type Settings = z.infer<typeof settingsSchema>;
 export const defaultSettings: Settings = {
   accent: "us",
+  groupSize: 5,
+  adaptiveInterval: true,
+  guidance: false,
   repeat: 2,
   interval: 4,
   speed: 1,
