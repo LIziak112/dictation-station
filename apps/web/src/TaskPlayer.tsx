@@ -32,6 +32,10 @@ export function TaskPlayer({
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const dirty = useRef(false);
+  const loaded = !!data;
+  useEffect(() => {
+    if (loaded) document.querySelector<HTMLElement>("main")?.focus({ preventScroll: true });
+  }, [loaded]);
   useEffect(() => {
     const controller = new AbortController();
     const refresh = () => {
@@ -52,7 +56,7 @@ export function TaskPlayer({
   }, [taskId]);
   if (!data)
     return (
-      <main>
+      <main tabIndex={-1} id="main">
         <p role="status">{message || "正在读取任务…"}</p>
         <button type="button" onClick={onBack}>
           返回任务
@@ -60,7 +64,7 @@ export function TaskPlayer({
       </main>
     );
   return (
-    <main>
+    <main tabIndex={-1} id="main">
       <div className="page-heading">
         <div>
           <p className="eyebrow">{data.task.date}</p>
@@ -90,7 +94,11 @@ export function TaskPlayer({
       )}
       {!data.attempt || data.attempt.completedAt ? (
         <section className="panel">
-          <p>{data.task.items.length} 项，准备好纸笔。</p>
+          <h2>准备好纸笔，就可以开始</h2>
+          <p>
+            {data.task.homeworkCount} 项作业 + {data.task.items.length - data.task.homeworkCount}{" "}
+            项复习
+          </p>
           <div className="row">
             <button
               className="primary"

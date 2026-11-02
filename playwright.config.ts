@@ -1,8 +1,9 @@
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
-const data = join(tmpdir(), `dictation-e2e-${process.pid}`);
+const data = mkdtempSync(join(tmpdir(), "dictation-e2e-"));
 export default defineConfig({
   testDir: "e2e",
   fullyParallel: false,

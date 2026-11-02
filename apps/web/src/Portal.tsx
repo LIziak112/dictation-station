@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Account, Batch, Task } from "../../../packages/contract/src/index";
 import { App } from "./App";
 import { Connections } from "./Connections";
@@ -40,13 +40,64 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
   const [initialBatch, setInitialBatch] = useState<Batch>();
   const [gate, setGate] = useState<"parent" | "child" | "review" | null>(null);
   const [message, setMessage] = useState("");
+  const lastHash = useRef(location.hash);
   useEffect(() => {
-    const route = () => {
+    const closeMenu = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !(event.target instanceof HTMLElement)) return;
+      const disclosure = event.target.closest<HTMLDetailsElement>(".site-header details");
+      if (disclosure?.open) {
+        disclosure.open = false;
+        disclosure.querySelector("summary")?.focus();
+      }
+    };
+    window.addEventListener("keydown", closeMenu);
+    return () => window.removeEventListener("keydown", closeMenu);
+  }, []);
+  useLayoutEffect(() => {
+    if (panel === "library") return;
+    const titles: Record<Panel, string> = {
+      today: "今日任务",
+      library: "词库",
+      compose: "安排任务",
+      task: "听写任务",
+      review: "核对听写",
+      learning: "待巩固",
+      history: "听写记录",
+      connections: "AI 连接",
+      print: "打印练习纸",
+      listen: "纯听",
+      follow: "跟读",
+    };
+    document.title = `${gate ? "家长验证" : titles[panel]} · 听写小站 · OwnClass`;
+    const main = document.querySelector("main");
+    if (main) {
+      main.tabIndex = -1;
+      main.id = "main";
+      main.focus({ preventScroll: true });
+    }
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [panel, gate]);
+  useEffect(() => {
+    const route = (event?: Event) => {
+      if (
+        event &&
+        !window.dispatchEvent(new Event("dictation:before-leave", { cancelable: true }))
+      ) {
+        history.replaceState(null, "", `${location.pathname}${location.search}${lastHash.current}`);
+        event.stopImmediatePropagation();
+        setMessage("有尚未保存或同步的内容，请先恢复保存或导出备份。");
+        return;
+      }
+      lastHash.current = location.hash;
       const params = new URLSearchParams(location.hash.slice(1));
       const id = params.get("task");
       if (id) {
         setTaskId(id);
         setPanel("task");
+      } else if (!child && ["history", "learning", "connections"].some((key) => params.has(key))) {
+        setPanel(
+          params.has("history") ? "history" : params.has("learning") ? "learning" : "connections",
+        );
       } else
         setPanel(
           !child && (params.has("library") || params.has("batch") || params.has("draft"))
@@ -55,8 +106,8 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
         );
     };
     route();
-    window.addEventListener("hashchange", route);
-    return () => window.removeEventListener("hashchange", route);
+    window.addEventListener("hashchange", route, true);
+    return () => window.removeEventListener("hashchange", route, true);
   }, [child]);
   function canLeave() {
     if (!window.dispatchEvent(new Event("dictation:before-leave", { cancelable: true }))) {
@@ -70,16 +121,63 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
     if (!canLeave()) return;
     if (next === "library") location.hash = "library";
     else if (next === "today") location.hash = "";
+    else if (["history", "learning", "connections"].includes(next)) location.hash = next;
     setPanel(next);
   }
   return (
     <>
+      {panel !== "library" && (
+        <button
+          type="button"
+          className="skip-link"
+          onClick={() => {
+            document.querySelector("main")?.focus();
+          }}
+        >
+          跳到正文
+        </button>
+      )}
       <header className="site-header">
         <div className="header-inner">
           <button className="brand subtle" type="button" onClick={() => navigate("today")}>
             <strong>OwnClass</strong>
             <span>听写小站</span>
           </button>
+          <div className="header-tools">
+            <button
+              type="button"
+              onClick={() => {
+                if (!canLeave()) return;
+                if (child) setGate("parent");
+                else if (!localStorage.getItem(localKey("parentPin", account.id))) setGate("child");
+                else {
+                  localStorage.setItem(localKey("childMode", account.id), "true");
+                  setChild(true);
+                  location.hash = "";
+                }
+              }}
+            >
+              {child ? "家长区" : "进入孩子区"}
+            </button>
+            <FocusControls accountId={account.id} />
+            {!child && (
+              <details className="access">
+                <summary>账号</summary>
+                <div className="account-menu">
+                  <p className="account-name">{account.username}</p>
+                  <PasswordForm disabled={false} beforeChange={canLeave} onChanged={onLogout} />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (canLeave()) onLogout();
+                    }}
+                  >
+                    退出登录
+                  </button>
+                </div>
+              </details>
+            )}
+          </div>
           {!child && (
             <nav className="row" aria-label="主要导航">
               <button
@@ -96,49 +194,28 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
               >
                 词库
               </button>
-              <button type="button" onClick={() => navigate("learning")}>
+              <button
+                type="button"
+                aria-current={panel === "learning" ? "page" : undefined}
+                onClick={() => navigate("learning")}
+              >
                 待巩固
               </button>
-              <button type="button" onClick={() => navigate("history")}>
+              <button
+                type="button"
+                aria-current={panel === "history" ? "page" : undefined}
+                onClick={() => navigate("history")}
+              >
                 记录
               </button>
-              <button type="button" onClick={() => navigate("connections")}>
+              <button
+                type="button"
+                aria-current={panel === "connections" ? "page" : undefined}
+                onClick={() => navigate("connections")}
+              >
                 AI 连接
               </button>
             </nav>
-          )}
-          <button
-            type="button"
-            onClick={() => {
-              if (!canLeave()) return;
-              if (child) setGate("parent");
-              else if (!localStorage.getItem(localKey("parentPin", account.id))) setGate("child");
-              else {
-                localStorage.setItem(localKey("childMode", account.id), "true");
-                setChild(true);
-                location.hash = "";
-              }
-            }}
-          >
-            {child ? "家长区" : "进入孩子区"}
-          </button>
-          <FocusControls accountId={account.id} />
-          {!child && (
-            <>
-              <span className="account-name">{account.username}</span>
-              <details className="access">
-                <summary>账号</summary>
-                <PasswordForm disabled={false} beforeChange={canLeave} onChanged={onLogout} />
-              </details>
-              <button
-                type="button"
-                onClick={() => {
-                  if (canLeave()) onLogout();
-                }}
-              >
-                退出登录
-              </button>
-            </>
           )}
         </div>
       </header>

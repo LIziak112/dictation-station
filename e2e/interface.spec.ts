@@ -10,6 +10,7 @@ test("本机落盘失败时保留编辑内容，不允许退出丢稿", async ({
     };
   });
   await page.getByRole("textbox", { name: "作业原文", exact: true }).fill("sun 太阳");
+  await page.getByText("账号", { exact: true }).click();
   await page.getByRole("button", { name: "退出登录" }).click();
   await expect(page.getByRole("textbox", { name: "作业原文", exact: true })).toHaveValue(
     "sun 太阳",

@@ -6,8 +6,16 @@ export function FocusControls({ accountId }: { accountId: string }) {
   const [dark, setDark] = useState(() => localStorage.getItem(key) === "dark");
   const [message, setMessage] = useState("");
   useEffect(() => {
+    document.documentElement.classList.add("theme-changing");
     document.documentElement.dataset.theme = dark ? "dark" : "light";
+    // 先落定主题颜色，再恢复普通交互的过渡。
+    void document.documentElement.offsetHeight;
+    const frame = requestAnimationFrame(() =>
+      document.documentElement.classList.remove("theme-changing"),
+    );
     return () => {
+      cancelAnimationFrame(frame);
+      document.documentElement.classList.remove("theme-changing");
       delete document.documentElement.dataset.theme;
     };
   }, [dark]);

@@ -3,6 +3,12 @@ import { test } from "./fixtures";
 
 test("纯听中英交替；跟读录音只留本机并释放麦克风，不写听写记录", async ({ page }) => {
   await page.addInitScript(() => {
+    Object.defineProperty(window, "SpeechSynthesisUtterance", {
+      configurable: true,
+      value: class {
+        onend: (() => void) | null = null;
+      },
+    });
     Object.defineProperty(window, "speechSynthesis", {
       configurable: true,
       value: {
@@ -11,17 +17,19 @@ test("纯听中英交替；跟读录音只留本机并释放麦克风，不写�
         cancel: () => {},
       },
     });
-    Object.defineProperty(navigator.mediaDevices, "getUserMedia", {
+    Object.defineProperty(navigator, "mediaDevices", {
       configurable: true,
-      value: async () => ({
-        getTracks: () => [
-          {
-            stop: () => {
-              document.documentElement.dataset.micStopped = "true";
+      value: {
+        getUserMedia: async () => ({
+          getTracks: () => [
+            {
+              stop: () => {
+                document.documentElement.dataset.micStopped = "true";
+              },
             },
-          },
-        ],
-      }),
+          ],
+        }),
+      },
     });
     class Capture {
       state = "inactive";
@@ -100,12 +108,19 @@ test("纯听中英交替；跟读录音只留本机并释放麦克风，不写�
 
 test("麦克风拒绝后仍可听示范", async ({ page }) => {
   await page.addInitScript(() => {
-    Object.defineProperty(navigator.mediaDevices, "getUserMedia", {
+    Object.defineProperty(window, "speechSynthesis", {
       configurable: true,
-      value: async () => {
-        throw new DOMException("denied", "NotAllowedError");
+      value: { speak: () => {}, cancel: () => {} },
+    });
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: {
+        getUserMedia: async () => {
+          throw new DOMException("denied", "NotAllowedError");
+        },
       },
     });
+    Object.defineProperty(window, "MediaRecorder", { configurable: true, value: class {} });
   });
   const batch = (
     await (await page.request.post("api/batches", { data: { entries: [{ en: "school" }] } })).json()

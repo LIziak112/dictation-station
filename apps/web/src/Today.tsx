@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MODES, type TaskSummary } from "../../../packages/contract/src/index";
 import { taskApi } from "./task-api";
 
@@ -15,6 +15,8 @@ export function Today({
 }) {
   const [tasks, setTasks] = useState<TaskSummary[]>([]);
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
+  const refreshNow = useRef<() => void>(() => {});
   useEffect(() => {
     const controller = new AbortController();
     const refresh = () => {
@@ -27,8 +29,12 @@ export function Today({
           })
           .catch((e: Error) => {
             if (!controller.signal.aborted) setMessage(e.message);
+          })
+          .finally(() => {
+            if (!controller.signal.aborted) setLoading(false);
           });
     };
+    refreshNow.current = refresh;
     refresh();
     const timer = setInterval(refresh, 15000);
     document.addEventListener("visibilitychange", refresh);
@@ -52,8 +58,22 @@ export function Today({
           </button>
         )}
       </div>
-      {message && <p role="alert">{message}</p>}
-      {!tasks.length && (
+      {message && (
+        <div className="notice error">
+          <p role="alert">任务未能更新：{message}。请检查连接后重试。</p>
+          <button
+            type="button"
+            onClick={() => {
+              setLoading(true);
+              refreshNow.current();
+            }}
+          >
+            重新读取任务
+          </button>
+        </div>
+      )}
+      <p role="status">{loading ? "正在读取任务…" : ""}</p>
+      {!loading && !message && !tasks.length && (
         <section className="panel empty">
           <h2>还没有安排任务</h2>
           <p>{child ? "请家长准备今天的内容。" : "从自己的词表选择今天要听的范围。"}</p>
@@ -66,7 +86,7 @@ export function Today({
       )}
       <div className="batch-grid">
         {tasks.map((task) => (
-          <article className="panel" key={task.id}>
+          <article className="panel task-card" key={task.id}>
             <p className="eyebrow">
               {task.date} ·{" "}
               {task.status === "completed"
@@ -80,7 +100,21 @@ export function Today({
               {task.count - task.reviewCount} 项作业
               {task.reviewCount ? ` + ${task.reviewCount} 项复习` : ""} · {MODES[task.mode].label}
             </p>
-            <button className="primary" type="button" onClick={() => onOpen(task.id)}>
+            <p className="small muted">
+              约{" "}
+              {Math.max(
+                1,
+                Math.ceil(
+                  (task.count *
+                    (task.settings.repeat * 2 +
+                      task.settings.interval +
+                      (task.settings.auto ? 0 : 8))) /
+                    60,
+                ),
+              )}{" "}
+              分钟 · 按自己的速度来
+            </p>
+            <button type="button" onClick={() => onOpen(task.id)}>
               {task.status === "completed"
                 ? "查看或再练"
                 : task.status === "pending"

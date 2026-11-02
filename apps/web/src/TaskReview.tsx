@@ -37,7 +37,14 @@ export function TaskReview({
   }, [attemptId]);
   return (
     <main>
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <div className="notice error">
+          <p role="alert">{error}。请返回任务后重试。</p>
+          <button type="button" onClick={onBack}>
+            返回任务
+          </button>
+        </div>
+      )}
       {detail ? (
         <ReviewSession
           accountId={accountId}
@@ -46,7 +53,7 @@ export function TaskReview({
           onBack={onBack}
         />
       ) : (
-        <p role="status">正在读取核对内容…</p>
+        !error && <p role="status">正在读取核对内容…</p>
       )}
     </main>
   );
