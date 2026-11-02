@@ -353,3 +353,6 @@ table.words tr.has-issue td { background: #fdf3ee; }
   .prompt-main { font-size: 36px; }
   .controls button { font-size: 15px; padding: 15px 6px; }
 }
+
+.qr-preview svg { max-width: 100%; height: auto; }
+.qr-preview { margin: 1rem 0; }

@@ -43,7 +43,18 @@ function toast(msg, ms = 2200) {
   toast._h = setTimeout(() => t.classList.remove('show'), ms);
 }
 async function api(path, opts = {}) {
-  const r = await fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts));
+  const headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers);
+  if (!['GET', 'HEAD'].includes((opts.method || 'GET').toUpperCase())) {
+    let token = sessionStorage.getItem('writeToken');
+    if (!token) {
+      token = prompt('请输入管理口令（仅当前标签页保存，不会放入分享链接）');
+      if (!token) throw new Error('已取消操作');
+      sessionStorage.setItem('writeToken', token);
+    }
+    headers.Authorization = `Bearer ${token}`;
+  }
+  const r = await fetch(path, Object.assign({}, opts, { headers }));
+  if (r.status === 401) sessionStorage.removeItem('writeToken');
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || `请求失败 (${r.status})`);
   return j;
@@ -281,9 +292,11 @@ async function renderHome() {
     b.onclick = async (ev) => {
       ev.stopPropagation();
       if (!confirm('删除这个批次？词表和音频缓存不会被恢复。')) return;
-      await api(`api/batches/${b.dataset.del}`, { method: 'DELETE' });
-      toast('已删除');
-      renderHome();
+      try {
+        await api(`api/batches/${b.dataset.del}`, { method: 'DELETE' });
+        toast('已删除');
+        renderHome();
+      } catch (e) { toast(e.message); }
     };
   });
 }
@@ -291,7 +304,7 @@ async function renderHome() {
 async function openBatch(id) {
   try {
     const { batch } = await api(`api/batches/${id}`);
-    S.batch = batch;
+    S.batch = { ...batch, entries: (batch.entries || []).map(normalizeEntry) };
     renderBatch();
   } catch (e) { toast(e.message); }
 }
@@ -312,7 +325,7 @@ async function loadSamples() {
         try {
           const sample = samples[Number(b.dataset.sample)];
           const { batch } = await api('api/batches', { method: 'POST', body: JSON.stringify(sample) });
-          S.batch = batch;
+          S.batch = { ...batch, entries: (batch.entries || []).map(normalizeEntry) };
           toast('已创建示例批次');
           renderBatch();
         } catch (e) { toast(e.message); b.disabled = false; }
@@ -358,6 +371,7 @@ function renderBatch() {
         </tbody>
       </table>
       <div class="row mt">
+        <button class="btn-soft" id="share-batch">分享链接 / 二维码</button>
         <button class="btn-ghost" id="edit-words">编辑词表</button>
         <button class="btn-ghost" id="reimport">重新导入</button>
       </div>
@@ -367,6 +381,28 @@ function renderBatch() {
   $$('.mode-btn').forEach((btn) => {
     btn.onclick = () => startPlayer(btn.dataset.mode);
   });
+  $('#share-batch').onclick = () => {
+    const url = new URL(location.href);
+    url.search = '';
+    url.hash = `batch=${encodeURIComponent(b.id)}`;
+    const panel = document.createElement('div');
+    panel.className = 'card';
+    panel.innerHTML = `<h2>分享听写</h2><p>任何持有链接的人均可读取词表，请勿分享隐私内容。播放使用设备语音，不携带管理口令。</p><input aria-label="分享链接" readonly><div class="qr-preview"></div><button class="btn-soft">复制链接</button><button class="btn-ghost">关闭</button>`;
+    panel.querySelector('input').value = url.href;
+    try {
+      const qr = qrcode(0, 'M');
+      qr.addData(url.href); qr.make();
+      panel.querySelector('.qr-preview').innerHTML = qr.createSvgTag({cellSize: 4, margin: 16});
+    } catch (_) { panel.querySelector('.qr-preview').textContent = '二维码生成失败，请复制链接'; }
+    const buttons = panel.querySelectorAll('button');
+    buttons[0].onclick = async () => {
+      try { await navigator.clipboard.writeText(url.href); toast('链接已复制'); }
+      catch (_) { panel.querySelector('input').select(); toast('请手动复制选中的链接'); }
+    };
+    buttons[1].onclick = () => panel.remove();
+    app.prepend(panel);
+    panel.querySelector('input').focus();
+  };
   $('#edit-words').onclick = () => renderEditor(b.entries, false);
   $('#reimport').onclick = () => renderImport();
   const rw = $('#retry-wrong');
@@ -566,7 +602,7 @@ async function saveBatch(d) {
   };
   try {
     const { batch } = await api('api/batches', { method: 'POST', body: JSON.stringify(payload) });
-    S.batch = batch;
+    S.batch = { ...batch, entries: (batch.entries || []).map(normalizeEntry) };
     S.importDraft = null;
     toast('已保存');
     renderBatch();
@@ -615,7 +651,7 @@ function renderEditor(entries, isNew) {
       const errs = issues.filter((x) => x.level === 'error');
       if (errs.length) { toast(`第 ${errs[0].i + 1} 条：${errs[0].msg}`); return; }
       const { batch } = await api(`api/batches/${S.batch.id}`, { method: 'PUT', body: JSON.stringify({ entries: normalized }) });
-      S.batch = batch;
+      S.batch = { ...batch, entries: (batch.entries || []).map(normalizeEntry) };
       toast('已保存');
       renderBatch();
     };
@@ -636,7 +672,7 @@ async function ensureAudio(items) {
     seen.add(k);
     need.push({ ...it, key: k });
   }
-  if (!need.length) return;
+  if (!need.length || !sessionStorage.getItem('writeToken')) return;
 
   const chunkSize = 6;
   let done = 0;
@@ -898,6 +934,8 @@ function renderResult() {
     <div class="card">
       <h2>逐个核对</h2>
       <p class="sub">对的点 ✓，错的点 ✗，错词可以只练那些</p>
+      <div class="row"><button class="btn-soft" id="mark-all-ok">全部正确</button><button class="btn-warn" id="mark-all-no">全部错误</button><button class="btn-ghost" id="mark-clear">清空标记</button></div>
+      <p id="mark-summary" role="status" aria-live="polite"></p>
       <div id="result-list">
         ${P.queue.map((q, i) => `
           <div class="result-row" data-i="${i}">
@@ -918,6 +956,23 @@ function renderResult() {
     </div>
   `;
 
+  const syncMarks = () => {
+    const ids = P.queue.filter((q, i) => P.results[i] === false).map(q => q.entry.id);
+    const currentIds = new Set(P.queue.map(q => q.entry.id));
+    setWrong(b.id, [...new Set([...getWrong(b.id).filter(id => !currentIds.has(id)), ...ids])]);
+    $$('#result-list [data-mark]').forEach(btn => {
+      const value = P.results[Number(btn.dataset.i)];
+      const selected = value !== undefined && value === (btn.dataset.mark === 'ok');
+      btn.classList.toggle('on', selected);
+      btn.setAttribute('aria-pressed', String(selected));
+    });
+    const marked = Object.keys(P.results).length;
+    $('#mark-summary').textContent = `已核对 ${marked}/${P.queue.length}，正确 ${Object.values(P.results).filter(v => v === true).length}，错误 ${ids.length}`;
+  };
+  $('#mark-all-ok').onclick = () => { P.queue.forEach((q, i) => { P.results[i] = true; }); syncMarks(); };
+  $('#mark-all-no').onclick = () => { P.queue.forEach((q, i) => { P.results[i] = false; }); syncMarks(); };
+  $('#mark-clear').onclick = () => { P.results = {}; syncMarks(); };
+  syncMarks();
   $$('#result-list [data-mark]').forEach((btn) => {
     btn.onclick = () => {
       const i = Number(btn.dataset.i);
@@ -925,6 +980,7 @@ function renderResult() {
       const row = $(`.result-row[data-i="${i}"]`);
       row.querySelectorAll('.mark button').forEach((x) => x.classList.remove('on'));
       btn.classList.add('on');
+      syncMarks();
     };
   });
 
@@ -958,4 +1014,15 @@ function fileToBase64(file) {
   });
 }
 
-renderHome();
+async function openInitialView() {
+  const id = new URLSearchParams(location.hash.slice(1)).get('batch');
+  if (!id) return renderHome();
+  if (!/^[A-Za-z0-9_-]{4,20}$/.test(id)) { toast('分享链接无效'); return renderHome(); }
+  try {
+    const data = await api(`api/batches/${encodeURIComponent(id)}`);
+    S.batch = { ...data.batch, entries: (data.batch.entries || []).map(normalizeEntry) };
+    renderBatch();
+  } catch (e) { toast(`无法打开分享：${e.message}`); renderHome(); }
+}
+window.addEventListener('hashchange', () => { if (S.player) { S.player.token++; S.player.playing = false; } cancelCurrentAudio(); openInitialView(); });
+openInitialView();
