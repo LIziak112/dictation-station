@@ -10,6 +10,8 @@ import {
   taskInputSchema,
   taskSchema,
 } from "../../../packages/contract/src/index";
+import { interleaveReview } from "../../../packages/core/src/scheduling";
+import { Learning } from "./learning";
 import { attempts, tasks, words } from "./schema";
 import { Conflict, type Store } from "./store";
 
@@ -60,7 +62,12 @@ export class Tasks {
       if (!entry.modes.includes(input.mode))
         throw new HTTPException(400, { message: "词条不支持本次练法" });
       if (!seen.has(wordId))
-        items.push({ wordId, entry, source: "homework", batchTitle: "复用内容" });
+        items.push({
+          wordId,
+          entry,
+          source: input.reviewOnly ? "review" : "homework",
+          batchTitle: "复用内容",
+        });
       seen.add(wordId);
     }
     for (const selection of input.selections) {
@@ -85,16 +92,35 @@ export class Tasks {
         [items[n], items[next]] = [items[next], items[n]];
       }
     }
+    const learning = new Learning(this.store),
+      preferences = learning.preferences(accountId);
+    const review = learning
+      .due(
+        accountId,
+        input.mode,
+        input.date,
+        seen,
+        input.reviewOnly ? 0 : (input.reviewCount ?? preferences.reviewCount),
+      )
+      .map(({ entry, state }) => ({
+        wordId: state.wordId,
+        entry,
+        source: "review" as const,
+        batchTitle: "待巩固复习",
+      }));
     const task = taskSchema.parse({
       ...input,
       selections: undefined,
       id: id(),
-      items,
+      items: interleaveReview(items, review, input.reviewPlacement ?? preferences.reviewPlacement),
       status: "pending",
       revision: 1,
       createdAt: new Date().toISOString(),
     });
     return task;
+  }
+  preview(accountId: string, value: unknown) {
+    return this.build(accountId, value);
   }
   create(accountId: string, value: unknown) {
     const task = this.build(accountId, value);
@@ -147,6 +173,8 @@ export class Tasks {
       const task = this.require(accountId, taskId);
       const active = this.listAttempts(accountId, taskId).find((attempt) => !attempt.completedAt);
       if (active) return active;
+      if (onlyHomework && task.status !== "pending")
+        throw new HTTPException(400, { message: "已经开始的任务请复制后调整范围" });
       if (onlyHomework) task.items = task.items.filter((item) => item.source === "homework");
       if (!task.items.length) throw new HTTPException(400, { message: "任务没有可练内容" });
       this.write(accountId, { ...task, status: "in_progress", revision: task.revision + 1 });
@@ -207,9 +235,28 @@ export class Tasks {
         attempt.results[item.wordId] ??= confirmRemaining ? "correct" : "unchecked";
       attempt.completedAt = new Date().toISOString();
       attempt.revision++;
+      new Learning(this.store).apply(accountId, task, attempt);
       this.writeAttempt(accountId, attempt);
       this.write(accountId, { ...task, status: "completed", revision: task.revision + 1 });
       return attempt;
+    });
+  }
+  correct(accountId: string, attemptId: string, revision: number, wordIds: string[]) {
+    return this.store.db.transaction(() => {
+      const attempt = this.attempt(accountId, attemptId);
+      if (!attempt.completedAt) throw new HTTPException(400, { message: "完成核对后才能记订正" });
+      const task = this.require(accountId, attempt.taskId);
+      if (wordIds.some((wordId) => !task.items.some((item) => item.wordId === wordId)))
+        throw new HTTPException(400, { message: "订正内容不属于本任务" });
+      if (wordIds.every((wordId) => attempt.corrections.includes(wordId))) return attempt;
+      if (attempt.revision !== revision) throw new Conflict();
+      const next = {
+        ...attempt,
+        corrections: [...new Set([...attempt.corrections, ...wordIds])],
+        revision: attempt.revision + 1,
+      };
+      this.writeAttempt(accountId, next);
+      return next;
     });
   }
 }

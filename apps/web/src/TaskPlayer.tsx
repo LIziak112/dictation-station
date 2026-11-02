@@ -87,7 +87,7 @@ export function TaskPlayer({
             >
               {data.attempt?.completedAt ? "再练一次" : "开始任务"}
             </button>
-            {!data.attempt && (
+            {!data.attempt && data.task.homeworkCount > 0 && (
               <button
                 type="button"
                 disabled={busy}

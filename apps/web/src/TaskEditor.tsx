@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  type AccountPreferences,
+  accountPreferencesSchema,
   type Batch,
   type BatchSummary,
   MODES,
+  preferencesResponseSchema,
   type Task,
   type TaskInput,
   taskInputSchema,
 } from "../../../packages/contract/src/index";
 import { selectRange } from "../../../packages/core/src/tasks";
-import { api, download } from "./api";
+import { api, download, request } from "./api";
 import { localKey, useLocal, useUnsavedProtection } from "./storage";
 import { taskApi } from "./task-api";
 
@@ -38,6 +41,8 @@ export function TaskEditor({
           date: initialTask.date,
           mode: initialTask.mode,
           settings: initialTask.settings,
+          reviewOnly: false,
+          reviewCount: 0,
           selections: [],
           wordIds: initialTask.items.map((item) => item.wordId),
         }
@@ -54,6 +59,7 @@ export function TaskEditor({
             : "zh_dictation",
           settings: { repeat: 2, interval: 4, speed: 1, auto: false, shuffle: false },
           wordIds: [],
+          reviewOnly: false,
           selections: initialBatch
             ? [{ batchId: initialBatch.id, entryIds: initialBatch.entries.map((e) => e.id) }]
             : [],
@@ -62,11 +68,20 @@ export function TaskEditor({
   const initialSelections = useRef(input.selections);
   const [list, setList] = useState<BatchSummary[]>([]);
   const [batches, setBatches] = useState<Batch[]>(initialBatch ? [initialBatch] : []);
+  const [preview, setPreview] = useState<Task | null>(null);
+  const [preferences, setPreferences] = useState<AccountPreferences>(
+    accountPreferencesSchema.parse({}),
+  );
   const [range, setRange] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
+    request("api/preferences", preferencesResponseSchema, { signal: controller.signal })
+      .then((result) => setPreferences(result.preferences))
+      .catch((e: Error) => {
+        if (!controller.signal.aborted) setMessage(e.message);
+      });
     api
       .list(controller.signal)
       .then(async ({ batches: summaries }) => {
@@ -86,6 +101,7 @@ export function TaskEditor({
   }, []);
   function patch(value: Partial<TaskInput>) {
     const next = { ...input, ...value };
+    setPreview(null);
     setInput(next);
     local.write(next);
   }
@@ -295,6 +311,61 @@ export function TaskEditor({
               </section>
             );
           })}
+          <div className="form-grid">
+            <label className="field">
+              本次带上几项到期复习
+              <input
+                type="number"
+                min={0}
+                max={20}
+                value={input.reviewCount ?? preferences.reviewCount}
+                onChange={(e) => patch({ reviewCount: Number(e.target.value) })}
+              />
+            </label>
+            <label className="field">
+              复习位置
+              <select
+                value={input.reviewPlacement ?? preferences.reviewPlacement}
+                onChange={(e) => patch({ reviewPlacement: e.target.value as "interleave" | "end" })}
+              >
+                <option value="interleave">每五项作业穿插一项</option>
+                <option value="end">放在作业后面</option>
+              </select>
+            </label>
+          </div>
+          <button
+            type="button"
+            disabled={busy || !count}
+            onClick={async () => {
+              setBusy(true);
+              setMessage("");
+              try {
+                const response = await taskApi.preview(input);
+                setPreview(response.task);
+              } catch (e) {
+                setMessage(e instanceof Error ? e.message : "预览失败");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            预览作业与复习
+          </button>
+          {preview && (
+            <div className="notice">
+              <p>
+                {preview.items.filter((item) => item.source === "homework").length} 项作业 +{" "}
+                {preview.items.filter((item) => item.source === "review").length} 项复习
+              </p>
+              <ol>
+                {preview.items.map((item) => (
+                  <li key={item.wordId}>
+                    {item.entry.en || item.entry.zh} · {item.source === "review" ? "复习" : "作业"}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
           <p>
             {count} 项作业，预计约 {Math.max(1, Math.ceil((count * 20) / 60))}{" "}
             分钟。相同内容只计一次。

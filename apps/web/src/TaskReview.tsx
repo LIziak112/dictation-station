@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   type Attempt,
   attemptDetailSchema,
+  attemptResponseSchema,
   attemptSchema,
   MODES,
   type Task,
@@ -23,7 +24,9 @@ export function TaskReview({
   const [error, setError] = useState("");
   useEffect(() => {
     const controller = new AbortController();
-    request(`api/attempts/${attemptId}`, attemptDetailSchema, { signal: controller.signal })
+    request(`api/attempts/${attemptId}`, attemptDetailSchema, {
+      signal: controller.signal,
+    })
       .then(setDetail)
       .catch((e: Error) => {
         if (!controller.signal.aborted) setError(e.message);
@@ -170,6 +173,35 @@ function ReviewSession({
                   </button>
                 ))}
               </div>
+            )}
+            {attempt.completedAt && attempt.results[item.wordId] !== "correct" && (
+              <button
+                type="button"
+                disabled={busy || attempt.corrections.includes(item.wordId)}
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    const response = await request(
+                      `api/attempts/${attempt.id}/corrections`,
+                      attemptResponseSchema,
+                      {
+                        method: "POST",
+                        body: JSON.stringify({
+                          revision: attempt.revision,
+                          wordIds: [item.wordId],
+                        }),
+                      },
+                    );
+                    setSaved(response.attempt);
+                  } catch (e) {
+                    setMessage(e instanceof Error ? e.message : "订正保存失败");
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                {attempt.corrections.includes(item.wordId) ? "已订正" : "记为已订正"}
+              </button>
             )}
           </article>
         ))}

@@ -26,6 +26,7 @@ export function projectTask(task: Task) {
   const mode = MODES[task.mode];
   return {
     ...summary,
+    homeworkCount: items.filter((item) => item.source === "homework").length,
     items: items.map(({ wordId, entry }) => ({
       wordId,
       prompt: mode.show ? entry[mode.show] : "",

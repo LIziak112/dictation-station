@@ -1029,3 +1029,33 @@ button[aria-disabled="true"] {
   max-width: 560px;
   margin-inline: auto;
 }
+
+.word-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-block: 18px;
+  border-bottom: 1px solid var(--border);
+}
+.word-row > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.weekly-grid {
+  display: grid;
+  gap: 24px;
+}
+.weekly-grid dt {
+  color: var(--muted);
+}
+.weekly-grid dd {
+  margin: 8px 0 0;
+  font-size: 1.1rem;
+  overflow-wrap: anywhere;
+}
+.task-actions {
+  max-width: 1120px;
+  margin: 20px auto;
+  padding-inline: 16px;
+}

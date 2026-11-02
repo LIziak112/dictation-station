@@ -9,6 +9,11 @@ import {
 import { request } from "./api";
 
 export const taskApi = {
+  preview: (input: TaskInput) =>
+    request("api/tasks/preview", taskResponseSchema, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
   list: (signal?: AbortSignal) => request("api/tasks", taskListSchema, { signal }),
   get: (id: string) => request(`api/tasks/${id}`, taskResponseSchema),
   create: (input: TaskInput) =>

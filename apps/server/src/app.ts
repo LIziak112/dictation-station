@@ -9,8 +9,11 @@ import { z } from "zod";
 import {
   type Account,
   attemptCompleteSchema,
+  correctionSchema,
   credentialsSchema,
+  examRequestSchema,
   idSchema,
+  manualLearningSchema,
   ocrRequestSchema,
   passwordChangeSchema,
   passwordVerificationSchema,
@@ -20,6 +23,7 @@ import {
 } from "../../../packages/contract/src/index";
 import { projectTask } from "../../../packages/core/src/tasks";
 import { Auth } from "./auth";
+import { Learning } from "./learning";
 import type { OcrInput, TtsInput } from "./providers";
 import { Conflict, type Store } from "./store";
 import { Tasks } from "./tasks";
@@ -35,6 +39,7 @@ export function createApp(store: Store, options: Options) {
   const app = new Hono<{ Variables: { account: Account } }>();
   const auth = new Auth(store);
   const tasks = new Tasks(store);
+  const learning = new Learning(store);
   const buckets = new Map<string, { count: number; expires: number }>();
   function limited(key: string, limit: number, ms: number) {
     const now = Date.now();
@@ -242,6 +247,34 @@ export function createApp(store: Store, options: Options) {
       }
     }
     return c.json({ items: result });
+  });
+  app.get("/api/preferences", (c) =>
+    c.json({ preferences: learning.preferences(c.get("account").id) }),
+  );
+  app.put("/api/preferences", async (c) =>
+    c.json({ preferences: learning.setPreferences(c.get("account").id, await c.req.json()) }),
+  );
+  app.get("/api/learning", (c) => c.json({ items: learning.list(c.get("account").id) }));
+  app.put("/api/learning/:wordId", async (c) => {
+    const input = manualLearningSchema.parse(await c.req.json());
+    return c.json({
+      state: learning.manual(c.get("account").id, c.req.param("wordId"), input.mode, input.status),
+    });
+  });
+  app.get("/api/history", (c) => c.json({ items: learning.history(c.get("account").id) }));
+  app.get("/api/weekly", (c) => c.json(learning.weekly(c.get("account").id)));
+  app.post("/api/learning/exam", async (c) => {
+    const input = examRequestSchema.parse(await c.req.json());
+    return c.json({ items: learning.exam(c.get("account").id, input.from, input.to, input.mode) });
+  });
+  app.post("/api/tasks/preview", async (c) =>
+    c.json({ task: tasks.preview(c.get("account").id, await c.req.json()) }),
+  );
+  app.post("/api/attempts/:id/corrections", async (c) => {
+    const input = correctionSchema.parse(await c.req.json());
+    return c.json({
+      attempt: tasks.correct(c.get("account").id, c.req.param("id"), input.revision, input.wordIds),
+    });
   });
   app.get("/api/tasks", (c) =>
     c.json({

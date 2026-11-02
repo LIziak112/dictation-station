@@ -3,6 +3,7 @@ export const accounts = sqliteTable("accounts", {
   id: text("id").primaryKey(),
   username: text("username").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
+  preferences: text("preferences").notNull().default("{}"),
 });
 export const sessions = sqliteTable("sessions", {
   tokenHash: text("token_hash").primaryKey(),
@@ -63,3 +64,17 @@ export const attempts = sqliteTable("attempts", {
     .references(() => tasks.id),
   payload: text("payload").notNull(),
 });
+export const learningStates = sqliteTable(
+  "learning_states",
+  {
+    accountId: text("account_id")
+      .notNull()
+      .references(() => accounts.id),
+    wordId: text("word_id")
+      .notNull()
+      .references(() => words.id),
+    mode: text("mode").notNull(),
+    payload: text("payload").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.accountId, table.wordId, table.mode] })],
+);

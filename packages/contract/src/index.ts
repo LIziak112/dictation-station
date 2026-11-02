@@ -268,6 +268,9 @@ export const taskInputSchema = z.strictObject({
     .array(z.strictObject({ batchId: idSchema, entryIds: z.array(idSchema).min(1).max(500) }))
     .max(50),
   wordIds: z.array(idSchema).max(500).default([]),
+  reviewCount: z.number().int().min(0).max(20).optional(),
+  reviewPlacement: z.enum(["interleave", "end"]).optional(),
+  reviewOnly: z.boolean().default(false),
 });
 export type TaskInput = z.infer<typeof taskInputSchema>;
 export const taskItemSchema = z.object({
@@ -312,6 +315,7 @@ export type Attempt = z.infer<typeof attemptSchema>;
 export type AttemptUpdate = z.infer<typeof attemptUpdateSchema>;
 export const attemptResponseSchema = z.object({ attempt: attemptSchema });
 export const taskPlaySchema = taskSummarySchema.omit({ count: true, reviewCount: true }).extend({
+  homeworkCount: z.number().int().nonnegative(),
   items: z.array(
     z.object({
       wordId: idSchema,
@@ -335,3 +339,64 @@ export const attemptCompleteSchema = z.strictObject({
 });
 export const startTaskSchema = z.strictObject({ onlyHomework: z.boolean().default(false) });
 export const attemptDetailSchema = z.object({ task: taskSchema, attempt: attemptSchema });
+export const correctionSchema = z.strictObject({
+  revision: z.number().int().positive(),
+  wordIds: z.array(idSchema).min(1).max(500),
+});
+export const accountPreferencesSchema = z.strictObject({
+  timezone: z
+    .string()
+    .refine((value) => {
+      try {
+        new Intl.DateTimeFormat("en", { timeZone: value });
+        return true;
+      } catch {
+        return false;
+      }
+    }, "时区无效")
+    .default("Asia/Shanghai"),
+  masteryThreshold: z.number().int().min(1).max(10).default(3),
+  reviewCount: z.number().int().min(0).max(20).default(3),
+  reviewPlacement: z.enum(["interleave", "end"]).default("interleave"),
+});
+export type AccountPreferences = z.infer<typeof accountPreferencesSchema>;
+export const preferencesResponseSchema = z.object({ preferences: accountPreferencesSchema });
+export const learningProgressSchema = z.object({
+  status: z.enum(["pending", "mastered"]),
+  streak: z.number().int().nonnegative(),
+  lastQualifiedDate: z.iso.date().nullable(),
+  lastWrongDate: z.iso.date().nullable(),
+  dueDate: z.iso.date().nullable(),
+  manual: z.boolean(),
+});
+export type LearningProgress = z.infer<typeof learningProgressSchema>;
+export const learningStateSchema = learningProgressSchema.extend({
+  wordId: idSchema,
+  mode: modeSchema,
+  lastPracticedAt: z.iso.datetime(),
+});
+export type LearningState = z.infer<typeof learningStateSchema>;
+export const learningItemSchema = z.object({ entry: entrySchema, state: learningStateSchema });
+export type LearningItem = z.infer<typeof learningItemSchema>;
+export const learningResponseSchema = z.object({ items: z.array(learningItemSchema) });
+export const historyItemSchema = z.object({ task: taskSummarySchema, attempt: attemptSchema });
+export type HistoryItem = z.infer<typeof historyItemSchema>;
+export const historyResponseSchema = z.object({ items: z.array(historyItemSchema) });
+export const weeklyResponseSchema = z.object({
+  completed: z.number(),
+  pending: z.number(),
+  next: z.array(learningItemSchema),
+  from: z.iso.date(),
+  to: z.iso.date(),
+});
+export const examRequestSchema = z
+  .strictObject({ from: z.iso.date(), to: z.iso.date(), mode: modeSchema })
+  .refine((input) => input.from <= input.to, "起止日期顺序无效");
+
+export const examResponseSchema = z.object({
+  items: z.array(z.object({ wordId: idSchema, entry: entrySchema, status: z.string() })),
+});
+export const manualLearningSchema = z.strictObject({
+  mode: modeSchema,
+  status: z.enum(["pending", "mastered"]),
+});

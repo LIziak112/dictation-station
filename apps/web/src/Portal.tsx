@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import type { Account, Batch, Task } from "../../../packages/contract/src/index";
 import { App } from "./App";
+import { History } from "./History";
+import { Learning } from "./Learning";
 import { ParentGate } from "./ParentGate";
 import { PasswordForm } from "./PasswordForm";
 import { localKey } from "./storage";
@@ -10,7 +12,7 @@ import { TaskReview } from "./TaskReview";
 import { Today } from "./Today";
 import { taskApi } from "./task-api";
 
-type Panel = "today" | "library" | "compose" | "task" | "review";
+type Panel = "today" | "library" | "compose" | "task" | "review" | "learning" | "history";
 export function Portal({ account, onLogout }: { account: Account; onLogout: () => void }) {
   const [child, setChild] = useState(
     () => localStorage.getItem(localKey("childMode", account.id)) === "true",
@@ -75,6 +77,12 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
               >
                 词库
               </button>
+              <button type="button" onClick={() => navigate("learning")}>
+                待巩固
+              </button>
+              <button type="button" onClick={() => navigate("history")}>
+                记录
+              </button>
             </nav>
           )}
           <button
@@ -136,6 +144,21 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
         />
       ) : (
         <>
+          {panel === "learning" && !child && (
+            <Learning
+              onPublished={(id) => {
+                location.hash = `task=${id}`;
+              }}
+            />
+          )}
+          {panel === "history" && !child && (
+            <History
+              onOpen={(id) => {
+                setAttemptId(id);
+                setPanel("review");
+              }}
+            />
+          )}
           {panel === "today" && (
             <Today
               child={child}
