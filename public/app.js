@@ -156,6 +156,27 @@ function validateEntries(entries) {
 }
 
 /* ---------- 词表：解析 ---------- */
+// OCR（PaddleOCR-VL 等）遇到表格会返回 HTML，例如
+// <table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center;'>1. 豌豆</td>...
+// 直接按行/分号切分会把 style 属性切碎，解析出 “<c”“">” 这类碎片。先还原成纯文本行再解析。
+function htmlToLines(text) {
+  let s = String(text || '');
+  if (!/<[a-zA-Z!/]/.test(s)) return s;
+  s = s
+    .replace(/<\s*br\s*\/?\s*>/gi, '\n')
+    .replace(/<\s*\/\s*(p|div|tr|li|h[1-6]|table|caption)\s*>/gi, '\n')
+    .replace(/<\s*(td|th)\b[^>]*>/gi, '\t')
+    .replace(/<[^>]*>/g, '');
+  s = s
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&amp;/gi, '&');
+  return s;
+}
+
 function parseList(text) {
   const raw = String(text || '').trim();
   if (!raw) throw new Error('没有可解析的内容');
@@ -177,10 +198,10 @@ function parseList(text) {
     };
   }
 
-  // 2) 逐行文本
+  // 2) 逐行文本（先把 OCR 的 HTML 表格还原成文本）
   const entries = [];
   let title = '';
-  for (const line0 of raw.split('\n')) {
+  for (const line0 of htmlToLines(raw).split('\n')) {
     let line = line0.trim();
     if (!line) continue;
     const hasSep = /\t|\s{2,}|[|｜]|[，,；;]/.test(line);
@@ -193,7 +214,10 @@ function parseList(text) {
 
     line = line.replace(/^[\s#>*\-]*/, '').replace(/^[（(]?\d+[)）.、:：]?\s*/, '').trim();
     if (!line) continue;
-    const parts = line.split(/\t+|\s*[|｜]\s*|\s{2,}|\s*[，,;；]\s*/).map((x) => x.trim()).filter(Boolean);
+    // 含制表符 = 表格单元格边界（OCR HTML 的 <td>/<th> 已转成制表符）：只按单元格切，
+    // 不再把单元格内的「走；步行」「苹果，梨」当分隔符切开。
+    const splitter = line.includes('\t') ? /\t+/ : /\t+|\s*[|｜]\s*|\s{2,}|\s*[，,；;]\s*/;
+    const parts = line.split(splitter).map((x) => x.trim()).filter(Boolean);
     if (!parts.length) continue;
 
     const hasCJK = (s2) => /[一-鿿]/.test(s2);
@@ -229,9 +253,14 @@ function parseList(text) {
       else { en = a; zh = b; pinyin = parts.slice(2).join(' '); }
     }
     if (!en && !zh) continue;
+    // 丢掉 OCR/HTML 残片（如 “<c”“">”“•ㄏ”）：中文或英文至少要有一个像样的词。
+    const NOISE = /[<>{}|\\^_=~•◆■□▲△◇○●★☆※§¶]/;
+    const BOPOMOFO = /[\u3100-\u312f]/;
+    if (!/[\u4e00-\u9fff]|[A-Za-z]{2,}/.test(en) && !/[\u4e00-\u9fff]|[A-Za-z]{2,}/.test(zh)) continue;
+    if (NOISE.test(en) || NOISE.test(zh) || BOPOMOFO.test(en) || BOPOMOFO.test(zh)) continue;
     entries.push(normalizeEntry({ en, zh, pinyin }, entries.length));
   }
-  if (!entries.length) throw new Error('没有解析出词条，请检查格式');
+  if (!entries.length) throw new Error('没有解析出词条：请检查「作业原文」是不是词表；如果是表格/截图，识别可能不完整，建议重拍或手动修改');
   return { meta: title ? { title } : {}, entries };
 }
 
@@ -492,7 +521,7 @@ function renderImport() {
         });
         texts.push(r.text);
       }
-      const merged = texts.filter(Boolean).join('\n\n');
+      const merged = texts.filter(Boolean).map(htmlToLines).join('\n\n').trim();
       rawEl.value = (rawEl.value ? rawEl.value + '\n\n' : '') + merged;
       d.raw = rawEl.value;
       toast('识别完成，请对照原图检查');
