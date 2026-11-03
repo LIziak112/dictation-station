@@ -20,7 +20,7 @@ it("官方 MCP 客户端通过真实 stdio 建草稿、校验和读取，撤销�
   if (!account) throw new Error("测试账号失败");
   const credentials = tokens.create(account.id, {
     name: "测试桥接",
-    scopes: ["wordlists:read", "drafts:write"],
+    scopes: ["wordlists:read", "drafts:write", "history:read"],
     expiresInDays: 1,
   });
   const app = createApp(store, {});
@@ -46,11 +46,15 @@ it("官方 MCP 客户端通过真实 stdio 建草稿、校验和读取，撤销�
     expect(tools.tools.map((tool) => tool.name).sort()).toEqual([
       "create_wordlist_draft",
       "get_wordlist_schema",
+      "list_dictation_history",
       "list_wordlists",
       "validate_wordlist",
     ]);
     const schema = await client.callTool({ name: "get_wordlist_schema", arguments: {} });
     expect(schema.isError).not.toBe(true);
+    expect(
+      (await client.callTool({ name: "list_dictation_history", arguments: {} })).structuredContent,
+    ).toEqual({ items: [] });
     const invalid = await client.callTool({
       name: "validate_wordlist",
       arguments: { wordlist: { entries: [{ en: "" }] } },
@@ -109,9 +113,13 @@ it("远程 MCP 客户端通过 HTTP Bearer 建草稿，令牌失效后拒绝继�
     expect(tools.tools.map((tool) => tool.name).sort()).toEqual([
       "create_wordlist_draft",
       "get_wordlist_schema",
+      "list_dictation_history",
       "list_wordlists",
       "validate_wordlist",
     ]);
+    expect((await client.callTool({ name: "list_dictation_history", arguments: {} })).isError).toBe(
+      true,
+    );
     const created = await client.callTool({
       name: "create_wordlist_draft",
       arguments: {

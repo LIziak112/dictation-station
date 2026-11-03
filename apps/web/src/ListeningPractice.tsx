@@ -1,3 +1,16 @@
+import {
+  ChevronLeft,
+  Headphones,
+  Mic,
+  Pause,
+  Play,
+  Repeat,
+  Shuffle,
+  SkipBack,
+  SkipForward,
+  Square,
+  Volume2,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type Batch, defaultSettings, type Voice } from "../../../packages/contract/src/index";
 import { listeningQueue } from "../../../packages/core/src/listen";
@@ -234,26 +247,157 @@ export function ListeningPractice({
   }
   const locked = recording || openingMic;
   const voice = voices[index];
+  const current = queue[index];
+  const hidden = !!current?.entry.wordId && lockedWordIds.includes(current.entry.wordId);
+  const progress = queue.length ? ((index + 1) / queue.length) * 100 : 0;
+  function go(next: number) {
+    stop();
+    clearClip();
+    setIndex(next);
+  }
+  function replayClip() {
+    stop();
+    const audio = new Audio(clip);
+    replay.current = audio;
+    setReplaying(true);
+    audio.onended = () => setReplaying(false);
+    audio.onerror = () => {
+      setReplaying(false);
+      setMessage("录音无法回放，请重新录制。");
+    };
+    void audio.play().catch(() => {
+      setReplaying(false);
+      setMessage("回放失败，请再点一次。");
+    });
+  }
   return (
     <main className="practice-page">
-      <button type="button" onClick={onBack}>
+      <button type="button" className="subtle back-link" onClick={onBack}>
+        <ChevronLeft size={18} aria-hidden="true" />
         返回词表
       </button>
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">{batch.title}</p>
-          <h1>{follow ? "听一听，跟着读" : "放下屏幕，听一听"}</h1>
-          <p>
-            {follow
-              ? "先听示范，再录下自己的声音，回放比较。录音仅留在当前页面。"
-              : "选好内容后连续播放。锁屏和后台播放取决于浏览器与系统。"}
+      <section
+        className={`player-card${playing ? " is-playing" : ""}`}
+        aria-label={follow ? "跟读播放器" : "纯听播放器"}
+      >
+        <header className="player-card-head">
+          <span className="player-mode">
+            {follow ? (
+              <Mic size={16} aria-hidden="true" />
+            ) : (
+              <Headphones size={16} aria-hidden="true" />
+            )}
+            {follow ? "跟读练口语" : "纯听磨耳朵"}
+          </span>
+          <h1>{batch.title}</h1>
+        </header>
+        <div className="player-stage">
+          <p className="player-count" aria-live="polite">
+            {queue.length ? `${index + 1} / ${queue.length}` : "0 / 0"}
           </p>
+          <h2 className="practice-word">{hidden ? "待考词 · 只听声音" : current?.audioText}</h2>
+          {hidden && (
+            <p className="small muted practice-lock-note">
+              批改后可以查看文字，当前可正常听示范或跟读。
+            </p>
+          )}
+          {busy && <p role="status">正在准备声音…</p>}
+          {!busy && !queue.length && <p role="status">词表没有这种语言，请切换语言。</p>}
+          {message && (
+            <p role="alert" className="error-text">
+              {message}
+            </p>
+          )}
         </div>
-      </div>
-      <section className="panel">
-        <div className="form-grid">
-          <label className="field">
-            英语口音
+        <div className="player-progress" aria-hidden="true">
+          <span style={{ width: `${progress}%` }} />
+        </div>
+        <div className="player-transport">
+          <button
+            type="button"
+            className="transport-btn"
+            aria-label="上一个"
+            disabled={locked || index === 0}
+            onClick={() => go(index - 1)}
+          >
+            <SkipBack size={22} aria-hidden="true" />
+          </button>
+          {playing || replaying ? (
+            <button type="button" className="transport-main" aria-label="暂停播放" onClick={stop}>
+              <Pause size={30} aria-hidden="true" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="transport-main"
+              aria-label={follow ? "播放示范" : "开始播放"}
+              disabled={!ready || !queue.length || locked}
+              onClick={() => void play()}
+            >
+              <Play size={30} aria-hidden="true" />
+            </button>
+          )}
+          <button
+            type="button"
+            className="transport-btn"
+            aria-label="下一个"
+            disabled={locked || index >= queue.length - 1}
+            onClick={() => go(index + 1)}
+          >
+            <SkipForward size={22} aria-hidden="true" />
+          </button>
+        </div>
+        {!follow && (
+          <div className="player-toggles">
+            <button
+              type="button"
+              className="toggle-chip"
+              aria-pressed={shuffle}
+              onClick={() => {
+                stop();
+                setShuffle(!shuffle);
+              }}
+            >
+              <Shuffle size={16} aria-hidden="true" />
+              打乱词序
+            </button>
+            <button
+              type="button"
+              className="toggle-chip"
+              aria-pressed={loop}
+              onClick={() => setLoop(!loop)}
+            >
+              <Repeat size={16} aria-hidden="true" />
+              循环播放
+            </button>
+          </div>
+        )}
+        {follow && (
+          <div className="record-bar">
+            <button
+              type="button"
+              className={recording ? "record-btn is-recording" : "record-btn"}
+              disabled={openingMic || !queue.length}
+              onClick={() => (recording ? stopRecording() : void record())}
+            >
+              {recording ? (
+                <Square size={18} aria-hidden="true" />
+              ) : (
+                <Mic size={18} aria-hidden="true" />
+              )}
+              {recording ? "结束录音" : "录下我的跟读"}
+            </button>
+            <button type="button" disabled={!clip || locked || replaying} onClick={replayClip}>
+              <Volume2 size={18} aria-hidden="true" />
+              回放我的录音
+            </button>
+            {recording && <p role="status">正在录音，最长 30 秒；读完后点“结束录音”。</p>}
+            {openingMic && <p role="status">请在浏览器中允许麦克风…</p>}
+          </div>
+        )}
+        <div className="player-options">
+          <label>
+            <span>口音</span>
             <select
               disabled={locked}
               value={accent}
@@ -266,8 +410,8 @@ export function ListeningPractice({
               <option value="uk">英音</option>
             </select>
           </label>
-          <label className="field">
-            播放语言
+          <label>
+            <span>语言</span>
             <select
               disabled={locked}
               value={language}
@@ -282,8 +426,8 @@ export function ListeningPractice({
               {!follow && <option value="both">中英交替</option>}
             </select>
           </label>
-          <label className="field">
-            语速
+          <label>
+            <span>语速</span>
             <select
               disabled={locked || playing}
               value={speed}
@@ -296,142 +440,32 @@ export function ListeningPractice({
               ))}
             </select>
           </label>
-          {!follow && (
-            <>
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={shuffle}
-                  onChange={(event) => {
-                    stop();
-                    setShuffle(event.target.checked);
-                  }}
-                />
-                打乱词序
-              </label>
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={loop}
-                  onChange={(event) => setLoop(event.target.checked)}
-                />
-                循环播放
-              </label>
-            </>
-          )}
         </div>
-        {busy && <p role="status">正在准备声音…</p>}
-        {!busy && !queue.length && <p role="status">词表没有这种语言，请切换语言。</p>}
-        {message && <p role="alert">{message}</p>}
-        <p className="eyebrow" aria-live="polite">
-          {queue.length ? `${index + 1} / ${queue.length}` : "0 / 0"}
-        </p>
-        <h2 className="practice-word">
-          {queue[index]?.entry.wordId && lockedWordIds.includes(queue[index].entry.wordId)
-            ? "待考词 · 只听声音"
-            : queue[index]?.audioText}
-        </h2>
-        {queue[index]?.entry.wordId && lockedWordIds.includes(queue[index].entry.wordId) && (
-          <p className="small muted practice-lock-note">
-            批改后可以查看文字，当前可正常听示范或跟读。
-          </p>
-        )}
-        <div className="row">
-          <button
-            type="button"
-            className="primary"
-            disabled={!ready || !queue.length || locked || playing}
-            onClick={() => void play()}
-          >
-            {follow ? "播放示范" : "开始播放"}
-          </button>
-          <button type="button" disabled={!playing && !replaying} onClick={stop}>
-            暂停播放
-          </button>
-          {follow && (
-            <>
-              <button
-                type="button"
-                disabled={openingMic || !queue.length}
-                onClick={() => (recording ? stopRecording() : void record())}
-              >
-                {recording ? "结束录音" : "录下我的跟读"}
-              </button>
-              <button
-                type="button"
-                disabled={!clip || locked || replaying}
-                onClick={() => {
-                  stop();
-                  const audio = new Audio(clip);
-                  replay.current = audio;
-                  setReplaying(true);
-                  audio.onended = () => setReplaying(false);
-                  audio.onerror = () => {
-                    setReplaying(false);
-                    setMessage("录音无法回放，请重新录制。");
-                  };
-                  void audio.play().catch(() => {
-                    setReplaying(false);
-                    setMessage("回放失败，请再点一次。");
-                  });
-                }}
-              >
-                回放我的录音
-              </button>
-            </>
-          )}
-        </div>
-        {recording && <p role="status">正在录音，最长 30 秒；读完后点“结束录音”。</p>}
-        {openingMic && <p role="status">请在浏览器中允许麦克风…</p>}
-        <div className="row">
-          <button
-            type="button"
-            disabled={locked || index === 0}
-            onClick={() => {
-              stop();
-              clearClip();
-              setIndex(index - 1);
-            }}
-          >
-            上一个
-          </button>
-          <button
-            type="button"
-            disabled={locked || index >= queue.length - 1}
-            onClick={() => {
-              stop();
-              clearClip();
-              setIndex(index + 1);
-            }}
-          >
-            下一个
-          </button>
-        </div>
-        {voice && (
-          <div className="notice">
+        <footer className="player-foot">
+          {voice && (
             <p>
               {voice.source} {voice.warning}
+              {voice.kind === "human" && (
+                <>
+                  {" "}
+                  · {voice.author} ·{" "}
+                  <a href={voice.sourceUrl} target="_blank" rel="noreferrer">
+                    录音来源
+                  </a>{" "}
+                  ·{" "}
+                  <a href={voice.licenseUrl} target="_blank" rel="noreferrer">
+                    {voice.licenseName}
+                  </a>
+                </>
+              )}
             </p>
-            {voice.kind === "human" && (
-              <p className="small">
-                {voice.author} ·{" "}
-                <a href={voice.sourceUrl} target="_blank" rel="noreferrer">
-                  录音来源
-                </a>{" "}
-                ·{" "}
-                <a href={voice.licenseUrl} target="_blank" rel="noreferrer">
-                  {voice.licenseName}
-                </a>{" "}
-                · 原文件未修改，播放可调速
-              </p>
-            )}
-          </div>
-        )}
-        <p className="small muted">
-          {follow
-            ? "离开页面会清除录音。这里不自动评分，也不改变掌握状态。"
-            : "纯听不计入听写记录或掌握状态。"}
-        </p>
+          )}
+          <p>
+            {follow
+              ? "录音只留在本页，离开即清除；不评分，不影响掌握状态。"
+              : "纯听不计入听写记录。锁屏后能否继续播放取决于浏览器。"}
+          </p>
+        </footer>
       </section>
     </main>
   );

@@ -7,6 +7,31 @@ export class BrowserAudio implements AudioDriver {
   private pending: (() => void) | null = null;
   private urls = new Map<string, string>();
   private sources = new Map<string, string>();
+  private chimeContext: AudioContext | undefined;
+  private chimeTone: OscillatorNode | undefined;
+  chime() {
+    try {
+      this.chimeContext ??= new AudioContext();
+      const context = this.chimeContext;
+      const tone = context.createOscillator();
+      this.chimeTone = tone;
+      const volume = context.createGain();
+      tone.type = "sine";
+      tone.frequency.value = 660;
+      volume.gain.setValueAtTime(0.0001, context.currentTime);
+      volume.gain.exponentialRampToValueAtTime(0.06, context.currentTime + 0.03);
+      volume.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.25);
+      tone.connect(volume).connect(context.destination);
+      tone.onended = () => {
+        if (this.chimeTone === tone) this.chimeTone = undefined;
+      };
+      tone.start();
+      tone.stop(context.currentTime + 0.25);
+      void context.resume().catch(() => {});
+    } catch {
+      // 声音提示不可用时继续正常播放。
+    }
+  }
   constructor(private accent: "us" | "uk" = "us") {}
   setAccent(accent: "us" | "uk") {
     this.accent = accent;
@@ -21,6 +46,10 @@ export class BrowserAudio implements AudioDriver {
     this.urls.set(key, URL.createObjectURL(blob));
   }
   cancel() {
+    if (this.chimeTone) {
+      this.chimeTone.stop();
+      this.chimeTone = undefined;
+    }
     this.pending?.();
     this.pending = null;
     this.utterance = null;
@@ -31,6 +60,7 @@ export class BrowserAudio implements AudioDriver {
   }
   dispose() {
     this.cancel();
+    void this.chimeContext?.close();
     this.clearCache();
   }
   clearCache() {

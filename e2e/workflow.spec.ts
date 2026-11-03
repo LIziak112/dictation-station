@@ -94,11 +94,11 @@ test("子路径完整流程：导入、草稿恢复、编辑、分享、播放�
   await page.getByRole("button", { name: "返回任务列表", exact: true }).click();
   await page.goto("./#today");
   await page.getByRole("button", { name: "立即批改" }).first().click();
-  await page.getByRole("button", { name: "再练一次", exact: true }).first().click();
-  await page.getByLabel("已全部核对，其余正确").check();
+  await page.getByRole("button", { name: "未通过", exact: true }).first().click();
+  await page.getByLabel("已全部核对，其余未标记的题目均正确").check();
   await page.getByRole("button", { name: "保存核对并完成" }).click();
   await expect(page.getByRole("heading", { name: "本次核对记录" })).toBeVisible();
-  await page.getByRole("button", { name: "错词再派发一次", exact: true }).click();
+  await page.getByRole("button", { name: "安排复习", exact: true }).click();
   await expect(page.getByAltText("孩子区入口二维码")).toBeVisible();
   await page.getByRole("button", { name: "关闭", exact: true }).click();
   await expect(page.getByRole("button", { name: "管理口令" })).toHaveCount(0);

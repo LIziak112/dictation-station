@@ -4,6 +4,9 @@ import { createQueue, Playback } from "../../../packages/core/src/player";
 import { mergeReview } from "../../../packages/core/src/review";
 import { api } from "./api";
 import { BrowserAudio } from "./audio";
+import { FullscreenButton } from "./FocusControls";
+import { RepeatInterval } from "./RepeatInterval";
+import { useWakeLock } from "./useWakeLock";
 
 export function Player({
   batch,
@@ -21,6 +24,7 @@ export function Player({
   autoStart: boolean;
 }) {
   const [playing, setPlaying] = useState(false);
+  useWakeLock(progress.phase === "player");
   const [message, setMessage] = useState("");
   const [reveal, setReveal] = useState(false);
   const [preparing, setPreparing] = useState(false);
@@ -51,8 +55,12 @@ export function Player({
       ["en2en", "zh_dictation"].includes(progress.mode) &&
       progress.phase === "player"
     )
-      void player.play(queue, progress.index, progress.settings, (index) =>
-        onChange({ ...ref.current, index }),
+      void player.play(
+        queue,
+        progress.index,
+        progress.settings,
+        (index) => onChange({ ...ref.current, index }),
+        { preAlert: true },
       );
     function hide() {
       if (document.hidden) {
@@ -86,10 +94,16 @@ export function Player({
       return;
     }
     setMessage("");
-    void playback.current?.play(queue, progress.index, progress.settings, (index) => {
-      update({ index });
-      setReveal(false);
-    });
+    void playback.current?.play(
+      queue,
+      progress.index,
+      progress.settings,
+      (index) => {
+        update({ index });
+        setReveal(false);
+      },
+      { preAlert: true },
+    );
   }
   function move(index: number) {
     stop();
@@ -293,6 +307,7 @@ export function Player({
             第 {progress.index + 1} / {queue.length} 词
           </span>
           <span className="small muted">{prepared ? "已下载的服务器语音" : "设备朗读"}</span>
+          <FullscreenButton />
         </div>
         <progress value={progress.index + 1} max={queue.length} aria-label="听写进度" />
         <div className="prompt">
@@ -365,6 +380,13 @@ export function Player({
               ))}
             </select>
           </label>
+          <RepeatInterval
+            value={progress.settings.repeatInterval}
+            onChange={(repeatInterval) => {
+              stop();
+              update({ settings: { ...progress.settings, repeatInterval } });
+            }}
+          />
           <label className="field">
             写字间隔（秒）
             <input

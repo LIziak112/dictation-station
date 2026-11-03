@@ -39,6 +39,7 @@ export function projectTask(task: Task) {
       wordId,
       audioKey: wordId,
       prompt: mode.show ? entry[mode.show] : "",
+      hint: entry.hint,
       audioText: mode.audio ? entry[mode.audio] : "",
       lang: mode.audio,
       kind: entry.kind,

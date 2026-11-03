@@ -52,6 +52,21 @@ describe("词表契约与导入", () => {
     expect(() => parseList('<c ">\n">\n•ㄏ\n•v')).toThrow("没有解析出词条");
     expect(() => parseList('{"entries":[null]}')).toThrow();
   });
+  it("纯中文多词拆分并自动注音，保留 AI 指定的拼音", () => {
+    const entries = parseList("1. 温暖 舒适 敬佩 掩护\n荷花，聚拢，仿佛").entries;
+    expect(entries.map((e) => e.zh)).toEqual([
+      "温暖",
+      "舒适",
+      "敬佩",
+      "掩护",
+      "荷花",
+      "聚拢",
+      "仿佛",
+    ]);
+    expect(entries[0].pinyin).toBe("wēn nuǎn");
+    expect(entries.every((e) => !e.en && e.modes.includes("pinyin2hanzi"))).toBe(true);
+    expect(parseList('{"entries":[{"zh":"行","pinyin":"háng"}]}').entries[0].pinyin).toBe("háng");
+  });
   it("拒绝错误模式、重复 ID、超长词条和超额词表，不静默截断", () => {
     const entry = normalizeEntry({ en: "apple", zh: "苹果" }, 0);
     expect(batchInputSchema.safeParse({ entries: [entry, entry] }).success).toBe(false);
@@ -166,5 +181,24 @@ describe("播放生命周期", () => {
       () => {},
     );
     expect(spoken).toHaveLength(4);
+  });
+  it("朗读词语后朗读语境提示", async () => {
+    const spoken: string[] = [];
+    const player = new Playback(
+      {
+        speak: async (text) => {
+          spoken.push(text);
+        },
+        cancel: () => {},
+      },
+      () => {},
+    );
+    await player.play(
+      createQueue([normalizeEntry({ zh: "升", hint: "上升的升" }, 0)], "zh_dictation"),
+      0,
+      { ...defaultSettings, repeat: 1 },
+      () => {},
+    );
+    expect(spoken).toEqual(["升", "上升的升"]);
   });
 });

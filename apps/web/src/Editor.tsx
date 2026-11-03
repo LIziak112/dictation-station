@@ -92,6 +92,10 @@ export function Editor({
   const [voiceMap, setVoiceMap] = useState<Record<string, Voice>>({});
   const [attempted, setAttempted] = useState(false);
   const [removed, setRemoved] = useState<{ entry: Entry; index: number } | null>(null);
+  const [source, setSource] = useState<"text" | "image" | "ai">(() =>
+    draft.input ? "ai" : "text",
+  );
+  const [showImport, setShowImport] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [images, setImages] = useState<string[]>([]);
   const controller = useRef<AbortController | null>(null);
@@ -382,71 +386,56 @@ export function Editor({
       </div>
       <fieldset className="editor-stack" aria-busy={saving}>
         <legend className="sr-only">准备听写词表</legend>
-        <section className="panel" aria-labelledby="meta-title">
-          <div className="section-head">
+        <section className="panel editor-step" aria-labelledby="import-title">
+          <div className="step-head">
+            <span className="step-num" aria-hidden="true">
+              1
+            </span>
             <div>
-              <h2 id="meta-title">01 / 词表信息</h2>
-              <p className="muted">确认名称；年级、单元和来源可选。</p>
+              <h2 id="import-title">放入作业内容</h2>
+              <p className="small muted">粘贴文字最快；也可以拍照识别，或用自己的 AI 整理。</p>
             </div>
           </div>
-          <div className="meta-grid">
-            <label className="field">
-              词表名称
-              <input
-                disabled={saving}
-                value={draft.title}
-                maxLength={80}
-                onChange={(e) => patch({ title: e.target.value })}
-                placeholder="例如：Unit 3 单词听写"
-              />
-            </label>
-            <label className="field">
-              年级
-              <input
-                disabled={saving}
-                value={draft.grade}
-                maxLength={40}
-                onChange={(e) => patch({ grade: e.target.value })}
-                placeholder="例如：小学三年级"
-              />
-            </label>
-            <label className="field">
-              单元
-              <input
-                disabled={saving}
-                value={draft.unit}
-                maxLength={60}
-                onChange={(e) => patch({ unit: e.target.value })}
-                placeholder="例如：第三单元 / Unit 3"
-              />
-            </label>
-            <label className="field">
-              教材或来源
-              <input
-                disabled={saving}
-                value={draft.textbook}
-                maxLength={60}
-                onChange={(e) => patch({ textbook: e.target.value })}
-                placeholder="例如：人教版 PEP / 课堂听写单"
-              />
-            </label>
-          </div>
-          <details open={!draft.batchId}>
-            <summary>导入文字、图片或 AI 整理结果</summary>
-            <div className="import-grid">
-              <div className="import-col">
+          {draft.batchId && !showImport ? (
+            <button type="button" className="subtle" onClick={() => setShowImport(true)}>
+              再导入一些词
+            </button>
+          ) : (
+            <>
+              <div className="source-tabs" role="tablist" aria-label="内容来源">
+                {(
+                  [
+                    ["text", "粘贴文字"],
+                    ["image", "拍照识别"],
+                    ["ai", "AI / JSON"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    role="tab"
+                    aria-selected={source === key}
+                    onClick={() => setSource(key)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="source-pane" hidden={source !== "text"}>
                 <label className="field">
                   作业原文
                   <textarea
                     disabled={saving}
                     id="source-text"
-                    rows={6}
+                    rows={8}
                     maxLength={20000}
                     value={draft.raw}
                     onChange={(e) => patch({ raw: e.target.value })}
                     placeholder={"apple  苹果\nlibrary  图书馆"}
                   />
                 </label>
+              </div>
+              <div className="source-pane" hidden={source !== "image"}>
                 <div className="ocr-box">
                   <label className="field">
                     选择作业图片
@@ -483,7 +472,7 @@ export function Editor({
                   </div>
                 </div>
               </div>
-              <div className="import-col">
+              <div className="source-pane source-ai" hidden={source !== "ai"}>
                 <details className="ai-organize-box">
                   <summary>使用自己的 AI 整理</summary>
                   <p className="small muted">
@@ -566,32 +555,90 @@ export function Editor({
                   />
                 </label>
               </div>
+              <div className="row import-actions">
+                <button
+                  type="button"
+                  className={entries.length ? undefined : "primary"}
+                  disabled={busy}
+                  onClick={parse}
+                >
+                  整理并预览词表
+                </button>
+                <span className="small muted">
+                  支持每行“英文 中文”、“词语 拼音”、单行多个中文词语或结构化
+                  JSON。纯中文文本会自动补充拼音，请逐行核对，尤其留意多音字。
+                </span>
+              </div>
+            </>
+          )}
+        </section>
+
+        <section className="panel editor-step" aria-labelledby="meta-title">
+          <div className="step-head">
+            <span className="step-num" aria-hidden="true">
+              2
+            </span>
+            <div>
+              <h2 id="meta-title">起个名字</h2>
+              <p className="small muted">名称必填，年级、单元和来源方便以后查找。</p>
             </div>
-            <div className="row import-actions">
-              <button
-                type="button"
-                className={entries.length ? undefined : "primary"}
-                disabled={busy}
-                onClick={parse}
-              >
-                整理并预览词表
-              </button>
-              <span className="small muted">
-                支持每行“英文 中文”、“词语 拼音”或结构化 JSON，整理后在下方列表逐行核对。
-              </span>
-            </div>
-          </details>
+          </div>
+          <div className="meta-grid">
+            <label className="field">
+              词表名称
+              <input
+                disabled={saving}
+                value={draft.title}
+                maxLength={80}
+                onChange={(e) => patch({ title: e.target.value })}
+                placeholder="例如：Unit 3 单词听写"
+              />
+            </label>
+            <label className="field">
+              年级
+              <input
+                disabled={saving}
+                value={draft.grade}
+                maxLength={40}
+                onChange={(e) => patch({ grade: e.target.value })}
+                placeholder="例如：小学三年级"
+              />
+            </label>
+            <label className="field">
+              单元
+              <input
+                disabled={saving}
+                value={draft.unit}
+                maxLength={60}
+                onChange={(e) => patch({ unit: e.target.value })}
+                placeholder="例如：第三单元 / Unit 3"
+              />
+            </label>
+            <label className="field">
+              教材或来源
+              <input
+                disabled={saving}
+                value={draft.textbook}
+                maxLength={60}
+                onChange={(e) => patch({ textbook: e.target.value })}
+                placeholder="例如：人教版 PEP / 课堂听写单"
+              />
+            </label>
+          </div>
         </section>
 
         <section className="panel" aria-labelledby="entries-title">
           <div className="entries-toolbar">
-            <div>
-              <h2 id="entries-title">
-                02 / 核对词表 <span className="count">{entries.length} 词</span>
-              </h2>
-              <p className="small muted">
-                列表一行一词直观排布，可直接修改词条、试听并查看每项读音是否已获取。
-              </p>
+            <div className="step-head">
+              <span className="step-num" aria-hidden="true">
+                3
+              </span>
+              <div>
+                <h2 id="entries-title">
+                  核对词表 <span className="count">{entries.length} 词</span>
+                </h2>
+                <p className="small muted">逐行确认词语和读音，可以直接修改、试听。</p>
+              </div>
             </div>
             <div className="row">
               {entries.length > 0 && (

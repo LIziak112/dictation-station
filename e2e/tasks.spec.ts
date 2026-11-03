@@ -51,10 +51,12 @@ test("选择今日范围、孩子区独立入口与听写、跨设备接力与�
 
     // 孩子区三大板块展示，且磨耳朵词表显示待考词盲听保护徽章
     await childPage.goto("./?child=1");
-    await expect(childPage.getByText("01 / 今日听写任务")).toBeVisible();
-    await expect(childPage.getByText("02 / 批改结果与错词订正")).toBeVisible();
-    await expect(childPage.getByText("03 / 自主磨耳朵（纯听与跟读）")).toBeVisible();
+    await expect(childPage.getByText("今日听写任务", { exact: true })).toBeVisible();
+    await expect(childPage.getByText("错词订正", { exact: true })).toBeVisible();
+    await childPage.getByRole("tab", { name: "磨耳朵" }).click();
+    await expect(childPage.getByText("自主磨耳朵", { exact: true })).toBeVisible();
     await expect(childPage.getByText("🔒 2 词盲听保护")).toBeVisible();
+    await childPage.getByRole("tab", { name: "今天" }).click();
 
     await childPage.getByRole("button", { name: "准备开始" }).click();
     await childPage.getByRole("button", { name: "开始任务", exact: true }).click();
@@ -77,17 +79,62 @@ test("选择今日范围、孩子区独立入口与听写、跨设备接力与�
     await childPage.reload();
     await expect(childPage.getByText("第 2 / 2 项", { exact: true })).toBeVisible();
     await childPage.getByRole("button", { name: "写完了，交卷", exact: true }).click();
+    await expect(childPage.getByText("写完啦，你真棒！")).toBeVisible();
     await expect(childPage.getByText("月亮", { exact: true })).toHaveCount(0);
     await childPage.getByRole("button", { name: "返回任务列表", exact: true }).click();
-    await expect(childPage.getByText("待批改", { exact: true })).toBeVisible();
+    await expect(childPage.getByText("待批改", { exact: true }).first()).toBeVisible();
 
     // 家长端看板收到已交卷待批改提醒并完成批改
     await page.goto("./#today");
-    await expect(page.getByText("有 1 份听写已写完交卷，请对照纸面批改")).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "待批改任务提醒" }).getByText("今天的听写"),
+    ).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 844 });
+    const banner = await page.locator(".review-alert-banner").boundingBox();
+    const card = await page.locator(".task-timeline .task-card").first().boundingBox();
+    expect(banner && card && Math.abs(banner.x - card.x)).toBeLessThanOrEqual(1);
+    await expect(page.getByRole("button", { name: "立即批改 今天的听写" })).toBeVisible();
     await page.getByRole("button", { name: "立即批改" }).first().click();
     await expect(page.getByRole("heading", { name: "moon", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "再练一次", exact: true }).first().click();
-    await page.getByLabel("已全部核对，其余正确").check();
+    await page.getByRole("button", { name: "按序号批改" }).click();
+    await page.getByRole("button", { name: "第 2 题，未选为错题" }).click();
+    await page.getByRole("button", { name: "保存错题标记" }).click();
+    await expect(page.getByRole("button", { name: "未通过", exact: true }).nth(1)).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await page.getByRole("button", { name: "按序号批改" }).click();
+    await page.getByRole("button", { name: "第 2 题，未通过" }).click();
+    await page.getByRole("button", { name: "保存错题标记" }).click();
+    await expect(page.getByRole("button", { name: "未通过", exact: true }).nth(1)).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    await page.getByRole("button", { name: "未通过", exact: true }).first().click();
+    await page.getByText("退回给孩子继续听写").click();
+    await expect(
+      page.getByText("退回的是整份任务，不是只重做错题；本次所有批改标记都会清除。"),
+    ).toBeVisible();
+    await expect(page.getByLabel("从交卷时的位置继续听写")).toBeChecked();
+    await page.getByLabel("从第一题重新听写整份任务").check();
+    await expect(page.getByLabel("从第一题重新听写整份任务")).toBeChecked();
+    await page.setViewportSize({ width: 320, height: 844 });
+    const completion = page.locator(".review-completion");
+    for (const direction of ["ltr", "rtl"]) {
+      await page.evaluate((dir) => {
+        document.documentElement.dir = dir;
+        document.body.style.zoom = "2";
+      }, direction);
+      await expect
+        .poll(() => completion.evaluate((element) => element.scrollWidth <= element.clientWidth))
+        .toBe(true);
+      await expect(page.getByRole("button", { name: "确认退回任务" })).toBeVisible();
+    }
+    await page.evaluate(() => {
+      document.documentElement.dir = "ltr";
+      document.body.style.zoom = "";
+    });
+    await page.getByLabel("已全部核对，其余未标记的题目均正确").check();
     await expect(page.getByRole("button", { name: "保存核对并完成" })).toBeEnabled();
     await page.getByRole("button", { name: "保存核对并完成" }).click();
     await expect(page.getByRole("heading", { name: "本次核对记录" })).toBeVisible();

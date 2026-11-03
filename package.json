@@ -28,6 +28,7 @@
     "drizzle-orm": "0.45.3",
     "hono": "^4.13.9",
     "lucide-react": "^1.48.0",
+    "pinyin-pro": "^3.29.5",
     "qrcode": "^1.5.4",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

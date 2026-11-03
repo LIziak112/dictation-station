@@ -74,6 +74,14 @@ export class ApiError extends Error {
 export async function request<T>(path: string, schema: z.ZodType<T>, options: RequestInit = {}) {
   const headers = new Headers(options.headers);
   if (options.body) headers.set("Content-Type", "application/json");
+  const returningFromChild = sessionStorage.getItem("ownclass:from-child") === "1";
+  const childReturnAuth =
+    returningFromChild &&
+    (path === "api/auth/me" ||
+      path === "api/auth/verify-password" ||
+      path === "api/auth/unlock-pin");
+  if (new URLSearchParams(location.search).get("child") !== "1" && !childReturnAuth)
+    headers.set("X-Parent-Mode", "1");
   for (const [k, v] of Object.entries(childHeaders())) {
     if (!headers.has(k)) headers.set(k, v);
   }

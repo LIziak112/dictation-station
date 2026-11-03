@@ -30,7 +30,9 @@ export class Tokens {
       name: input.name,
       scopes: input.scopes,
       createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + input.expiresInDays * 86400000).toISOString(),
+      expiresAt: input.expiresInDays
+        ? new Date(Date.now() + input.expiresInDays * 86400000).toISOString()
+        : null,
     };
     this.store.db
       .insert(apiTokens)
@@ -39,7 +41,7 @@ export class Tokens {
         accountId,
         tokenHash: digestToken(token),
         payload: JSON.stringify(info),
-        expiresAt: new Date(info.expiresAt).getTime(),
+        expiresAt: info.expiresAt ? new Date(info.expiresAt).getTime() : 253402300799999,
       })
       .run();
     return { token, info };

@@ -5,7 +5,9 @@ import { afterEach, expect, it, vi } from "vitest";
 import { createApp } from "../apps/server/src/app";
 import { Auth } from "../apps/server/src/auth";
 import { Store } from "../apps/server/src/store";
+import { Tasks } from "../apps/server/src/tasks";
 import { Tokens } from "../apps/server/src/tokens";
+import { defaultSettings } from "../packages/contract/src/index";
 
 const stores: Store[] = [];
 afterEach(() => {
@@ -24,6 +26,57 @@ async function setup() {
   return { store, auth, tokens, account, app, cookie };
 }
 const sample = { title: "AI 草稿", entries: [{ en: "sun", zh: "太阳" }] };
+it("长期令牌可读取本账号已完成听写详情，权限及账号隔离生效", async () => {
+  const { app, tokens, account, auth, store } = await setup();
+  const other = await auth.register("other", "synthetic-password");
+  if (!other) throw new Error("测试账号失败");
+  const tasks = new Tasks(store);
+  const batch = store.create(account.id, sample);
+  const task = tasks.create(account.id, {
+    title: "听写",
+    date: "2026-11-03",
+    mode: "en2en",
+    settings: defaultSettings,
+    selections: [{ batchId: batch.id, entryIds: [batch.entries[0].id] }],
+  });
+  const attempt = tasks.start(account.id, task.id, false);
+  const reviewing = tasks.save(account.id, attempt.id, {
+    revision: attempt.revision,
+    index: 0,
+    phase: "review",
+    results: { [task.items[0].wordId]: "wrong" },
+  });
+  tasks.complete(account.id, attempt.id, reviewing.revision, true);
+  const token = tokens.create(account.id, { name: "记录", scopes: ["history:read"] });
+  expect(token.info.expiresAt).toBeNull();
+  const headers = { Authorization: `Bearer ${token.token}` };
+  expect((await (await app.request("/api/agent/history", { headers })).json()).items).toHaveLength(
+    1,
+  );
+  const detail = await (await app.request(`/api/agent/history/${attempt.id}`, { headers })).json();
+  expect(detail.task.items[0].entry.en).toBe("sun");
+  expect(detail.attempt.results[task.items[0].wordId]).toBe("wrong");
+  const foreign = tokens.create(other.id, { name: "其他", scopes: ["history:read"] });
+  expect(
+    (
+      await app.request(`/api/agent/history/${attempt.id}`, {
+        headers: { Authorization: `Bearer ${foreign.token}` },
+      })
+    ).status,
+  ).toBe(404);
+  const noHistory = tokens.create(account.id, { name: "词表", scopes: ["wordlists:read"] });
+  expect(
+    (
+      await app.request("/api/agent/history", {
+        headers: { Authorization: `Bearer ${noHistory.token}` },
+      })
+    ).status,
+  ).toBe(403);
+  vi.spyOn(Date, "now").mockReturnValue(Date.now() + 400 * 86400000);
+  expect((await app.request("/api/agent/history", { headers })).status).toBe(200);
+  tokens.revoke(account.id, token.info.id);
+  expect((await app.request("/api/agent/history", { headers })).status).toBe(401);
+});
 it("Agent 只能按令牌范围读词表、建草稿，不能直接发布或修改掌握状态", async () => {
   const { app, tokens, account, store, cookie } = await setup();
   store.create(account.id, { ...sample, sourceText: "不得外发的识别原文" });

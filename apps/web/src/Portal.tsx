@@ -1,6 +1,19 @@
-import { ExternalLink, Headphones, QrCode, RefreshCw } from "lucide-react";
+import {
+  BarChart3,
+  CalendarCheck,
+  Headphones,
+  Library,
+  LockKeyhole,
+  LogOut,
+  QrCode,
+  RefreshCw,
+  Settings2,
+  Sparkles,
+  Target,
+} from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { z } from "zod";
 import type {
   Account,
   Attempt,
@@ -9,11 +22,13 @@ import type {
   Task,
 } from "../../../packages/contract/src/index";
 import { App } from "./App";
+import { request } from "./api";
 import { Connections } from "./Connections";
 import { FocusControls } from "./FocusControls";
 import { History } from "./History";
 import { Learning } from "./Learning";
 import { ListeningPractice } from "./ListeningPractice";
+import { ParentPinSettings } from "./ParentGate";
 import { PasswordForm } from "./PasswordForm";
 import { PrintView } from "./PrintView";
 import { TaskEditor } from "./TaskEditor";
@@ -21,6 +36,14 @@ import { TaskPlayer } from "./TaskPlayer";
 import { TaskReview } from "./TaskReview";
 import { Today } from "./Today";
 import { taskApi } from "./task-api";
+
+const NAV_ITEMS = [
+  { key: "today", label: "今日任务", icon: CalendarCheck },
+  { key: "library", label: "词库", icon: Library },
+  { key: "learning", label: "待巩固", icon: Target },
+  { key: "history", label: "记录", icon: BarChart3 },
+  { key: "connections", label: "AI 连接", icon: Sparkles },
+] as const;
 
 type Panel =
   | "today"
@@ -53,6 +76,13 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
     info?: ChildTokenInfo;
   } | null>(null);
   const lastHash = useRef(location.hash);
+
+  useEffect(() => {
+    document.documentElement.dataset.side = child ? "child" : "parent";
+    return () => {
+      delete document.documentElement.dataset.side;
+    };
+  }, [child]);
 
   useEffect(() => {
     const closeMenu = (event: KeyboardEvent) => {
@@ -107,7 +137,21 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
       const params = new URLSearchParams(location.hash.slice(1));
       const id = params.get("task");
       const reviewId = params.get("review");
-      if (reviewId) {
+      const checkId = params.get("check");
+      if (checkId && !child) {
+        setTaskId(checkId);
+        setPanel("task");
+        void taskApi
+          .play(checkId)
+          .then(({ attempt }) => {
+            if (location.hash !== `#check=${encodeURIComponent(checkId)}`) return;
+            if (attempt && attempt.phase === "review") {
+              setAttemptId(attempt.id);
+              setPanel("review");
+            }
+          })
+          .catch(() => {});
+      } else if (reviewId) {
         setAttemptId(reviewId);
         setPanel("review");
       } else if (id) {
@@ -129,6 +173,21 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
     window.addEventListener("hashchange", route, true);
     return () => window.removeEventListener("hashchange", route, true);
   }, [child]);
+
+  async function openPrint(id: string) {
+    if (!canLeave()) return;
+    try {
+      const [{ task }, playData] = await Promise.all([
+        taskApi.get(id),
+        taskApi.play(id).catch(() => ({ attempt: null })),
+      ]);
+      setInitialTask(task);
+      setInitialAttempt(playData.attempt ?? undefined);
+      setPanel("print");
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "读取失败");
+    }
+  }
 
   function canLeave() {
     if (!window.dispatchEvent(new Event("dictation:before-leave", { cancelable: true }))) {
@@ -222,47 +281,36 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
             </span>
           </button>
           {!child && (
-            <nav className="row main-nav" aria-label="主要导航">
-              <button
-                type="button"
-                aria-current={panel === "today" ? "page" : undefined}
-                onClick={() => navigate("today")}
-              >
-                今日任务
-              </button>
-              <button
-                type="button"
-                aria-current={panel === "library" ? "page" : undefined}
-                onClick={() => navigate("library")}
-              >
-                词库
-              </button>
-              <button
-                type="button"
-                aria-current={panel === "learning" ? "page" : undefined}
-                onClick={() => navigate("learning")}
-              >
-                待巩固
-              </button>
-              <button
-                type="button"
-                aria-current={panel === "history" ? "page" : undefined}
-                onClick={() => navigate("history")}
-              >
-                记录
-              </button>
-              <button
-                type="button"
-                aria-current={panel === "connections" ? "page" : undefined}
-                onClick={() => navigate("connections")}
-              >
-                AI 连接
-              </button>
+            <nav className="main-nav" aria-label="主要导航">
+              {NAV_ITEMS.map(({ key, label, icon: Icon }) => (
+                <button
+                  key={key}
+                  type="button"
+                  aria-current={
+                    panel === key ||
+                    (key === "today" && ["compose", "task", "review", "print"].includes(panel)) ||
+                    (key === "library" && ["listen", "follow"].includes(panel))
+                      ? "page"
+                      : undefined
+                  }
+                  onClick={() => navigate(key)}
+                >
+                  <Icon size={18} aria-hidden="true" />
+                  <span>{label}</span>
+                </button>
+              ))}
             </nav>
           )}
           <div className="header-tools">
             {child ? (
-              <span className="child-badge">学生独立练习页面</span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (canLeave()) location.href = location.pathname;
+                }}
+              >
+                返回家长端
+              </button>
             ) : (
               <button
                 type="button"
@@ -273,24 +321,43 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
                 进入孩子区
               </button>
             )}
-            <FocusControls accountId={account.id} />
-            {!child && (
-              <details className="access">
-                <summary>账号</summary>
-                <div className="account-menu">
-                  <p className="account-name">{account.username}</p>
-                  <PasswordForm disabled={false} beforeChange={canLeave} onChanged={onLogout} />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (canLeave()) onLogout();
-                    }}
-                  >
-                    退出登录
-                  </button>
-                </div>
-              </details>
-            )}
+            <details className="access user-menu">
+              <summary aria-label={child ? "显示设置" : "账号"}>
+                {child ? (
+                  <Settings2 size={18} aria-hidden="true" />
+                ) : (
+                  <span className="avatar" aria-hidden="true">
+                    {account.username.slice(0, 1).toUpperCase()}
+                  </span>
+                )}
+              </summary>
+              <div className="account-menu">
+                {!child && <p className="account-name">{account.username}</p>}
+                <FocusControls accountId={account.id} />
+                {!child && (
+                  <>
+                    <ParentPinSettings account={account} />
+                    <details className="password-disclosure">
+                      <summary>
+                        <LockKeyhole size={16} aria-hidden="true" />
+                        修改密码
+                      </summary>
+                      <PasswordForm disabled={false} beforeChange={canLeave} onChanged={onLogout} />
+                    </details>
+                    <button
+                      type="button"
+                      className="subtle danger"
+                      onClick={() => {
+                        if (canLeave()) onLogout();
+                      }}
+                    >
+                      <LogOut size={16} aria-hidden="true" />
+                      退出登录
+                    </button>
+                  </>
+                )}
+              </div>
+            </details>
           </div>
         </div>
       </header>
@@ -343,20 +410,18 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
                   <button
                     type="button"
                     className="primary"
-                    onClick={() => {
-                      location.href = childShare.url;
+                    onClick={async () => {
+                      try {
+                        await request("api/auth/logout", z.object({ ok: z.boolean() }), {
+                          method: "POST",
+                        });
+                        location.replace(childShare.url);
+                      } catch {
+                        setMessage("退出家长账号失败，请重试。");
+                      }
                     }}
                   >
                     在当前浏览器打开
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      window.open(childShare.url, "_blank", "noopener,noreferrer");
-                    }}
-                  >
-                    <ExternalLink size={16} aria-hidden="true" />
-                    新窗口打开孩子区
                   </button>
                   <button
                     type="button"
@@ -441,6 +506,7 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
           onOpen={(id) => {
             location.hash = `task=${id}`;
           }}
+          onPrint={!child ? (id) => void openPrint(id) : undefined}
           onReview={(id) => {
             if (!canLeave()) return;
             location.hash = `review=${encodeURIComponent(id)}`;
@@ -508,24 +574,7 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
           child={child}
           accountId={account.id}
           onShareChild={!child ? () => void openChildShare(taskId) : undefined}
-          onPrint={
-            !child
-              ? async () => {
-                  if (!canLeave()) return;
-                  try {
-                    const [{ task }, playData] = await Promise.all([
-                      taskApi.get(taskId),
-                      taskApi.play(taskId).catch(() => ({ attempt: null })),
-                    ]);
-                    setInitialTask(task);
-                    setInitialAttempt(playData.attempt ?? undefined);
-                    setPanel("print");
-                  } catch (e) {
-                    setMessage(e instanceof Error ? e.message : "读取失败");
-                  }
-                }
-              : undefined
-          }
+          onPrint={!child ? () => void openPrint(taskId) : undefined}
           onEditTask={
             !child
               ? async () => {
