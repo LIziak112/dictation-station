@@ -1756,6 +1756,26 @@ a {
   font-size: 0.8125rem;
   font-weight: 600;
 }
+.child-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.return-parent-button {
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--control-border);
+  background: var(--surface);
+  color: var(--brand);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.return-parent-button:hover {
+  background: var(--hover);
+}
 .top-alert-wrap,
 .child-share-wrap {
   max-width: 1140px;
@@ -1825,8 +1845,14 @@ a {
   color: var(--muted);
 }
 .review-alert-banner {
-  border-color: var(--warning);
+  border-color: color-mix(in srgb, var(--brand) 40%, var(--line));
+  background: color-mix(in srgb, var(--brand) 8%, var(--surface));
   margin-bottom: 24px;
+}
+.review-alert-content {
+  width: 100%;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 .task-card-top {
   width: 100%;
@@ -1949,14 +1975,15 @@ a {
 .entry-table-wrap {
   border: 1px solid var(--line);
   border-radius: 14px;
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   background: var(--surface);
 }
 .entry-table-head {
   display: grid;
-  grid-template-columns: 44px 96px minmax(90px, 1fr) minmax(90px, 1fr) minmax(90px, 0.95fr) minmax(
-      100px,
-      1fr
+  grid-template-columns: 36px 88px minmax(120px, 1.4fr) minmax(120px, 1.4fr) minmax(95px, 1fr) minmax(
+      95px,
+      0.9fr
     ) auto;
   gap: 10px;
   align-items: center;
@@ -1966,6 +1993,7 @@ a {
   font-size: 0.8125rem;
   font-weight: 650;
   color: var(--label);
+  min-width: 700px;
 }
 .entry-row {
   padding: 12px 16px;
@@ -1976,12 +2004,13 @@ a {
 }
 .entry-row-main {
   display: grid;
-  grid-template-columns: 44px 96px minmax(90px, 1fr) minmax(90px, 1fr) minmax(90px, 0.95fr) minmax(
-      100px,
-      1fr
+  grid-template-columns: 36px 88px minmax(120px, 1.4fr) minmax(120px, 1.4fr) minmax(95px, 1fr) minmax(
+      95px,
+      0.9fr
     ) auto;
   gap: 10px;
   align-items: center;
+  min-width: 700px;
 }
 .entry-index-cell {
   display: flex;
@@ -2197,6 +2226,7 @@ a {
   }
   .entry-row-main {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-width: 0;
   }
   .entry-index-cell,
   .entry-actions-cell {
@@ -2243,6 +2273,7 @@ a {
   .entry-row-main,
   .prompt-context {
     grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
   }
   .top-alert-wrap,
   .child-share-wrap {

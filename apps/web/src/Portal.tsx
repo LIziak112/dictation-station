@@ -257,7 +257,23 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
           )}
           <div className="header-tools">
             {child ? (
-              <span className="child-badge">学生独立练习页面</span>
+              <div className="row child-header-actions">
+                <span className="child-badge">学生独立听写模式</span>
+                <button
+                  type="button"
+                  className="subtle return-parent-button"
+                  onClick={() => {
+                    if (canLeave()) {
+                      const url = new URL(location.href);
+                      url.searchParams.delete("child");
+                      url.searchParams.delete("ct");
+                      location.href = url.pathname + (url.hash ? url.hash : "");
+                    }
+                  }}
+                >
+                  返回家长管理端
+                </button>
+              </div>
             ) : (
               <button
                 type="button"
@@ -301,10 +317,10 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
           <section className="panel child-share-panel" aria-labelledby="child-share-title">
             <div className="page-heading compact">
               <div>
-                <p className="eyebrow">家长端与学生端隔离 · 免密受限入口</p>
-                <h2 id="child-share-title">孩子区专属链接与二维码</h2>
+                <p className="eyebrow">学生专属免密通道</p>
+                <h2 id="child-share-title">孩子听写区专属链接与二维码</h2>
                 <p>
-                  此链接自带受限学生凭证（仅允许查看待办听写、交卷、订正错词与盲听磨耳朵，无权修改词库或偷看未批改答案）。孩子平板扫码即可免密直达！
+                  适合平板或手机扫码直接打开。学生端界面专注纯粹，支持报词听写、自主交卷与错词订正。
                 </p>
               </div>
               <button type="button" onClick={() => setChildShare(null)}>

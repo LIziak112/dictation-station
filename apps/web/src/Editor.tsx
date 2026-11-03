@@ -651,22 +651,22 @@ export function Editor({
                   const rowIssues = issues.filter(
                     (x) => x.id === e.id && (x.level === "warn" || attempted),
                   );
-                  let voiceBadgeLabel = "未获取读音";
+                  let voiceBadgeLabel = "未获取";
                   let voiceBadgeClass = "voice-badge-pending";
                   if (customReading) {
-                    voiceBadgeLabel = `已指定 (${customReading})`;
+                    voiceBadgeLabel = "已指定";
                     voiceBadgeClass = "voice-badge-human";
                   } else if (voice?.kind === "human") {
-                    voiceBadgeLabel = "已获取 · 真人读音";
+                    voiceBadgeLabel = "真人";
                     voiceBadgeClass = "voice-badge-human";
                   } else if (voice?.kind === "server") {
-                    voiceBadgeLabel = "已获取 · 云端合成";
+                    voiceBadgeLabel = "合成";
                     voiceBadgeClass = "voice-badge-synth";
                   } else if (voice?.kind === "device") {
-                    voiceBadgeLabel = "已就绪 · 本机朗读";
+                    voiceBadgeLabel = "本机";
                     voiceBadgeClass = "voice-badge-synth";
                   } else if (checkingAudio) {
-                    voiceBadgeLabel = "获取读音中…";
+                    voiceBadgeLabel = "获取中…";
                     voiceBadgeClass = "voice-badge-pending";
                   }
 
@@ -745,10 +745,11 @@ export function Editor({
                           <button
                             type="button"
                             className="compact-btn"
+                            aria-label={`试听第 ${i + 1} 词`}
                             onClick={() => void previewEntryAudio(e)}
                           >
                             <Volume2 size={15} aria-hidden="true" />
-                            试听{e.en ? "英文" : "中文"}
+                            试听
                           </button>
                           <button
                             type="button"

@@ -231,39 +231,21 @@ export function Today({
       )}
       <p role="status">{loading ? "正在读取任务…" : ""}</p>
       {!child && submittedTasks.length > 0 && (
-        <section className="panel review-alert-banner" aria-label="待批改任务提醒">
-          <div className="row between">
+        <section className="notice review-alert-banner" aria-label="待批改任务提醒">
+          <div className="row between review-alert-content">
             <div>
               <p className="eyebrow">孩子已交卷 · 待家长核对</p>
               <h2>有 {submittedTasks.length} 份听写已写完交卷，请对照纸面批改</h2>
             </div>
-          </div>
-          <div className="batch-grid">
-            {submittedTasks.map((task) => (
-              <article className="panel task-card" key={`submitted-${task.id}`}>
-                <div className="row between task-card-top">
-                  <p className="eyebrow">{task.date} · 已交卷待批改</p>
-                  <span className="status-pill status-in_progress">待批改</span>
-                </div>
-                <h3>{task.title}</h3>
-                <p className="task-meta">
-                  共 {task.count} 词 · {MODES[task.mode].label}
-                </p>
-                <div className="row task-card-actions">
-                  <button
-                    type="button"
-                    className="primary"
-                    onClick={() =>
-                      task.activeAttemptId && onReview
-                        ? onReview(task.activeAttemptId)
-                        : onOpen(task.id)
-                    }
-                  >
-                    立即批改
-                  </button>
-                </div>
-              </article>
-            ))}
+            {submittedTasks[0].activeAttemptId && onReview && (
+              <button
+                type="button"
+                className="primary"
+                onClick={() => onReview(submittedTasks[0].activeAttemptId as string)}
+              >
+                立即批改
+              </button>
+            )}
           </div>
         </section>
       )}
@@ -394,6 +376,9 @@ export function Today({
                         </>
                       ) : (
                         <>
+                          <button type="button" className="primary" onClick={() => onOpen(task.id)}>
+                            {task.status === "in_progress" ? "继续听写" : "进入听写"}
+                          </button>
                           {onShareChild && (
                             <button type="button" onClick={() => onShareChild(task.id)}>
                               发给孩子练

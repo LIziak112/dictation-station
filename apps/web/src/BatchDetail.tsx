@@ -119,6 +119,35 @@ export function BatchDetail({
     }
   }
 
+  async function startDirectDictation() {
+    setDispatching(true);
+    try {
+      const picked = selectRange(batch.entries, range);
+      const validEntries = picked.filter((entry) => entry.modes.includes(mode));
+      if (!validEntries.length) {
+        onNotice("所选范围内没有支持当前练法的词条，请调整范围或练法");
+        return;
+      }
+      const today = localDate(new Date(), "Asia/Shanghai");
+      const { task } = await taskApi.create({
+        title: batch.title,
+        date: today,
+        mode,
+        settings,
+        selections: [{ batchId: batch.id, entryIds: validEntries.map((e) => e.id) }],
+        wordIds: [],
+        reviewCount,
+        allowSelfReview,
+        reviewOnly: false,
+      });
+      location.hash = `task=${task.id}&start=1`;
+    } catch (e) {
+      onNotice(e instanceof Error ? e.message : "创建听写任务失败");
+    } finally {
+      setDispatching(false);
+    }
+  }
+
   return (
     <>
       <button type="button" className="back-link subtle" onClick={onBack}>
@@ -293,9 +322,12 @@ export function BatchDetail({
             <Send size={16} aria-hidden="true" />
             {dispatching ? "正在派发…" : "派发到孩子听写区"}
           </button>
+          <button type="button" disabled={dispatching} onClick={() => void startDirectDictation()}>
+            在当前设备直接开始听写
+          </button>
           <span className="small muted">
             {MODES[mode].audio
-              ? "派发后自动预检真人/合成语音，孩子平板扫码即可开练"
+              ? "支持直接在电脑练，或派发到孩子平板独立完成"
               : "此模式看拼音默写，不播放语音"}
           </span>
         </div>

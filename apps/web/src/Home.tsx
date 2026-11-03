@@ -102,7 +102,7 @@ export function Home({ list, filtered, query, setQuery, draft, edit, open, onRes
                   })}
                 </span>
                 <button type="button" onClick={() => open(b.id)}>
-                  查看与派发 →
+                  查看与听写 →
                 </button>
               </div>
             </article>
