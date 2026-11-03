@@ -84,6 +84,8 @@ test("子路径完整流程：导入、草稿恢复、编辑、分享、播放�
   await expect(page.getByText("第 1 / 2 项", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "我写好了，下一个", exact: true }).click();
   await expect(page.getByText("第 2 / 2 项", { exact: true })).toBeVisible();
+  // 项号先在本机更新，等待同步完成再刷新，避免中断正在保存的请求。
+  await expect(page.getByRole("button", { name: "写完了，交卷", exact: true })).toBeEnabled();
   await page.reload();
   await expect(page.getByText("第 2 / 2 项", { exact: true })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath("player.png"), fullPage: true });
