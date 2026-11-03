@@ -81,9 +81,10 @@ export function PrintView({
   // Three items share a row; reserve enough vertical space for its tallest item.
   const fragments = rows.flatMap((row) => {
     const answer = task.items[row.number - 1].entry[MODES[task.mode].answer] || "";
-    const lineCount = grid === "tian" || grid === "mi"
-      ? Math.max(row.lines, Math.ceil(Array.from(answer.replace(/\s/g, "")).length / 4))
-      : row.lines;
+    const lineCount =
+      grid === "tian" || grid === "mi"
+        ? Math.max(row.lines, Math.ceil(Array.from(answer.replace(/\s/g, "")).length / 4))
+        : row.lines;
     return Array.from({ length: Math.ceil(lineCount / 8) }, (_, index) => ({
       ...row,
       continuation: index > 0,
@@ -158,6 +159,7 @@ export function PrintView({
         </div>
       </div>
       {pages.map((page, pageIndex) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: Print pages have a fixed order.
         <article className="print-sheet" key={pageIndex}>
           <header className="print-header">
             <div className="print-title-group">
@@ -172,8 +174,12 @@ export function PrintView({
               </span>
             </div>
             <p className="print-meta">
-              {pageIndex === 0 && <>日期：{task.date}　姓名：____________　得分：______ / {rows.length}　</>}第{" "}
-              {pageIndex + 1} / {pages.length} 页
+              {pageIndex === 0 && (
+                <>
+                  日期：{task.date}　姓名：____________　得分：______ / {rows.length}　
+                </>
+              )}
+              第 {pageIndex + 1} / {pages.length} 页
             </p>
             {qr && (
               <div className="print-qr">
@@ -185,6 +191,7 @@ export function PrintView({
           <ol className="worksheet">
             {page.map((row, index) => (
               <li
+                // biome-ignore lint/suspicious/noArrayIndexKey: Print rows have a fixed order.
                 key={`${row.number}-${index}`}
                 value={row.number}
                 className={row.lines === 3 ? "worksheet-item sentence-item" : "worksheet-item"}
@@ -194,6 +201,7 @@ export function PrintView({
                   <span>{row.continuation ? "（续）" : row.prompt}</span>
                 </div>
                 {Array.from({ length: row.gridLines }, (_, i) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: Grid lines have a fixed order.
                   <WritingGrid key={i} grid={grid} />
                 ))}
               </li>
@@ -204,21 +212,21 @@ export function PrintView({
       ))}
       {answers &&
         pages.map((page, pageIndex) => (
-          <article
-            className="print-sheet answer-sheet"
-            key={`answers-${pageIndex}`}
-          >
+          // biome-ignore lint/suspicious/noArrayIndexKey: Print pages have a fixed order.
+          <article className="print-sheet answer-sheet" key={`answers-${pageIndex}`}>
             <section className="print-answers" data-testid="print-answers">
               <h2>
                 答案对照页 · 第 {pageIndex + 1} / {pages.length} 页
               </h2>
               <div className="print-answers-grid">
-                {page.filter((row) => !row.continuation).map((row) => (
-                  <p key={row.number}>
-                    <strong>{row.number}.</strong>{" "}
-                    {task.items[row.number - 1].entry[MODES[task.mode].answer]}
-                  </p>
-                ))}
+                {page
+                  .filter((row) => !row.continuation)
+                  .map((row) => (
+                    <p key={row.number}>
+                      <strong>{row.number}.</strong>{" "}
+                      {task.items[row.number - 1].entry[MODES[task.mode].answer]}
+                    </p>
+                  ))}
               </div>
             </section>
           </article>

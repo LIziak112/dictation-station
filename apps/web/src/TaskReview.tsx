@@ -317,6 +317,7 @@ function ReviewSession({
           </div>
         </dialog>
       )}
+      {/* biome-ignore lint/a11y/useSemanticElements: Preserve the existing list layout. */}
       <div className="review-list" role="list" hidden={filter !== "all" && tally(filter) === 0}>
         {task.items
           .map((item, index) => ({ item, index }))
@@ -325,6 +326,7 @@ function ReviewSession({
               filter === "all" || (attempt.results[item.wordId] ?? "unchecked") === filter,
           )
           .map(({ item, index }) => (
+            // biome-ignore lint/a11y/useSemanticElements: Review cards retain article semantics.
             <article
               key={item.wordId}
               role="listitem"

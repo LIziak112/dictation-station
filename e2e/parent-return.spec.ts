@@ -15,7 +15,11 @@ test("另一个标签页进入孩子区后，家长页要求登录而不是误�
   await page.getByRole("button", { name: "登录", exact: true }).click();
   await expect(page.getByRole("heading", { name: "今日任务" })).toBeVisible();
   await expect(childPage.getByRole("button", { name: "返回家长端" })).toBeVisible();
-  const blocked = await childPage.evaluate(() => fetch("api/batches", { headers: { "X-Child-Token": localStorage.getItem("ownclass:dictation:child-token") || "" } }).then((r) => r.status));
+  const blocked = await childPage.evaluate(() =>
+    fetch("api/batches", {
+      headers: { "X-Child-Token": localStorage.getItem("ownclass:dictation:child-token") || "" },
+    }).then((r) => r.status),
+  );
   expect(blocked).toBe(403);
 });
 
@@ -38,7 +42,11 @@ test("只在学生端返回时显示本机 PIN，学生端没有家长会话", a
   const wrongPin = await page.evaluate(async () => {
     const token = localStorage.getItem("ownclass:dictation:child-token") || "";
     const deviceId = localStorage.getItem("ownclass:dictation:parent-device");
-    return fetch("api/auth/unlock-pin", { method: "POST", headers: { "Content-Type": "application/json", "X-Child-Token": token }, body: JSON.stringify({ deviceId, pin: "1111" }) }).then((r) => r.status);
+    return fetch("api/auth/unlock-pin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Child-Token": token },
+      body: JSON.stringify({ deviceId, pin: "1111" }),
+    }).then((r) => r.status);
   });
   expect(wrongPin).toBe(400);
   expect((await page.request.get("api/batches")).status()).toBe(403);

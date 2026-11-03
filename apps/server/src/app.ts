@@ -200,9 +200,10 @@ export function createApp(store: Store, options: Options) {
     const headerChildToken =
       c.req.header("X-Child-Token") ?? (bearer.startsWith("ct_") ? bearer : "");
     const sessionAccount = auth.current(getCookie(c, "dictation_session") ?? "");
-    const cookieChildToken = !sessionAccount && c.req.header("X-Parent-Mode") !== "1"
-      ? (getCookie(c, "dictation_child") ?? "")
-      : "";
+    const cookieChildToken =
+      !sessionAccount && c.req.header("X-Parent-Mode") !== "1"
+        ? (getCookie(c, "dictation_child") ?? "")
+        : "";
     const activeChildToken = headerChildToken || cookieChildToken;
     if (activeChildToken) {
       const childActor = tokens.authenticateChild(
@@ -280,13 +281,21 @@ export function createApp(store: Store, options: Options) {
     const input = passwordVerificationSchema.parse(await c.req.json());
     if (!(await auth.login(c.get("account").username, input.password)))
       return c.json({ error: "账号密码不正确" }, 400);
-    if (c.get("childMode")) setCookie(c, "dictation_session", auth.createSession(c.get("account").id), {
-      httpOnly: true, sameSite: "Lax", path: "/", maxAge: 30 * 86400,
-      secure: c.req.url.startsWith("https:") || (c.req.header("Origin") ?? "").startsWith("https:"),
-    });
+    if (c.get("childMode"))
+      setCookie(c, "dictation_session", auth.createSession(c.get("account").id), {
+        httpOnly: true,
+        sameSite: "Lax",
+        path: "/",
+        maxAge: 30 * 86400,
+        secure:
+          c.req.url.startsWith("https:") || (c.req.header("Origin") ?? "").startsWith("https:"),
+      });
     return c.json({ ok: true });
   });
-  const devicePinSchema = z.strictObject({ deviceId: z.string().regex(/^[a-f0-9]{32}$/), pin: z.string().regex(/^[0-9]{4}$/) });
+  const devicePinSchema = z.strictObject({
+    deviceId: z.string().regex(/^[a-f0-9]{32}$/),
+    pin: z.string().regex(/^[0-9]{4}$/),
+  });
   app.post("/api/auth/device-pin", async (c) => {
     const { deviceId, pin } = devicePinSchema.parse(await c.req.json());
     await auth.setDevicePin(c.get("account").id, deviceId, pin);
@@ -298,7 +307,10 @@ export function createApp(store: Store, options: Options) {
     if (valid === null) return c.json({ error: "请使用账号密码验证并重新设置本机口令" }, 409);
     if (!valid) return c.json({ error: "口令不正确，请重试" }, 400);
     setCookie(c, "dictation_session", auth.createSession(c.get("account").id), {
-      httpOnly: true, sameSite: "Lax", path: "/", maxAge: 30 * 86400,
+      httpOnly: true,
+      sameSite: "Lax",
+      path: "/",
+      maxAge: 30 * 86400,
       secure: c.req.url.startsWith("https:") || (c.req.header("Origin") ?? "").startsWith("https:"),
     });
     return c.json({ ok: true });

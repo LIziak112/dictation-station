@@ -1,1239 +1,1145 @@
 {
- "url": "http://127.0.0.1:8083/",
- "at": "2026-11-03T13:49:15.785Z",
- "allow": [],
- "viewports": [
-  {
-   "width": 1440,
-   "height": 900,
-   "load": "load",
-   "screens": 1,
-   "filled": [
-    1
-   ],
-   "motion": {
-    "elements": 0,
-    "css": 0,
-    "transitions": 0,
-    "scripted": 0,
-    "videos": 0,
-    "playingVideos": 0
-   },
-   "metrics": {
-    "viewport": {
-     "w": 1440,
-     "h": 900
-    },
-    "page": {
-     "height": 900,
-     "screens": 1,
-     "words": 18,
-     "img": 0,
-     "video": 0,
-     "canvas": 0,
-     "svg": 6,
-     "sections": 1,
-     "horizontalOverflow": 0,
-     "overflowCulprits": [],
-     "uiFragments": 0,
-     "uiAbuse": false,
-     "realPictures": 0,
-     "videoCount": 0,
-     "uiPictures": 0,
-     "pictureSamples": [],
-     "blendText": 0,
-     "sideScrollers": 0,
-     "brokenImages": [],
-     "emoji": [],
-     "videosNoPoster": 0
-    },
-    "hero": {
-     "text": "欢迎回来",
-     "words": 1,
-     "chars": 4,
-     "lines": 1,
-     "size": 32,
-     "vw": 2.2,
-     "font": "-apple-system",
-     "weight": 750,
-     "tracking": -0.03,
-     "leading": 1.3,
-     "top": 210,
-     "tag": "h1",
-     "kind": "heading",
-     "align": "left",
-     "position": "left"
-    },
-    "h1": {
-     "text": "欢迎回来",
-     "words": 1,
-     "lines": 1,
-     "size": 32,
-     "font": "-apple-system"
-    },
-    "headings": [
-     {
-      "text": "欢迎回来",
-      "words": 1,
-      "chars": 4,
-      "lines": 1,
-      "size": 32,
-      "vw": 2.2,
-      "font": "-apple-system",
-      "weight": 750,
-      "tracking": -0.03,
-      "leading": 1.3,
-      "upper": false,
-      "italic": false,
-      "mono": false,
-      "align": "left",
-      "position": "right",
-      "widthRatio": 0.26,
-      "top": 210,
-      "tag": "h1",
-      "kind": "heading"
-     },
-     {
-      "text": "今天的听写，自己也能完成。",
-      "words": 1,
-      "chars": 13,
-      "lines": 2,
-      "size": 42,
-      "vw": 2.9,
-      "font": "-apple-system",
-      "weight": 700,
-      "tracking": -0.04,
-      "leading": 1.35,
-      "upper": false,
-      "italic": false,
-      "mono": false,
-      "align": "left",
-      "position": "left",
-      "widthRatio": 0.3,
-      "top": 332,
-      "tag": "p",
-      "kind": "heading"
-     }
-    ],
-    "headingSummary": {
-     "count": 2,
-     "maxLines": 2,
-     "over2Lines": 0,
-     "statements": 0,
-     "centered": 0,
-     "medianWords": 1,
-     "mixedFontHeadings": 0
-    },
-    "type": {
-     "families": [
-      {
-       "family": "-apple-system",
-       "share": 1,
-       "mono": false
-      }
-     ],
-     "familyCount": 1,
-     "sizes": [
-      12,
-      13,
-      14,
-      15,
-      16,
-      22,
-      32,
-      42
-     ],
-     "sizeCount": 8,
-     "notLoaded": [],
-     "body": null,
-     "measureChars": null,
-     "max": {
-      "size": 42,
-      "vw": 2.9,
-      "font": "-apple-system",
-      "text": "今天的听写，自己也能完成。"
-     },
-     "monoShare": 0,
-     "monoProseShare": 0,
-     "monoFamilies": [],
-     "monoSamples": [],
-     "microLabels": 0,
-     "microLabelShare": 0,
-     "microSamples": [],
-     "upperShare": 0,
-     "centerShare": 0.04,
-     "smallText": 0
-    },
-    "eyebrows": [
-     {
-      "text": "听写小站",
-      "above": "今天的听写，自己也能完成。",
-      "upper": false,
-      "tracked": true,
-      "mono": false,
-      "pill": false,
-      "size": 12,
-      "top": 292
-     }
-    ],
-    "numbered": [],
-    "color": {
-     "bodyBg": "#f4f6f3",
-     "bodyBgHsl": {
-      "h": 100,
-      "s": 0.14,
-      "l": 0.96
-     },
-     "dark": false,
-     "sectionBgs": [
-      {
-       "color": "#f4f6f3",
-       "top": 0,
-       "hsl": {
-        "h": 100,
-        "s": 0.14,
-        "l": 0.96
-       }
-      }
-     ],
-     "textColors": [
-      {
-       "color": "#5d6862",
-       "share": 0.6
+  "url": "http://127.0.0.1:8083/",
+  "at": "2026-11-03T13:49:15.785Z",
+  "allow": [],
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 900,
+      "load": "load",
+      "screens": 1,
+      "filled": [1],
+      "motion": {
+        "elements": 0,
+        "css": 0,
+        "transitions": 0,
+        "scripted": 0,
+        "videos": 0,
+        "playingVideos": 0
       },
-      {
-       "color": "#3f4c45",
-       "share": 0.22
+      "metrics": {
+        "viewport": {
+          "w": 1440,
+          "h": 900
+        },
+        "page": {
+          "height": 900,
+          "screens": 1,
+          "words": 18,
+          "img": 0,
+          "video": 0,
+          "canvas": 0,
+          "svg": 6,
+          "sections": 1,
+          "horizontalOverflow": 0,
+          "overflowCulprits": [],
+          "uiFragments": 0,
+          "uiAbuse": false,
+          "realPictures": 0,
+          "videoCount": 0,
+          "uiPictures": 0,
+          "pictureSamples": [],
+          "blendText": 0,
+          "sideScrollers": 0,
+          "brokenImages": [],
+          "emoji": [],
+          "videosNoPoster": 0
+        },
+        "hero": {
+          "text": "欢迎回来",
+          "words": 1,
+          "chars": 4,
+          "lines": 1,
+          "size": 32,
+          "vw": 2.2,
+          "font": "-apple-system",
+          "weight": 750,
+          "tracking": -0.03,
+          "leading": 1.3,
+          "top": 210,
+          "tag": "h1",
+          "kind": "heading",
+          "align": "left",
+          "position": "left"
+        },
+        "h1": {
+          "text": "欢迎回来",
+          "words": 1,
+          "lines": 1,
+          "size": 32,
+          "font": "-apple-system"
+        },
+        "headings": [
+          {
+            "text": "欢迎回来",
+            "words": 1,
+            "chars": 4,
+            "lines": 1,
+            "size": 32,
+            "vw": 2.2,
+            "font": "-apple-system",
+            "weight": 750,
+            "tracking": -0.03,
+            "leading": 1.3,
+            "upper": false,
+            "italic": false,
+            "mono": false,
+            "align": "left",
+            "position": "right",
+            "widthRatio": 0.26,
+            "top": 210,
+            "tag": "h1",
+            "kind": "heading"
+          },
+          {
+            "text": "今天的听写，自己也能完成。",
+            "words": 1,
+            "chars": 13,
+            "lines": 2,
+            "size": 42,
+            "vw": 2.9,
+            "font": "-apple-system",
+            "weight": 700,
+            "tracking": -0.04,
+            "leading": 1.35,
+            "upper": false,
+            "italic": false,
+            "mono": false,
+            "align": "left",
+            "position": "left",
+            "widthRatio": 0.3,
+            "top": 332,
+            "tag": "p",
+            "kind": "heading"
+          }
+        ],
+        "headingSummary": {
+          "count": 2,
+          "maxLines": 2,
+          "over2Lines": 0,
+          "statements": 0,
+          "centered": 0,
+          "medianWords": 1,
+          "mixedFontHeadings": 0
+        },
+        "type": {
+          "families": [
+            {
+              "family": "-apple-system",
+              "share": 1,
+              "mono": false
+            }
+          ],
+          "familyCount": 1,
+          "sizes": [12, 13, 14, 15, 16, 22, 32, 42],
+          "sizeCount": 8,
+          "notLoaded": [],
+          "body": null,
+          "measureChars": null,
+          "max": {
+            "size": 42,
+            "vw": 2.9,
+            "font": "-apple-system",
+            "text": "今天的听写，自己也能完成。"
+          },
+          "monoShare": 0,
+          "monoProseShare": 0,
+          "monoFamilies": [],
+          "monoSamples": [],
+          "microLabels": 0,
+          "microLabelShare": 0,
+          "microSamples": [],
+          "upperShare": 0,
+          "centerShare": 0.04,
+          "smallText": 0
+        },
+        "eyebrows": [
+          {
+            "text": "听写小站",
+            "above": "今天的听写，自己也能完成。",
+            "upper": false,
+            "tracked": true,
+            "mono": false,
+            "pill": false,
+            "size": 12,
+            "top": 292
+          }
+        ],
+        "numbered": [],
+        "color": {
+          "bodyBg": "#f4f6f3",
+          "bodyBgHsl": {
+            "h": 100,
+            "s": 0.14,
+            "l": 0.96
+          },
+          "dark": false,
+          "sectionBgs": [
+            {
+              "color": "#f4f6f3",
+              "top": 0,
+              "hsl": {
+                "h": 100,
+                "s": 0.14,
+                "l": 0.96
+              }
+            }
+          ],
+          "textColors": [
+            {
+              "color": "#5d6862",
+              "share": 0.6
+            },
+            {
+              "color": "#3f4c45",
+              "share": 0.22
+            },
+            {
+              "color": "#1f2a24",
+              "share": 0.15
+            },
+            {
+              "color": "#1d6b52",
+              "share": 0.02
+            },
+            {
+              "color": "#ffffff",
+              "share": 0.01
+            }
+          ],
+          "button": {
+            "bg": "#1d6b52",
+            "hsl": {
+              "h": 161,
+              "s": 0.57,
+              "l": 0.27
+            },
+            "fg": "#ffffff"
+          },
+          "lowContrast": []
+        },
+        "buttons": {
+          "count": 1,
+          "inHero": 1,
+          "radius": 10,
+          "height": 48,
+          "withShadow": 1,
+          "withGradient": 0,
+          "mono": 0,
+          "upper": 0,
+          "heroLabels": ["登录"]
+        },
+        "surfaces": {
+          "shadowStatic": 3,
+          "shadowOverlay": 0,
+          "shadowSamples": [
+            "span.brand-mark → rgba(29, 107, 82, 0.5) 0px 4px 12px -4px",
+            "section.panel.auth-card → rgba(26, 43, 34, 0.063) 0px 1px 2px 0px, rgba(26, 43, 34, 0.04) 0px 1px 3px 0px",
+            "button.primary.auth-submit → rgba(15, 58, 43, 0.2) 0px 1px 2px 0px, rgba(29, 107, 82, 0.4) 0px 4px 12px -4px"
+          ],
+          "gradients": 1,
+          "scrims": 0,
+          "gradientSamples": [
+            "main.login-page → radial-gradient(1100px 620px at 88% -12%, color(srgb 0.113725 0.419608 0.321569 / 0.13), rgba(0, 0, 0, 0) 62%)"
+          ],
+          "gradientText": 0,
+          "hairlines": 1,
+          "hairlineSamples": ["p.auth-switch 372px"],
+          "outlinedBoxes": 1,
+          "dashed": 0,
+          "blurred": 0,
+          "roundedBoxes": 1,
+          "boxRadius": 18,
+          "squareMedia": 0,
+          "roundedMedia": 0,
+          "mediaRadius": 0,
+          "textShadow": 0,
+          "cardRows": []
+        },
+        "heroMedia": [],
+        "nav": null,
+        "fontsLoaded": []
       },
-      {
-       "color": "#1f2a24",
-       "share": 0.15
+      "layout": {
+        "viewport": {
+          "w": 1440,
+          "h": 900
+        },
+        "pageH": 900,
+        "margins": {
+          "left": 247,
+          "right": 254
+        },
+        "sections": [],
+        "gaps": [],
+        "h1s": [
+          {
+            "text": "欢迎回来",
+            "size": 32,
+            "top": 210,
+            "firstScreen": true
+          }
+        ],
+        "edgeText": [],
+        "edges": [
+          {
+            "x": 812,
+            "n": 1
+          }
+        ],
+        "leftBlocks": 1,
+        "bodySize": 16,
+        "stage": false,
+        "explains": false,
+        "slivers": [],
+        "voidShare": 0.2,
+        "voidBox": {
+          "x": 0,
+          "y": 720,
+          "w": 1440,
+          "h": 180
+        }
       },
-      {
-       "color": "#1d6b52",
-       "share": 0.02
+      "app": {
+        "viewport": {
+          "w": 1440,
+          "h": 900
+        },
+        "dark": false,
+        "ground": "#f4f6f3",
+        "sidebar": null,
+        "topbar": null,
+        "canvas": {
+          "left": 247,
+          "right": 254
+        },
+        "hero": {
+          "text": "欢迎回来",
+          "words": 1,
+          "chars": 4,
+          "lines": 1,
+          "size": 32,
+          "vw": 2.2,
+          "font": "-apple-system",
+          "weight": 750,
+          "tracking": -0.03,
+          "leading": 1.3,
+          "top": 210,
+          "tag": "h1",
+          "kind": "heading",
+          "align": "left",
+          "position": "left"
+        },
+        "charts": 0,
+        "layout": {
+          "panels": 1,
+          "firstScreen": 1,
+          "ragged": [],
+          "voids": []
+        },
+        "tiles": 0,
+        "panels": {
+          "count": 1,
+          "radii": [[18, 1]],
+          "heavyBorders": 0,
+          "borderSamples": [],
+          "heavyShadows": 0,
+          "softShadows": 2,
+          "shadowSamples": [],
+          "glass": 0
+        },
+        "chips": {
+          "count": 0,
+          "hues": 0,
+          "samples": []
+        },
+        "numbers": {
+          "cells": 0,
+          "leftAligned": 0,
+          "figures": 0,
+          "tabularShare": null,
+          "kpiMax": null
+        },
+        "rows": null,
+        "chartHues": 0,
+        "placeholders": [],
+        "type": {
+          "under13": 0.04,
+          "tiny": 0,
+          "tinySamples": [],
+          "sizes": [12, 13, 14, 15, 16, 18, 22, 32, 42]
+        },
+        "title": {
+          "text": "欢迎回来",
+          "size": 32,
+          "top": 210
+        },
+        "colourShare": 0.012
       },
-      {
-       "color": "#ffffff",
-       "share": 0.01
-      }
-     ],
-     "button": {
-      "bg": "#1d6b52",
-      "hsl": {
-       "h": 161,
-       "s": 0.57,
-       "l": 0.27
+      "consoleErrors": []
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "load": "load",
+      "screens": 1,
+      "filled": [1],
+      "motion": {
+        "elements": 0,
+        "css": 0,
+        "transitions": 0,
+        "scripted": 0,
+        "videos": 0,
+        "playingVideos": 0
       },
-      "fg": "#ffffff"
-     },
-     "lowContrast": []
+      "metrics": {
+        "viewport": {
+          "w": 768,
+          "h": 1024
+        },
+        "page": {
+          "height": 1024,
+          "screens": 1,
+          "words": 13,
+          "img": 0,
+          "video": 0,
+          "canvas": 0,
+          "svg": 6,
+          "sections": 1,
+          "horizontalOverflow": 0,
+          "overflowCulprits": [],
+          "uiFragments": 0,
+          "uiAbuse": false,
+          "realPictures": 0,
+          "videoCount": 0,
+          "uiPictures": 0,
+          "pictureSamples": [],
+          "blendText": 0,
+          "sideScrollers": 0,
+          "brokenImages": [],
+          "emoji": [],
+          "videosNoPoster": 0
+        },
+        "hero": {
+          "text": "欢迎回来",
+          "words": 1,
+          "chars": 4,
+          "lines": 1,
+          "size": 26,
+          "vw": 3.4,
+          "font": "-apple-system",
+          "weight": 750,
+          "tracking": -0.03,
+          "leading": 1.3,
+          "top": 312,
+          "tag": "h1",
+          "kind": "heading",
+          "align": "left",
+          "position": "left"
+        },
+        "h1": {
+          "text": "欢迎回来",
+          "words": 1,
+          "lines": 1,
+          "size": 26,
+          "font": "-apple-system"
+        },
+        "headings": [
+          {
+            "text": "欢迎回来",
+            "words": 1,
+            "chars": 4,
+            "lines": 1,
+            "size": 26,
+            "vw": 3.4,
+            "font": "-apple-system",
+            "weight": 750,
+            "tracking": -0.03,
+            "leading": 1.3,
+            "upper": false,
+            "italic": false,
+            "mono": false,
+            "align": "left",
+            "position": "center",
+            "widthRatio": 0.45,
+            "top": 312,
+            "tag": "h1",
+            "kind": "heading"
+          }
+        ],
+        "headingSummary": {
+          "count": 1,
+          "maxLines": 1,
+          "over2Lines": 0,
+          "statements": 0,
+          "centered": 0,
+          "medianWords": null,
+          "mixedFontHeadings": 0
+        },
+        "type": {
+          "families": [
+            {
+              "family": "-apple-system",
+              "share": 1,
+              "mono": false
+            }
+          ],
+          "familyCount": 1,
+          "sizes": [12, 13, 14, 15, 16, 18, 26],
+          "sizeCount": 7,
+          "notLoaded": [],
+          "body": null,
+          "measureChars": null,
+          "max": {
+            "size": 26,
+            "vw": 3.4,
+            "font": "-apple-system",
+            "text": "欢迎回来"
+          },
+          "monoShare": 0,
+          "monoProseShare": 0,
+          "monoFamilies": [],
+          "monoSamples": [],
+          "microLabels": 0,
+          "microLabelShare": 0,
+          "microSamples": [],
+          "upperShare": 0,
+          "centerShare": 0.06,
+          "smallText": 0
+        },
+        "eyebrows": [
+          {
+            "text": "听写小站",
+            "above": "欢迎回来",
+            "upper": false,
+            "tracked": true,
+            "mono": false,
+            "pill": false,
+            "size": 12,
+            "top": 268
+          }
+        ],
+        "numbered": [],
+        "color": {
+          "bodyBg": "#f4f6f3",
+          "bodyBgHsl": {
+            "h": 100,
+            "s": 0.14,
+            "l": 0.96
+          },
+          "dark": false,
+          "sectionBgs": [
+            {
+              "color": "#f4f6f3",
+              "top": 0,
+              "hsl": {
+                "h": 100,
+                "s": 0.14,
+                "l": 0.96
+              }
+            },
+            {
+              "color": "#ffffff",
+              "top": 213,
+              "hsl": {
+                "h": 0,
+                "s": 0,
+                "l": 1
+              }
+            }
+          ],
+          "textColors": [
+            {
+              "color": "#5d6862",
+              "share": 0.76
+            },
+            {
+              "color": "#1f2a24",
+              "share": 0.12
+            },
+            {
+              "color": "#3f4c45",
+              "share": 0.05
+            },
+            {
+              "color": "#1d6b52",
+              "share": 0.04
+            },
+            {
+              "color": "#ffffff",
+              "share": 0.02
+            }
+          ],
+          "button": {
+            "bg": "#1d6b52",
+            "hsl": {
+              "h": 161,
+              "s": 0.57,
+              "l": 0.27
+            },
+            "fg": "#ffffff"
+          },
+          "lowContrast": []
+        },
+        "buttons": {
+          "count": 1,
+          "inHero": 1,
+          "radius": 10,
+          "height": 48,
+          "withShadow": 1,
+          "withGradient": 0,
+          "mono": 0,
+          "upper": 0,
+          "heroLabels": ["登录"]
+        },
+        "surfaces": {
+          "shadowStatic": 3,
+          "shadowOverlay": 0,
+          "shadowSamples": [
+            "section.panel.auth-card → rgba(26, 43, 34, 0.063) 0px 1px 2px 0px, rgba(26, 43, 34, 0.04) 0px 1px 3px 0px",
+            "span.brand-mark → rgba(29, 107, 82, 0.5) 0px 4px 12px -4px",
+            "button.primary.auth-submit → rgba(15, 58, 43, 0.2) 0px 1px 2px 0px, rgba(29, 107, 82, 0.4) 0px 4px 12px -4px"
+          ],
+          "gradients": 1,
+          "scrims": 0,
+          "gradientSamples": [
+            "main.login-page → radial-gradient(1100px 620px at 88% -12%, color(srgb 0.113725 0.419608 0.321569 / 0.13), rgba(0, 0, 0, 0) 62%)"
+          ],
+          "gradientText": 0,
+          "hairlines": 1,
+          "hairlineSamples": ["p.auth-switch 341px"],
+          "outlinedBoxes": 1,
+          "dashed": 0,
+          "blurred": 0,
+          "roundedBoxes": 1,
+          "boxRadius": 18,
+          "squareMedia": 0,
+          "roundedMedia": 0,
+          "mediaRadius": 0,
+          "textShadow": 0,
+          "cardRows": []
+        },
+        "heroMedia": [],
+        "nav": null,
+        "fontsLoaded": []
+      },
+      "layout": {
+        "viewport": {
+          "w": 768,
+          "h": 1024
+        },
+        "pageH": 1024,
+        "margins": {
+          "left": 212,
+          "right": 212
+        },
+        "sections": [],
+        "gaps": [],
+        "h1s": [
+          {
+            "text": "欢迎回来",
+            "size": 26,
+            "top": 312,
+            "firstScreen": true
+          }
+        ],
+        "edgeText": [],
+        "edges": [
+          {
+            "x": 212,
+            "n": 1
+          }
+        ],
+        "leftBlocks": 1,
+        "bodySize": 16,
+        "stage": false,
+        "explains": false,
+        "slivers": [],
+        "voidShare": 0,
+        "voidBox": null
+      },
+      "app": {
+        "viewport": {
+          "w": 768,
+          "h": 1024
+        },
+        "dark": false,
+        "ground": "#f4f6f3",
+        "sidebar": null,
+        "topbar": null,
+        "canvas": {
+          "left": 212,
+          "right": 212
+        },
+        "hero": {
+          "text": "欢迎回来",
+          "words": 1,
+          "chars": 4,
+          "lines": 1,
+          "size": 26,
+          "vw": 3.4,
+          "font": "-apple-system",
+          "weight": 750,
+          "tracking": -0.03,
+          "leading": 1.3,
+          "top": 312,
+          "tag": "h1",
+          "kind": "heading",
+          "align": "left",
+          "position": "left"
+        },
+        "charts": 0,
+        "layout": {
+          "panels": 1,
+          "firstScreen": 1,
+          "ragged": [],
+          "voids": []
+        },
+        "tiles": 0,
+        "panels": {
+          "count": 1,
+          "radii": [[18, 1]],
+          "heavyBorders": 0,
+          "borderSamples": [],
+          "heavyShadows": 0,
+          "softShadows": 2,
+          "shadowSamples": [],
+          "glass": 0
+        },
+        "chips": {
+          "count": 0,
+          "hues": 0,
+          "samples": []
+        },
+        "numbers": {
+          "cells": 0,
+          "leftAligned": 0,
+          "figures": 0,
+          "tabularShare": null,
+          "kpiMax": null
+        },
+        "rows": null,
+        "chartHues": 0,
+        "placeholders": [],
+        "type": {
+          "under13": 0.04,
+          "tiny": 0,
+          "tinySamples": [],
+          "sizes": [12, 13, 14, 15, 16, 18, 22, 26, 30]
+        },
+        "title": {
+          "text": "欢迎回来",
+          "size": 26,
+          "top": 312
+        },
+        "colourShare": 0.02
+      },
+      "consoleErrors": []
     },
-    "buttons": {
-     "count": 1,
-     "inHero": 1,
-     "radius": 10,
-     "height": 48,
-     "withShadow": 1,
-     "withGradient": 0,
-     "mono": 0,
-     "upper": 0,
-     "heroLabels": [
-      "登录"
-     ]
-    },
-    "surfaces": {
-     "shadowStatic": 3,
-     "shadowOverlay": 0,
-     "shadowSamples": [
-      "span.brand-mark → rgba(29, 107, 82, 0.5) 0px 4px 12px -4px",
-      "section.panel.auth-card → rgba(26, 43, 34, 0.063) 0px 1px 2px 0px, rgba(26, 43, 34, 0.04) 0px 1px 3px 0px",
-      "button.primary.auth-submit → rgba(15, 58, 43, 0.2) 0px 1px 2px 0px, rgba(29, 107, 82, 0.4) 0px 4px 12px -4px"
-     ],
-     "gradients": 1,
-     "scrims": 0,
-     "gradientSamples": [
-      "main.login-page → radial-gradient(1100px 620px at 88% -12%, color(srgb 0.113725 0.419608 0.321569 / 0.13), rgba(0, 0, 0, 0) 62%)"
-     ],
-     "gradientText": 0,
-     "hairlines": 1,
-     "hairlineSamples": [
-      "p.auth-switch 372px"
-     ],
-     "outlinedBoxes": 1,
-     "dashed": 0,
-     "blurred": 0,
-     "roundedBoxes": 1,
-     "boxRadius": 18,
-     "squareMedia": 0,
-     "roundedMedia": 0,
-     "mediaRadius": 0,
-     "textShadow": 0,
-     "cardRows": []
-    },
-    "heroMedia": [],
-    "nav": null,
-    "fontsLoaded": []
-   },
-   "layout": {
-    "viewport": {
-     "w": 1440,
-     "h": 900
-    },
-    "pageH": 900,
-    "margins": {
-     "left": 247,
-     "right": 254
-    },
-    "sections": [],
-    "gaps": [],
-    "h1s": [
-     {
-      "text": "欢迎回来",
-      "size": 32,
-      "top": 210,
-      "firstScreen": true
-     }
-    ],
-    "edgeText": [],
-    "edges": [
-     {
-      "x": 812,
-      "n": 1
-     }
-    ],
-    "leftBlocks": 1,
-    "bodySize": 16,
-    "stage": false,
-    "explains": false,
-    "slivers": [],
-    "voidShare": 0.2,
-    "voidBox": {
-     "x": 0,
-     "y": 720,
-     "w": 1440,
-     "h": 180
+    {
+      "width": 390,
+      "height": 844,
+      "load": "load",
+      "screens": 1,
+      "filled": [1],
+      "motion": {
+        "elements": 0,
+        "css": 0,
+        "transitions": 0,
+        "scripted": 0,
+        "videos": 0,
+        "playingVideos": 0
+      },
+      "metrics": {
+        "viewport": {
+          "w": 390,
+          "h": 844
+        },
+        "page": {
+          "height": 844,
+          "screens": 1,
+          "words": 13,
+          "img": 0,
+          "video": 0,
+          "canvas": 0,
+          "svg": 6,
+          "sections": 1,
+          "horizontalOverflow": 0,
+          "overflowCulprits": [],
+          "uiFragments": 0,
+          "uiAbuse": false,
+          "realPictures": 0,
+          "videoCount": 0,
+          "uiPictures": 0,
+          "pictureSamples": [],
+          "blendText": 0,
+          "sideScrollers": 0,
+          "brokenImages": [],
+          "emoji": [],
+          "videosNoPoster": 0
+        },
+        "hero": {
+          "text": "欢迎回来",
+          "words": 1,
+          "chars": 4,
+          "lines": 1,
+          "size": 26,
+          "vw": 6.7,
+          "font": "-apple-system",
+          "weight": 750,
+          "tracking": -0.03,
+          "leading": 1.3,
+          "top": 210,
+          "tag": "h1",
+          "kind": "heading",
+          "align": "left",
+          "position": "left"
+        },
+        "h1": {
+          "text": "欢迎回来",
+          "words": 1,
+          "lines": 1,
+          "size": 26,
+          "font": "-apple-system"
+        },
+        "headings": [
+          {
+            "text": "欢迎回来",
+            "words": 1,
+            "chars": 4,
+            "lines": 1,
+            "size": 26,
+            "vw": 6.7,
+            "font": "-apple-system",
+            "weight": 750,
+            "tracking": -0.03,
+            "leading": 1.3,
+            "upper": false,
+            "italic": false,
+            "mono": false,
+            "align": "left",
+            "position": "center",
+            "widthRatio": 0.82,
+            "top": 210,
+            "tag": "h1",
+            "kind": "heading"
+          }
+        ],
+        "headingSummary": {
+          "count": 1,
+          "maxLines": 1,
+          "over2Lines": 0,
+          "statements": 0,
+          "centered": 0,
+          "medianWords": null,
+          "mixedFontHeadings": 0
+        },
+        "type": {
+          "families": [
+            {
+              "family": "-apple-system",
+              "share": 1,
+              "mono": false
+            }
+          ],
+          "familyCount": 1,
+          "sizes": [12, 13, 14, 15, 16, 18, 26],
+          "sizeCount": 7,
+          "notLoaded": [],
+          "body": null,
+          "measureChars": null,
+          "max": {
+            "size": 26,
+            "vw": 6.7,
+            "font": "-apple-system",
+            "text": "欢迎回来"
+          },
+          "monoShare": 0,
+          "monoProseShare": 0,
+          "monoFamilies": [],
+          "monoSamples": [],
+          "microLabels": 0,
+          "microLabelShare": 0,
+          "microSamples": [],
+          "upperShare": 0,
+          "centerShare": 0.06,
+          "smallText": 0
+        },
+        "eyebrows": [
+          {
+            "text": "听写小站",
+            "above": "欢迎回来",
+            "upper": false,
+            "tracked": true,
+            "mono": false,
+            "pill": false,
+            "size": 12,
+            "top": 166
+          }
+        ],
+        "numbered": [],
+        "color": {
+          "bodyBg": "#f4f6f3",
+          "bodyBgHsl": {
+            "h": 100,
+            "s": 0.14,
+            "l": 0.96
+          },
+          "dark": false,
+          "sectionBgs": [
+            {
+              "color": "#f4f6f3",
+              "top": 0,
+              "hsl": {
+                "h": 100,
+                "s": 0.14,
+                "l": 0.96
+              }
+            },
+            {
+              "color": "#ffffff",
+              "top": 117,
+              "hsl": {
+                "h": 0,
+                "s": 0,
+                "l": 1
+              }
+            }
+          ],
+          "textColors": [
+            {
+              "color": "#5d6862",
+              "share": 0.76
+            },
+            {
+              "color": "#1f2a24",
+              "share": 0.12
+            },
+            {
+              "color": "#3f4c45",
+              "share": 0.05
+            },
+            {
+              "color": "#1d6b52",
+              "share": 0.04
+            },
+            {
+              "color": "#ffffff",
+              "share": 0.02
+            }
+          ],
+          "button": {
+            "bg": "#1d6b52",
+            "hsl": {
+              "h": 161,
+              "s": 0.57,
+              "l": 0.27
+            },
+            "fg": "#ffffff"
+          },
+          "lowContrast": []
+        },
+        "buttons": {
+          "count": 1,
+          "inHero": 1,
+          "radius": 10,
+          "height": 48,
+          "withShadow": 1,
+          "withGradient": 0,
+          "mono": 0,
+          "upper": 0,
+          "heroLabels": ["登录"]
+        },
+        "surfaces": {
+          "shadowStatic": 3,
+          "shadowOverlay": 0,
+          "shadowSamples": [
+            "section.panel.auth-card → rgba(26, 43, 34, 0.063) 0px 1px 2px 0px, rgba(26, 43, 34, 0.04) 0px 1px 3px 0px",
+            "span.brand-mark → rgba(29, 107, 82, 0.5) 0px 4px 12px -4px",
+            "button.primary.auth-submit → rgba(15, 58, 43, 0.2) 0px 1px 2px 0px, rgba(29, 107, 82, 0.4) 0px 4px 12px -4px"
+          ],
+          "gradients": 1,
+          "scrims": 0,
+          "gradientSamples": [
+            "main.login-page → radial-gradient(1100px 620px at 88% -12%, color(srgb 0.113725 0.419608 0.321569 / 0.13), rgba(0, 0, 0, 0) 62%)"
+          ],
+          "gradientText": 0,
+          "hairlines": 1,
+          "hairlineSamples": ["p.auth-switch 316px"],
+          "outlinedBoxes": 1,
+          "dashed": 0,
+          "blurred": 0,
+          "roundedBoxes": 1,
+          "boxRadius": 18,
+          "squareMedia": 0,
+          "roundedMedia": 0,
+          "mediaRadius": 0,
+          "textShadow": 0,
+          "cardRows": []
+        },
+        "heroMedia": [],
+        "nav": null,
+        "fontsLoaded": []
+      },
+      "layout": {
+        "viewport": {
+          "w": 390,
+          "h": 844
+        },
+        "pageH": 844,
+        "margins": {
+          "left": 35,
+          "right": 37
+        },
+        "sections": [],
+        "gaps": [],
+        "h1s": [
+          {
+            "text": "欢迎回来",
+            "size": 26,
+            "top": 210,
+            "firstScreen": true
+          }
+        ],
+        "edgeText": [],
+        "edges": [
+          {
+            "x": 35,
+            "n": 1
+          }
+        ],
+        "leftBlocks": 1,
+        "bodySize": 16,
+        "stage": false,
+        "explains": false,
+        "slivers": [],
+        "voidShare": 0,
+        "voidBox": null
+      },
+      "app": {
+        "viewport": {
+          "w": 390,
+          "h": 844
+        },
+        "dark": false,
+        "ground": "#f4f6f3",
+        "sidebar": null,
+        "topbar": null,
+        "canvas": {
+          "left": 35,
+          "right": 37
+        },
+        "hero": {
+          "text": "欢迎回来",
+          "words": 1,
+          "chars": 4,
+          "lines": 1,
+          "size": 26,
+          "vw": 6.7,
+          "font": "-apple-system",
+          "weight": 750,
+          "tracking": -0.03,
+          "leading": 1.3,
+          "top": 210,
+          "tag": "h1",
+          "kind": "heading",
+          "align": "left",
+          "position": "left"
+        },
+        "charts": 0,
+        "layout": {
+          "panels": 1,
+          "firstScreen": 1,
+          "ragged": [],
+          "voids": []
+        },
+        "tiles": 0,
+        "panels": {
+          "count": 1,
+          "radii": [[18, 1]],
+          "heavyBorders": 0,
+          "borderSamples": [],
+          "heavyShadows": 0,
+          "softShadows": 2,
+          "shadowSamples": [],
+          "glass": 0
+        },
+        "chips": {
+          "count": 0,
+          "hues": 0,
+          "samples": []
+        },
+        "numbers": {
+          "cells": 0,
+          "leftAligned": 0,
+          "figures": 0,
+          "tabularShare": null,
+          "kpiMax": null
+        },
+        "rows": null,
+        "chartHues": 0,
+        "placeholders": [],
+        "type": {
+          "under13": 0.04,
+          "tiny": 0,
+          "tinySamples": [],
+          "sizes": [12, 13, 14, 15, 16, 18, 22, 26, 30]
+        },
+        "title": {
+          "text": "欢迎回来",
+          "size": 26,
+          "top": 210
+        },
+        "colourShare": 0.047
+      },
+      "consoleErrors": []
     }
-   },
-   "app": {
-    "viewport": {
-     "w": 1440,
-     "h": 900
+  ],
+  "findings": [
+    {
+      "level": "FAIL",
+      "id": "gradient",
+      "width": 1440,
+      "message": "1 gradient fill(s): main.login-page → radial-gradient(1100px 620px at 88% -12%, color(srgb 0.113725 0.419608 0.321569 / 0.13), rgba(0, 0, 0, 0) 62%)",
+      "fix": "Use a flat colour or a real image. The only gradient allowed by default is a neutral scrim over a photo for legibility.",
+      "alsoAt": [768, 390]
     },
-    "dark": false,
-    "ground": "#f4f6f3",
-    "sidebar": null,
-    "topbar": null,
-    "canvas": {
-     "left": 247,
-     "right": 254
+    {
+      "level": "FAIL",
+      "id": "button-fx",
+      "width": 1440,
+      "message": "Buttons with shadow/glow.",
+      "fix": "Flat fill, one colour.",
+      "alsoAt": [768, 390]
+    }
+  ],
+  "images": [
+    {
+      "viewport": "desktop",
+      "width": 1440,
+      "fold": "C:\\Users\\HUAYU\\Documents\\github\\dictation-station\\.taste-skill\\before\\desktop-fold.jpg",
+      "pages": [
+        "C:\\Users\\HUAYU\\Documents\\github\\dictation-station\\.taste-skill\\before\\desktop-page-01.jpg"
+      ],
+      "film": []
     },
-    "hero": {
-     "text": "欢迎回来",
-     "words": 1,
-     "chars": 4,
-     "lines": 1,
-     "size": 32,
-     "vw": 2.2,
-     "font": "-apple-system",
-     "weight": 750,
-     "tracking": -0.03,
-     "leading": 1.3,
-     "top": 210,
-     "tag": "h1",
-     "kind": "heading",
-     "align": "left",
-     "position": "left"
+    {
+      "viewport": "tablet",
+      "width": 768,
+      "fold": "C:\\Users\\HUAYU\\Documents\\github\\dictation-station\\.taste-skill\\before\\tablet-fold.jpg",
+      "pages": [
+        "C:\\Users\\HUAYU\\Documents\\github\\dictation-station\\.taste-skill\\before\\tablet-page-01.jpg"
+      ],
+      "film": []
     },
-    "charts": 0,
-    "layout": {
-     "panels": 1,
-     "firstScreen": 1,
-     "ragged": [],
-     "voids": []
-    },
-    "tiles": 0,
-    "panels": {
-     "count": 1,
-     "radii": [
-      [
-       18,
-       1
-      ]
-     ],
-     "heavyBorders": 0,
-     "borderSamples": [],
-     "heavyShadows": 0,
-     "softShadows": 2,
-     "shadowSamples": [],
-     "glass": 0
-    },
-    "chips": {
-     "count": 0,
-     "hues": 0,
-     "samples": []
-    },
-    "numbers": {
-     "cells": 0,
-     "leftAligned": 0,
-     "figures": 0,
-     "tabularShare": null,
-     "kpiMax": null
-    },
-    "rows": null,
-    "chartHues": 0,
-    "placeholders": [],
-    "type": {
-     "under13": 0.04,
-     "tiny": 0,
-     "tinySamples": [],
-     "sizes": [
-      12,
-      13,
-      14,
-      15,
-      16,
-      18,
-      22,
-      32,
-      42
-     ]
-    },
-    "title": {
-     "text": "欢迎回来",
-     "size": 32,
-     "top": 210
-    },
-    "colourShare": 0.012
-   },
-   "consoleErrors": []
-  },
-  {
-   "width": 768,
-   "height": 1024,
-   "load": "load",
-   "screens": 1,
-   "filled": [
-    1
-   ],
-   "motion": {
-    "elements": 0,
-    "css": 0,
-    "transitions": 0,
-    "scripted": 0,
-    "videos": 0,
-    "playingVideos": 0
-   },
-   "metrics": {
-    "viewport": {
-     "w": 768,
-     "h": 1024
-    },
-    "page": {
-     "height": 1024,
-     "screens": 1,
-     "words": 13,
-     "img": 0,
-     "video": 0,
-     "canvas": 0,
-     "svg": 6,
-     "sections": 1,
-     "horizontalOverflow": 0,
-     "overflowCulprits": [],
-     "uiFragments": 0,
-     "uiAbuse": false,
-     "realPictures": 0,
-     "videoCount": 0,
-     "uiPictures": 0,
-     "pictureSamples": [],
-     "blendText": 0,
-     "sideScrollers": 0,
-     "brokenImages": [],
-     "emoji": [],
-     "videosNoPoster": 0
-    },
-    "hero": {
-     "text": "欢迎回来",
-     "words": 1,
-     "chars": 4,
-     "lines": 1,
-     "size": 26,
-     "vw": 3.4,
-     "font": "-apple-system",
-     "weight": 750,
-     "tracking": -0.03,
-     "leading": 1.3,
-     "top": 312,
-     "tag": "h1",
-     "kind": "heading",
-     "align": "left",
-     "position": "left"
-    },
-    "h1": {
-     "text": "欢迎回来",
-     "words": 1,
-     "lines": 1,
-     "size": 26,
-     "font": "-apple-system"
-    },
-    "headings": [
-     {
-      "text": "欢迎回来",
-      "words": 1,
-      "chars": 4,
-      "lines": 1,
-      "size": 26,
-      "vw": 3.4,
-      "font": "-apple-system",
-      "weight": 750,
-      "tracking": -0.03,
-      "leading": 1.3,
-      "upper": false,
-      "italic": false,
-      "mono": false,
-      "align": "left",
-      "position": "center",
-      "widthRatio": 0.45,
-      "top": 312,
-      "tag": "h1",
-      "kind": "heading"
-     }
-    ],
-    "headingSummary": {
-     "count": 1,
-     "maxLines": 1,
-     "over2Lines": 0,
-     "statements": 0,
-     "centered": 0,
-     "medianWords": null,
-     "mixedFontHeadings": 0
-    },
-    "type": {
-     "families": [
-      {
-       "family": "-apple-system",
-       "share": 1,
-       "mono": false
-      }
-     ],
-     "familyCount": 1,
-     "sizes": [
-      12,
-      13,
-      14,
-      15,
-      16,
-      18,
-      26
-     ],
-     "sizeCount": 7,
-     "notLoaded": [],
-     "body": null,
-     "measureChars": null,
-     "max": {
-      "size": 26,
-      "vw": 3.4,
-      "font": "-apple-system",
-      "text": "欢迎回来"
-     },
-     "monoShare": 0,
-     "monoProseShare": 0,
-     "monoFamilies": [],
-     "monoSamples": [],
-     "microLabels": 0,
-     "microLabelShare": 0,
-     "microSamples": [],
-     "upperShare": 0,
-     "centerShare": 0.06,
-     "smallText": 0
-    },
-    "eyebrows": [
-     {
-      "text": "听写小站",
-      "above": "欢迎回来",
-      "upper": false,
-      "tracked": true,
-      "mono": false,
-      "pill": false,
-      "size": 12,
-      "top": 268
-     }
-    ],
-    "numbered": [],
-    "color": {
-     "bodyBg": "#f4f6f3",
-     "bodyBgHsl": {
-      "h": 100,
-      "s": 0.14,
-      "l": 0.96
-     },
-     "dark": false,
-     "sectionBgs": [
-      {
-       "color": "#f4f6f3",
-       "top": 0,
-       "hsl": {
-        "h": 100,
-        "s": 0.14,
-        "l": 0.96
-       }
-      },
-      {
-       "color": "#ffffff",
-       "top": 213,
-       "hsl": {
-        "h": 0,
-        "s": 0,
-        "l": 1
-       }
-      }
-     ],
-     "textColors": [
-      {
-       "color": "#5d6862",
-       "share": 0.76
-      },
-      {
-       "color": "#1f2a24",
-       "share": 0.12
-      },
-      {
-       "color": "#3f4c45",
-       "share": 0.05
-      },
-      {
-       "color": "#1d6b52",
-       "share": 0.04
-      },
-      {
-       "color": "#ffffff",
-       "share": 0.02
-      }
-     ],
-     "button": {
-      "bg": "#1d6b52",
-      "hsl": {
-       "h": 161,
-       "s": 0.57,
-       "l": 0.27
-      },
-      "fg": "#ffffff"
-     },
-     "lowContrast": []
-    },
-    "buttons": {
-     "count": 1,
-     "inHero": 1,
-     "radius": 10,
-     "height": 48,
-     "withShadow": 1,
-     "withGradient": 0,
-     "mono": 0,
-     "upper": 0,
-     "heroLabels": [
-      "登录"
-     ]
-    },
-    "surfaces": {
-     "shadowStatic": 3,
-     "shadowOverlay": 0,
-     "shadowSamples": [
-      "section.panel.auth-card → rgba(26, 43, 34, 0.063) 0px 1px 2px 0px, rgba(26, 43, 34, 0.04) 0px 1px 3px 0px",
-      "span.brand-mark → rgba(29, 107, 82, 0.5) 0px 4px 12px -4px",
-      "button.primary.auth-submit → rgba(15, 58, 43, 0.2) 0px 1px 2px 0px, rgba(29, 107, 82, 0.4) 0px 4px 12px -4px"
-     ],
-     "gradients": 1,
-     "scrims": 0,
-     "gradientSamples": [
-      "main.login-page → radial-gradient(1100px 620px at 88% -12%, color(srgb 0.113725 0.419608 0.321569 / 0.13), rgba(0, 0, 0, 0) 62%)"
-     ],
-     "gradientText": 0,
-     "hairlines": 1,
-     "hairlineSamples": [
-      "p.auth-switch 341px"
-     ],
-     "outlinedBoxes": 1,
-     "dashed": 0,
-     "blurred": 0,
-     "roundedBoxes": 1,
-     "boxRadius": 18,
-     "squareMedia": 0,
-     "roundedMedia": 0,
-     "mediaRadius": 0,
-     "textShadow": 0,
-     "cardRows": []
-    },
-    "heroMedia": [],
-    "nav": null,
-    "fontsLoaded": []
-   },
-   "layout": {
-    "viewport": {
-     "w": 768,
-     "h": 1024
-    },
-    "pageH": 1024,
-    "margins": {
-     "left": 212,
-     "right": 212
-    },
-    "sections": [],
-    "gaps": [],
-    "h1s": [
-     {
-      "text": "欢迎回来",
-      "size": 26,
-      "top": 312,
-      "firstScreen": true
-     }
-    ],
-    "edgeText": [],
-    "edges": [
-     {
-      "x": 212,
-      "n": 1
-     }
-    ],
-    "leftBlocks": 1,
-    "bodySize": 16,
-    "stage": false,
-    "explains": false,
-    "slivers": [],
-    "voidShare": 0,
-    "voidBox": null
-   },
-   "app": {
-    "viewport": {
-     "w": 768,
-     "h": 1024
-    },
-    "dark": false,
-    "ground": "#f4f6f3",
-    "sidebar": null,
-    "topbar": null,
-    "canvas": {
-     "left": 212,
-     "right": 212
-    },
-    "hero": {
-     "text": "欢迎回来",
-     "words": 1,
-     "chars": 4,
-     "lines": 1,
-     "size": 26,
-     "vw": 3.4,
-     "font": "-apple-system",
-     "weight": 750,
-     "tracking": -0.03,
-     "leading": 1.3,
-     "top": 312,
-     "tag": "h1",
-     "kind": "heading",
-     "align": "left",
-     "position": "left"
-    },
-    "charts": 0,
-    "layout": {
-     "panels": 1,
-     "firstScreen": 1,
-     "ragged": [],
-     "voids": []
-    },
-    "tiles": 0,
-    "panels": {
-     "count": 1,
-     "radii": [
-      [
-       18,
-       1
-      ]
-     ],
-     "heavyBorders": 0,
-     "borderSamples": [],
-     "heavyShadows": 0,
-     "softShadows": 2,
-     "shadowSamples": [],
-     "glass": 0
-    },
-    "chips": {
-     "count": 0,
-     "hues": 0,
-     "samples": []
-    },
-    "numbers": {
-     "cells": 0,
-     "leftAligned": 0,
-     "figures": 0,
-     "tabularShare": null,
-     "kpiMax": null
-    },
-    "rows": null,
-    "chartHues": 0,
-    "placeholders": [],
-    "type": {
-     "under13": 0.04,
-     "tiny": 0,
-     "tinySamples": [],
-     "sizes": [
-      12,
-      13,
-      14,
-      15,
-      16,
-      18,
-      22,
-      26,
-      30
-     ]
-    },
-    "title": {
-     "text": "欢迎回来",
-     "size": 26,
-     "top": 312
-    },
-    "colourShare": 0.02
-   },
-   "consoleErrors": []
-  },
-  {
-   "width": 390,
-   "height": 844,
-   "load": "load",
-   "screens": 1,
-   "filled": [
-    1
-   ],
-   "motion": {
-    "elements": 0,
-    "css": 0,
-    "transitions": 0,
-    "scripted": 0,
-    "videos": 0,
-    "playingVideos": 0
-   },
-   "metrics": {
-    "viewport": {
-     "w": 390,
-     "h": 844
-    },
-    "page": {
-     "height": 844,
-     "screens": 1,
-     "words": 13,
-     "img": 0,
-     "video": 0,
-     "canvas": 0,
-     "svg": 6,
-     "sections": 1,
-     "horizontalOverflow": 0,
-     "overflowCulprits": [],
-     "uiFragments": 0,
-     "uiAbuse": false,
-     "realPictures": 0,
-     "videoCount": 0,
-     "uiPictures": 0,
-     "pictureSamples": [],
-     "blendText": 0,
-     "sideScrollers": 0,
-     "brokenImages": [],
-     "emoji": [],
-     "videosNoPoster": 0
-    },
-    "hero": {
-     "text": "欢迎回来",
-     "words": 1,
-     "chars": 4,
-     "lines": 1,
-     "size": 26,
-     "vw": 6.7,
-     "font": "-apple-system",
-     "weight": 750,
-     "tracking": -0.03,
-     "leading": 1.3,
-     "top": 210,
-     "tag": "h1",
-     "kind": "heading",
-     "align": "left",
-     "position": "left"
-    },
-    "h1": {
-     "text": "欢迎回来",
-     "words": 1,
-     "lines": 1,
-     "size": 26,
-     "font": "-apple-system"
-    },
-    "headings": [
-     {
-      "text": "欢迎回来",
-      "words": 1,
-      "chars": 4,
-      "lines": 1,
-      "size": 26,
-      "vw": 6.7,
-      "font": "-apple-system",
-      "weight": 750,
-      "tracking": -0.03,
-      "leading": 1.3,
-      "upper": false,
-      "italic": false,
-      "mono": false,
-      "align": "left",
-      "position": "center",
-      "widthRatio": 0.82,
-      "top": 210,
-      "tag": "h1",
-      "kind": "heading"
-     }
-    ],
-    "headingSummary": {
-     "count": 1,
-     "maxLines": 1,
-     "over2Lines": 0,
-     "statements": 0,
-     "centered": 0,
-     "medianWords": null,
-     "mixedFontHeadings": 0
-    },
-    "type": {
-     "families": [
-      {
-       "family": "-apple-system",
-       "share": 1,
-       "mono": false
-      }
-     ],
-     "familyCount": 1,
-     "sizes": [
-      12,
-      13,
-      14,
-      15,
-      16,
-      18,
-      26
-     ],
-     "sizeCount": 7,
-     "notLoaded": [],
-     "body": null,
-     "measureChars": null,
-     "max": {
-      "size": 26,
-      "vw": 6.7,
-      "font": "-apple-system",
-      "text": "欢迎回来"
-     },
-     "monoShare": 0,
-     "monoProseShare": 0,
-     "monoFamilies": [],
-     "monoSamples": [],
-     "microLabels": 0,
-     "microLabelShare": 0,
-     "microSamples": [],
-     "upperShare": 0,
-     "centerShare": 0.06,
-     "smallText": 0
-    },
-    "eyebrows": [
-     {
-      "text": "听写小站",
-      "above": "欢迎回来",
-      "upper": false,
-      "tracked": true,
-      "mono": false,
-      "pill": false,
-      "size": 12,
-      "top": 166
-     }
-    ],
-    "numbered": [],
-    "color": {
-     "bodyBg": "#f4f6f3",
-     "bodyBgHsl": {
-      "h": 100,
-      "s": 0.14,
-      "l": 0.96
-     },
-     "dark": false,
-     "sectionBgs": [
-      {
-       "color": "#f4f6f3",
-       "top": 0,
-       "hsl": {
-        "h": 100,
-        "s": 0.14,
-        "l": 0.96
-       }
-      },
-      {
-       "color": "#ffffff",
-       "top": 117,
-       "hsl": {
-        "h": 0,
-        "s": 0,
-        "l": 1
-       }
-      }
-     ],
-     "textColors": [
-      {
-       "color": "#5d6862",
-       "share": 0.76
-      },
-      {
-       "color": "#1f2a24",
-       "share": 0.12
-      },
-      {
-       "color": "#3f4c45",
-       "share": 0.05
-      },
-      {
-       "color": "#1d6b52",
-       "share": 0.04
-      },
-      {
-       "color": "#ffffff",
-       "share": 0.02
-      }
-     ],
-     "button": {
-      "bg": "#1d6b52",
-      "hsl": {
-       "h": 161,
-       "s": 0.57,
-       "l": 0.27
-      },
-      "fg": "#ffffff"
-     },
-     "lowContrast": []
-    },
-    "buttons": {
-     "count": 1,
-     "inHero": 1,
-     "radius": 10,
-     "height": 48,
-     "withShadow": 1,
-     "withGradient": 0,
-     "mono": 0,
-     "upper": 0,
-     "heroLabels": [
-      "登录"
-     ]
-    },
-    "surfaces": {
-     "shadowStatic": 3,
-     "shadowOverlay": 0,
-     "shadowSamples": [
-      "section.panel.auth-card → rgba(26, 43, 34, 0.063) 0px 1px 2px 0px, rgba(26, 43, 34, 0.04) 0px 1px 3px 0px",
-      "span.brand-mark → rgba(29, 107, 82, 0.5) 0px 4px 12px -4px",
-      "button.primary.auth-submit → rgba(15, 58, 43, 0.2) 0px 1px 2px 0px, rgba(29, 107, 82, 0.4) 0px 4px 12px -4px"
-     ],
-     "gradients": 1,
-     "scrims": 0,
-     "gradientSamples": [
-      "main.login-page → radial-gradient(1100px 620px at 88% -12%, color(srgb 0.113725 0.419608 0.321569 / 0.13), rgba(0, 0, 0, 0) 62%)"
-     ],
-     "gradientText": 0,
-     "hairlines": 1,
-     "hairlineSamples": [
-      "p.auth-switch 316px"
-     ],
-     "outlinedBoxes": 1,
-     "dashed": 0,
-     "blurred": 0,
-     "roundedBoxes": 1,
-     "boxRadius": 18,
-     "squareMedia": 0,
-     "roundedMedia": 0,
-     "mediaRadius": 0,
-     "textShadow": 0,
-     "cardRows": []
-    },
-    "heroMedia": [],
-    "nav": null,
-    "fontsLoaded": []
-   },
-   "layout": {
-    "viewport": {
-     "w": 390,
-     "h": 844
-    },
-    "pageH": 844,
-    "margins": {
-     "left": 35,
-     "right": 37
-    },
-    "sections": [],
-    "gaps": [],
-    "h1s": [
-     {
-      "text": "欢迎回来",
-      "size": 26,
-      "top": 210,
-      "firstScreen": true
-     }
-    ],
-    "edgeText": [],
-    "edges": [
-     {
-      "x": 35,
-      "n": 1
-     }
-    ],
-    "leftBlocks": 1,
-    "bodySize": 16,
-    "stage": false,
-    "explains": false,
-    "slivers": [],
-    "voidShare": 0,
-    "voidBox": null
-   },
-   "app": {
-    "viewport": {
-     "w": 390,
-     "h": 844
-    },
-    "dark": false,
-    "ground": "#f4f6f3",
-    "sidebar": null,
-    "topbar": null,
-    "canvas": {
-     "left": 35,
-     "right": 37
-    },
-    "hero": {
-     "text": "欢迎回来",
-     "words": 1,
-     "chars": 4,
-     "lines": 1,
-     "size": 26,
-     "vw": 6.7,
-     "font": "-apple-system",
-     "weight": 750,
-     "tracking": -0.03,
-     "leading": 1.3,
-     "top": 210,
-     "tag": "h1",
-     "kind": "heading",
-     "align": "left",
-     "position": "left"
-    },
-    "charts": 0,
-    "layout": {
-     "panels": 1,
-     "firstScreen": 1,
-     "ragged": [],
-     "voids": []
-    },
-    "tiles": 0,
-    "panels": {
-     "count": 1,
-     "radii": [
-      [
-       18,
-       1
-      ]
-     ],
-     "heavyBorders": 0,
-     "borderSamples": [],
-     "heavyShadows": 0,
-     "softShadows": 2,
-     "shadowSamples": [],
-     "glass": 0
-    },
-    "chips": {
-     "count": 0,
-     "hues": 0,
-     "samples": []
-    },
-    "numbers": {
-     "cells": 0,
-     "leftAligned": 0,
-     "figures": 0,
-     "tabularShare": null,
-     "kpiMax": null
-    },
-    "rows": null,
-    "chartHues": 0,
-    "placeholders": [],
-    "type": {
-     "under13": 0.04,
-     "tiny": 0,
-     "tinySamples": [],
-     "sizes": [
-      12,
-      13,
-      14,
-      15,
-      16,
-      18,
-      22,
-      26,
-      30
-     ]
-    },
-    "title": {
-     "text": "欢迎回来",
-     "size": 26,
-     "top": 210
-    },
-    "colourShare": 0.047
-   },
-   "consoleErrors": []
-  }
- ],
- "findings": [
-  {
-   "level": "FAIL",
-   "id": "gradient",
-   "width": 1440,
-   "message": "1 gradient fill(s): main.login-page → radial-gradient(1100px 620px at 88% -12%, color(srgb 0.113725 0.419608 0.321569 / 0.13), rgba(0, 0, 0, 0) 62%)",
-   "fix": "Use a flat colour or a real image. The only gradient allowed by default is a neutral scrim over a photo for legibility.",
-   "alsoAt": [
-    768,
-    390
-   ]
-  },
-  {
-   "level": "FAIL",
-   "id": "button-fx",
-   "width": 1440,
-   "message": "Buttons with shadow/glow.",
-   "fix": "Flat fill, one colour.",
-   "alsoAt": [
-    768,
-    390
-   ]
-  }
- ],
- "images": [
-  {
-   "viewport": "desktop",
-   "width": 1440,
-   "fold": "C:\\Users\\HUAYU\\Documents\\github\\dictation-station\\.taste-skill\\before\\desktop-fold.jpg",
-   "pages": [
-    "C:\\Users\\HUAYU\\Documents\\github\\dictation-station\\.taste-skill\\before\\desktop-page-01.jpg"
-   ],
-   "film": []
-  },
-  {
-   "viewport": "tablet",
-   "width": 768,
-   "fold": "C:\\Users\\HUAYU\\Documents\\github\\dictation-station\\.taste-skill\\before\\tablet-fold.jpg",
-   "pages": [
-    "C:\\Users\\HUAYU\\Documents\\github\\dictation-station\\.taste-skill\\before\\tablet-page-01.jpg"
-   ],
-   "film": []
-  },
-  {
-   "viewport": "mobile",
-   "width": 390,
-   "fold": "C:\\Users\\HUAYU\\Documents\\github\\dictation-station\\.taste-skill\\before\\mobile-fold.jpg",
-   "pages": [
-    "C:\\Users\\HUAYU\\Documents\\github\\dictation-station\\.taste-skill\\before\\mobile-page-01.jpg"
-   ],
-   "film": []
-  }
- ]
+    {
+      "viewport": "mobile",
+      "width": 390,
+      "fold": "C:\\Users\\HUAYU\\Documents\\github\\dictation-station\\.taste-skill\\before\\mobile-fold.jpg",
+      "pages": [
+        "C:\\Users\\HUAYU\\Documents\\github\\dictation-station\\.taste-skill\\before\\mobile-page-01.jpg"
+      ],
+      "film": []
+    }
+  ]
 }

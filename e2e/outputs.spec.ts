@@ -79,7 +79,12 @@ test("自动生成可下载汇报卡，打印拼音纸默认不包含答案", as
   await expect(page.getByRole("img", { name: "扫码打开任务核对" })).toBeVisible();
   await expect(page.getByLabel("书写格线")).toHaveValue("tian");
   await expect(page.locator(".writing-squares svg")).toHaveCount(8);
-  expect(await page.locator(".writing-squares svg").first().evaluate((el) => el.getBoundingClientRect().width)).toBeCloseTo(14 * 96 / 25.4, 0);
+  expect(
+    await page
+      .locator(".writing-squares svg")
+      .first()
+      .evaluate((el) => el.getBoundingClientRect().width),
+  ).toBeCloseTo((14 * 96) / 25.4, 0);
   await page.getByLabel("书写格线").selectOption("mi");
   await expect(page.locator(".writing-squares svg path")).toHaveCount(16);
   await expect(page.getByTestId("print-answers")).toHaveCount(0);
@@ -144,7 +149,10 @@ test("练习纸自动分页并保留编号", async ({ page }) => {
   await expect(page.locator(".print-sheet").last()).not.toContainText("姓名");
   await expect(page.locator(".print-sheet").last()).toContainText("第 2 / 2 页");
   await page.emulateMedia({ media: "print" });
-  const pdf = await page.pdf({ path: test.info().outputPath("worksheet.pdf"), preferCSSPageSize: true });
+  const pdf = await page.pdf({
+    path: test.info().outputPath("worksheet.pdf"),
+    preferCSSPageSize: true,
+  });
   expect(pdf.toString("latin1").match(/\/Type\s*\/Page\b/g)).toHaveLength(2);
   await page.emulateMedia({ media: "screen" });
   await page.getByLabel("书写格线").selectOption("tian");

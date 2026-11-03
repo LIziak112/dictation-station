@@ -21,7 +21,11 @@ export class Auth {
   async setDevicePin(accountId: string, deviceId: string, pin: string) {
     const key = `parent-pin:${accountId}:${deviceId}`;
     const value = await hashPassword(pin);
-    this.store.db.insert(metadata).values({ key, value }).onConflictDoUpdate({ target: metadata.key, set: { value } }).run();
+    this.store.db
+      .insert(metadata)
+      .values({ key, value })
+      .onConflictDoUpdate({ target: metadata.key, set: { value } })
+      .run();
   }
   async verifyDevicePin(accountId: string, deviceId: string, pin: string) {
     const key = `parent-pin:${accountId}:${deviceId}`;

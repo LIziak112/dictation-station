@@ -1480,7 +1480,9 @@ code {
   border-radius: 6px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
 }
-.print-view > .print-sheet { margin: 0 auto 20px; }
+.print-view > .print-sheet {
+  margin: 0 auto 20px;
+}
 .print-header {
   display: flex;
   flex-wrap: wrap;
@@ -1518,13 +1520,33 @@ code {
   font-size: 8pt;
   color: #222;
 }
-.print-qr img { width: 18mm; height: 18mm; }
-.worksheet-prompt, .worksheet-item > div:not(.writing-squares):not(.writing-line), .print-answers-grid {
+.print-qr img {
+  width: 18mm;
+  height: 18mm;
+}
+.worksheet-prompt,
+.worksheet-item > div:not(.writing-squares):not(.writing-line),
+.print-answers-grid {
   font-family: STKaiti, KaiTi, "楷体", "Kaiti SC", serif;
 }
-.writing-squares { display: flex; flex: none; margin-top: 1mm; }
-.writing-squares svg { display: block; width: 14mm; height: 14mm; flex: 0 0 14mm; }
-.writing-english { display: block; width: 100%; height: 9mm; flex: none; margin-top: 1mm; }
+.writing-squares {
+  display: flex;
+  flex: none;
+  margin-top: 1mm;
+}
+.writing-squares svg {
+  display: block;
+  width: 14mm;
+  height: 14mm;
+  flex: 0 0 14mm;
+}
+.writing-english {
+  display: block;
+  width: 100%;
+  height: 9mm;
+  flex: none;
+  margin-top: 1mm;
+}
 .worksheet {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1778,8 +1800,12 @@ a {
     min-height: 0;
     break-before: page;
   }
-  .print-view > .print-sheet { margin: 0; }
-  .print-view > .print-sheet:first-of-type { break-before: auto; }
+  .print-view > .print-sheet {
+    margin: 0;
+  }
+  .print-view > .print-sheet:first-of-type {
+    break-before: auto;
+  }
   .print-answers {
     margin-top: 14px;
   }
@@ -2409,9 +2435,16 @@ main > section + section {
   .print-answers {
     break-before: auto;
   }
-  .print-sheet { padding: 0; }
+  .print-sheet {
+    padding: 0;
+  }
 }
 @media screen {
-  .print-view { overflow-x: auto; }
-  .print-sheet { width: 210mm; min-width: 210mm; }
+  .print-view {
+    overflow-x: auto;
+  }
+  .print-sheet {
+    width: 210mm;
+    min-width: 210mm;
+  }
 }

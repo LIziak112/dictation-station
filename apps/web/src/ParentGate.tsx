@@ -15,14 +15,19 @@ function deviceId() {
   const key = "ownclass:dictation:parent-device";
   let id = localStorage.getItem(key);
   if (!id || !/^[a-f0-9]{32}$/.test(id)) {
-    id = Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    id = Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) =>
+      byte.toString(16).padStart(2, "0"),
+    ).join("");
     localStorage.setItem(key, id);
   }
   return id;
 }
 const okSchema = z.object({ ok: z.boolean() });
 function savePin(pin: string) {
-  return request("api/auth/device-pin", okSchema, { method: "POST", body: JSON.stringify({ deviceId: deviceId(), pin }) });
+  return request("api/auth/device-pin", okSchema, {
+    method: "POST",
+    body: JSON.stringify({ deviceId: deviceId(), pin }),
+  });
 }
 export function ParentGate({
   account,
@@ -77,7 +82,10 @@ export function ParentGate({
               }
               if (stored) {
                 try {
-                  await request("api/auth/unlock-pin", okSchema, { method: "POST", body: JSON.stringify({ deviceId: deviceId(), pin }) });
+                  await request("api/auth/unlock-pin", okSchema, {
+                    method: "POST",
+                    body: JSON.stringify({ deviceId: deviceId(), pin }),
+                  });
                 } catch (e) {
                   if (e instanceof ApiError && e.status === 409) {
                     setReset(true);

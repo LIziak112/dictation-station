@@ -51,12 +51,12 @@ DICTATION_URL 是网站服务地址，必须包含真实子路径；根路径部
 
 五项工具：
 
-| 工具                  | 行为                                     |
-| --------------------- | ---------------------------------------- |
-| get_wordlist_schema   | 读取服务端由 Zod 导出的当前词表格式      |
-| validate_wordlist     | 返回错误／提醒，不写数据                 |
-| create_wordlist_draft | 建草稿，返回含 #draft= 的核对链接        |
-| list_wordlists        | 不传 id 列出自己的词表，传 id 读取该词表 |
+| 工具                   | 行为                                                                 |
+| ---------------------- | -------------------------------------------------------------------- |
+| get_wordlist_schema    | 读取服务端由 Zod 导出的当前词表格式                                  |
+| validate_wordlist      | 返回错误／提醒，不写数据                                             |
+| create_wordlist_draft  | 建草稿，返回含 #draft= 的核对链接                                    |
+| list_wordlists         | 不传 id 列出自己的词表，传 id 读取该词表                             |
 | list_dictation_history | 不传 attemptId 列出已完成的听写记录，传 attemptId 查看词条与判分详情 |
 
 网站使用 opaque Bearer token，而非 OAuth。HTTP 端点与本地桥接共用同一套工具和权限校验，不冒充远程 OAuth MCP。仅支持远程连接的客户端使用上面的 HTTP 配置，或使用下面的 API。
