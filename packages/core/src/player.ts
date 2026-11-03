@@ -1,4 +1,5 @@
 import { type Entry, MODES, type Mode, type Settings } from "../../contract/src/index";
+import { writingSeconds } from "./pacing";
 
 export function createQueue(entries: Entry[], mode: Mode) {
   const m = MODES[mode];
@@ -13,7 +14,7 @@ export function createQueue(entries: Entry[], mode: Mode) {
     }));
 }
 export interface AudioDriver {
-  speak(text: string, lang: "en" | "zh", speed: number): Promise<void>;
+  speak(text: string, lang: "en" | "zh", speed: number, audioKey?: string): Promise<void>;
   cancel(): void;
 }
 export class Playback {
@@ -29,10 +30,11 @@ export class Playback {
     this.state(false);
   }
   async play(
-    queue: ReturnType<typeof createQueue>,
+    queue: { audioText: string; lang: "en" | "zh" | null; audioKey?: string }[],
     start: number,
     settings: Settings,
-    onIndex: (index: number) => void,
+    onIndex: (index: number) => unknown,
+    options?: { intro?: string; groupGuide?: string; onBreak?: (index: number) => void },
   ) {
     this.stop();
     const generation = this.generation;
@@ -40,18 +42,32 @@ export class Playback {
     if (!queue[start]?.audioText) return;
     this.state(true);
     try {
+      if (options?.intro) await this.driver.speak(options.intro, "zh", 1);
       for (let index = start; index < queue.length; index++) {
         const q = queue[index];
         if (!active()) return;
-        if (index !== start) onIndex(index);
+        if (index !== start) await onIndex(index);
+        if (!active()) return;
         for (let n = 0; n < settings.repeat; n++) {
           if (!active()) return;
-          if (q.lang) await this.driver.speak(q.audioText, q.lang, settings.speed);
+          if (q.lang) await this.driver.speak(q.audioText, q.lang, settings.speed, q.audioKey);
           if (!active()) return;
           if (n < settings.repeat - 1) await this.wait(320);
         }
         if (!settings.auto || index === queue.length - 1) break;
-        await this.wait(settings.interval * 1000);
+        if (settings.groupSize && (index + 1) % settings.groupSize === 0 && options?.onBreak) {
+          await onIndex(index + 1);
+          if (!active()) return;
+          if (options.groupGuide) await this.driver.speak(options.groupGuide, "zh", 1);
+          if (!active()) return;
+          options.onBreak(index + 1);
+          break;
+        }
+        await this.wait(
+          (settings.adaptiveInterval
+            ? writingSeconds(q.audioText, q.lang, settings.interval)
+            : settings.interval) * 1000,
+        );
       }
     } catch (error) {
       if (active()) this.state(false, error instanceof Error ? error.message : "朗读失败，请重试");

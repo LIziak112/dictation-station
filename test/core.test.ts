@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { batchInputSchema, normalizeEntry } from "../packages/contract/src/index";
-import { parseList, validateEntries } from "../packages/core/src/import";
+import { batchInputSchema, defaultSettings, normalizeEntry } from "../packages/contract/src/index";
+import { buildAgentPrompt, parseList, validateEntries } from "../packages/core/src/import";
 import { createQueue, Playback } from "../packages/core/src/player";
 import samples from "../public/samples.json";
 
@@ -13,6 +13,20 @@ describe("词表契约与导入", () => {
     expect(() =>
       parseList('{"entries":[{"id":"same","zh":"太阳"},{"id":"same","zh":"月亮"}]}'),
     ).toThrow("ID");
+  });
+  it("AI 提示词的元信息字段能与核对表单对应", () => {
+    const prompt = buildAgentPrompt("Unit 3 单词听写\napple 苹果");
+    for (const field of ["title", "grade", "unit", "textbook"])
+      expect(prompt).toContain(`"${field}"`);
+    const meta = parseList(
+      '{"version":1,"title":"Unit 3 单词听写","grade":"小学三年级","unit":"Unit 3","textbook":"人教版 PEP","entries":[{"en":"apple","zh":"苹果"}]}',
+    ).meta;
+    expect(meta).toMatchObject({
+      title: "Unit 3 单词听写",
+      grade: "小学三年级",
+      unit: "Unit 3",
+      textbook: "人教版 PEP",
+    });
   });
   it("保留 OCR 表格单元格内的分号并解析拼音", () => {
     const result = parseList(
@@ -88,7 +102,15 @@ describe("播放生命周期", () => {
     const pending = player.play(
       queue,
       0,
-      { repeat: 1, interval: 0, speed: 1, auto: true, shuffle: false },
+      {
+        ...defaultSettings,
+        accent: "us",
+        repeat: 1,
+        interval: 0,
+        speed: 1,
+        auto: true,
+        shuffle: false,
+      },
       () => {},
     );
     player.stop();
@@ -116,7 +138,15 @@ describe("播放生命周期", () => {
     await player.play(
       createQueue(entries, "zh_dictation"),
       0,
-      { repeat: 2, interval: 0, speed: 1, auto: true, shuffle: false },
+      {
+        ...defaultSettings,
+        accent: "us",
+        repeat: 2,
+        interval: 0,
+        speed: 1,
+        auto: true,
+        shuffle: false,
+      },
       (i) => changes.push(i),
     );
     expect(spoken).toEqual(["太阳", "太阳", "月亮", "月亮"]);
@@ -124,7 +154,15 @@ describe("播放生命周期", () => {
     await player.play(
       createQueue(entries, "pinyin2hanzi"),
       0,
-      { repeat: 1, interval: 0, speed: 1, auto: true, shuffle: false },
+      {
+        ...defaultSettings,
+        accent: "us",
+        repeat: 1,
+        interval: 0,
+        speed: 1,
+        auto: true,
+        shuffle: false,
+      },
       () => {},
     );
     expect(spoken).toHaveLength(4);

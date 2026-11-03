@@ -4,6 +4,7 @@ import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { createApp } from "./app";
+import { Pronunciation } from "./pronunciation";
 import { createTts, paddleOcr } from "./providers";
 import { Store } from "./store";
 
@@ -14,22 +15,23 @@ const rawBase = process.env.BASE_PATH ?? "/";
 if (!/^\/(?:[A-Za-z0-9_-]+\/)*$/.test(rawBase))
   throw new Error("BASE_PATH 必须为 / 或 /tingxie/ 形式");
 const base = rawBase === "/" ? "" : rawBase.slice(0, -1);
+const tts =
+  process.env.ENABLE_SERVER_TTS === "true" ? createTts(resolve(data, "audio")) : undefined;
+const pronunciation = new Pronunciation({
+  dir: resolve(data, "audio"),
+  publicDictionary: process.env.PUBLIC_DICTIONARY !== "false",
+  localDirectory: process.env.WORD_AUDIO_DIR,
+  tts,
+});
 const api = createApp(store, {
-  writeToken: process.env.WRITE_TOKEN ?? "",
+  pronunciation,
+  allowRegistration: process.env.ALLOW_REGISTRATION !== "false",
   trustProxy: process.env.TRUST_PROXY === "true",
   ocr: process.env.PADDLEOCR_TOKEN ? paddleOcr : undefined,
-  tts: process.env.ENABLE_SERVER_TTS === "true" ? createTts(resolve(data, "audio")) : undefined,
+  tts,
+  basePath: base,
 });
 const app = new Hono();
-// 静态资源同源托管；URL 只映射音频哈希，不能读取其他 data 文件。
-api.get("/audio/:file", async (c, next) => {
-  if (!/^[a-f0-9]{40}\.mp3$/.test(c.req.param("file"))) return c.notFound();
-  c.header("Cache-Control", "public,max-age=31536000,immutable");
-  return serveStatic({
-    root: resolve(data, "audio"),
-    rewriteRequestPath: (p) => p.slice("/audio/".length),
-  })(c, next);
-});
 api.get("*", serveStatic({ root: "dist/web" }));
 if (base) {
   app.get(base, (c) => c.redirect(`${base}/`));

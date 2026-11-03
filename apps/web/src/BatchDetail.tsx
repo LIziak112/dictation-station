@@ -1,15 +1,21 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Send, Volume2 } from "lucide-react";
 import QRCode from "qrcode";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   type Batch,
+  type Entry,
   MODES,
   type Mode,
-  type Progress,
   type Settings,
+  voiceResponseSchema,
 } from "../../../packages/contract/src/index";
 import { createQueue } from "../../../packages/core/src/player";
-import { api, download, exportBatch } from "./api";
+import { localDate } from "../../../packages/core/src/scheduling";
+import { selectRange } from "../../../packages/core/src/tasks";
+import { loadAudio } from "./AudioPreparation";
+import { api, exportBatch, request } from "./api";
+import { BrowserAudio } from "./audio";
+import { taskApi } from "./task-api";
 
 interface Props {
   batch: Batch;
@@ -17,12 +23,10 @@ interface Props {
   setMode: (m: Mode) => void;
   settings: Settings;
   setSettings: (s: Settings) => void;
-  progress: Progress | null;
-  compatible: boolean;
-  wrongCount: number;
   onEdit: () => void;
-  onResume: () => void;
-  onStart: (wrong?: boolean) => void;
+  onTask?: () => void;
+  onDispatched?: (taskId: string) => void;
+  onPractice?: (follow: boolean) => void;
   onBack: () => void;
   onNotice: (s: string) => void;
 }
@@ -32,17 +36,89 @@ export function BatchDetail({
   setMode,
   settings,
   setSettings,
-  progress,
-  compatible,
-  wrongCount,
   onEdit,
-  onResume,
-  onStart,
+  onTask,
+  onDispatched,
+  onPractice,
   onBack,
   onNotice,
 }: Props) {
   const [qr, setQr] = useState("");
   const [share, setShare] = useState("");
+  const [range, setRange] = useState(`1-${batch.entries.length}`);
+  const [reviewCount, setReviewCount] = useState(3);
+  const [allowSelfReview, setAllowSelfReview] = useState(false);
+  const [dispatching, setDispatching] = useState(false);
+  const audioRef = useRef<BrowserAudio | null>(null);
+
+  useEffect(() => {
+    setRange(`1-${batch.entries.length}`);
+  }, [batch.entries.length]);
+
+  useEffect(() => {
+    audioRef.current = new BrowserAudio(settings.accent);
+    return () => audioRef.current?.dispose();
+  }, [settings.accent]);
+
+  async function previewEntryVoice(entry: Entry) {
+    const lang: "en" | "zh" = entry.en ? "en" : "zh";
+    const text = entry[lang];
+    if (!text) return;
+    try {
+      const { voice } = await request("api/pronunciation/preview", voiceResponseSchema, {
+        method: "POST",
+        body: JSON.stringify({
+          wordId: entry.wordId,
+          text,
+          lang,
+          accent: settings.accent,
+          reading: entry.readings[lang] || entry.reading,
+          pinyin: lang === "zh" ? entry.pinyin : undefined,
+        }),
+      });
+      if (voice.url) {
+        const blob = await loadAudio(voice.url);
+        audioRef.current?.cache(text, lang, blob, entry.id);
+      }
+      await audioRef.current?.speak(text, lang, 1, entry.id);
+    } catch (e) {
+      onNotice(e instanceof Error ? e.message : "试听失败");
+    }
+  }
+
+  async function dispatchToChild() {
+    setDispatching(true);
+    try {
+      const picked = selectRange(batch.entries, range);
+      const validEntries = picked.filter((entry) => entry.modes.includes(mode));
+      if (!validEntries.length) {
+        onNotice("所选范围内没有支持当前练法的词条，请调整范围或练法");
+        return;
+      }
+      const today = localDate(new Date(), "Asia/Shanghai");
+      const { task } = await taskApi.create({
+        title: batch.title,
+        date: today,
+        mode,
+        settings,
+        selections: [{ batchId: batch.id, entryIds: validEntries.map((e) => e.id) }],
+        wordIds: [],
+        reviewCount,
+        allowSelfReview,
+        reviewOnly: false,
+      });
+      if (onDispatched) {
+        onDispatched(task.id);
+      } else {
+        location.hash = `task=${task.id}`;
+      }
+    } catch (e) {
+      onNotice(e instanceof Error ? e.message : "派发任务失败，请重试");
+    } finally {
+      setDispatching(false);
+    }
+  }
+
   return (
     <>
       <button type="button" className="back-link subtle" onClick={onBack}>
@@ -53,45 +129,41 @@ export function BatchDetail({
         <div>
           <p className="eyebrow">
             {batch.entries.length} 词 ·{" "}
-            {[batch.grade, batch.unit].filter(Boolean).join(" · ") || "听写练习"}
+            {[batch.grade, batch.unit].filter(Boolean).join(" · ") || "听写词表"}
           </p>
           <h1>{batch.title}</h1>
-          <p>选择练法，准备好纸笔，就可以开始。</p>
+          <p>核对读音后，选择练法与范围，一键派发到孩子听写区。</p>
         </div>
-        <button type="button" onClick={() => onEdit()}>
-          编辑词表
-        </button>
+        <div className="row">
+          <button type="button" onClick={() => onEdit()}>
+            编辑词表
+          </button>
+          {onTask && (
+            <button type="button" onClick={onTask}>
+              多词表组合排课
+            </button>
+          )}
+        </div>
       </div>
-      {compatible && (
-        <section className="resume-banner">
+      <section className="panel">
+        <div className="row between section-head">
           <div>
-            <strong>继续上次进度</strong>
-            <p>
-              {progress?.phase === "result"
-                ? "还有核对记录可以查看"
-                : `从第 ${(progress?.index ?? 0) + 1} 词继续`}
+            <h2>01 / 派发到孩子听写区</h2>
+            <p className="small muted">
+              派发后任务将直接进入孩子端「今日待听写」队列，同时自动锁定词表快照与发音。
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              onResume();
-            }}
-          >
-            继续上次听写
-          </button>
-        </section>
-      )}
-      {progress?.batchId === batch.id && !compatible && (
-        <p className="notice">
-          词表已经更新，上次进度已保留供导出，本次请重新开始。
-          <button type="button" onClick={() => download("旧听写进度.json", progress)}>
-            导出旧进度
-          </button>
-        </p>
-      )}
-      <section className="panel">
-        <h2>01 / 今天怎么练</h2>
+          {onPractice && (
+            <div className="row">
+              <button type="button" onClick={() => onPractice(false)}>
+                纯听这份词表
+              </button>
+              <button type="button" onClick={() => onPractice(true)}>
+                跟读练口语
+              </button>
+            </div>
+          )}
+        </div>
         <div className="mode-grid">
           {(Object.keys(MODES) as Mode[])
             .filter((m) => batch.entries.some((e) => e.modes.includes(m)))
@@ -110,6 +182,46 @@ export function BatchDetail({
                 </span>
               </button>
             ))}
+        </div>
+        <div className="form-grid">
+          <div className="field">
+            <div className="row between">
+              <label htmlFor="dispatch-range-input">本次派发编号范围</label>
+              <button
+                type="button"
+                className="subtle small-btn"
+                onClick={() => setRange(`1-${batch.entries.length}`)}
+              >
+                全选（1-{batch.entries.length}）
+              </button>
+            </div>
+            <input
+              id="dispatch-range-input"
+              value={range}
+              placeholder={`1-${batch.entries.length} 或 1,3,5`}
+              onChange={(e) => setRange(e.target.value)}
+            />
+          </div>
+          <label className="field">
+            穿插待巩固旧词上限
+            <input
+              type="number"
+              min={0}
+              max={20}
+              value={reviewCount}
+              onChange={(e) =>
+                setReviewCount(Math.min(20, Math.max(0, Number(e.target.value) || 0)))
+              }
+            />
+          </label>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={allowSelfReview}
+              onChange={(e) => setAllowSelfReview(e.target.checked)}
+            />
+            允许孩子交卷后自主核对答案（家长抽查 1–2 词）
+          </label>
         </div>
         <details className="setup-settings">
           <summary>调整重复、语速与顺序</summary>
@@ -172,36 +284,54 @@ export function BatchDetail({
           </div>
         </details>
         <div className="row start-row">
-          <button type="button" className="primary" onClick={() => onStart()}>
-            开始听写
+          <button
+            type="button"
+            className="primary"
+            disabled={dispatching}
+            onClick={() => void dispatchToChild()}
+          >
+            <Send size={16} aria-hidden="true" />
+            {dispatching ? "正在派发…" : "派发到孩子听写区"}
           </button>
-          {wrongCount > 0 && (
-            <button type="button" onClick={() => onStart(true)}>
-              只练错词（{wrongCount}）
-            </button>
-          )}
           <span className="small muted">
-            {MODES[mode].audio ? "设备朗读，无需准备服务器语音" : "此模式不播放语音"}
+            {MODES[mode].audio
+              ? "派发后自动预检真人/合成语音，孩子平板扫码即可开练"
+              : "此模式看拼音默写，不播放语音"}
           </span>
         </div>
       </section>
       <section className="panel">
-        <details>
-          <summary>02 / 词表预览与导出</summary>
-          <div className="word-list">
-            {batch.entries.map((e, i) => (
-              <div key={e.id}>
-                <span className="small muted">{i + 1}</span>
-                <strong>{e.en || e.zh}</strong>
-                <span>{e.en ? e.zh : e.pinyin}</span>
-                {e.hint && <span className="small muted">{e.hint}</span>}
-              </div>
-            ))}
-          </div>
+        <div className="row between">
+          <h2>02 / 词表预览与导出</h2>
           <button type="button" onClick={() => exportBatch(batch)}>
             导出词表 JSON
           </button>
-        </details>
+        </div>
+        <div className="word-list">
+          {batch.entries.map((e, i) => (
+            <div key={e.id} className="word-list-row">
+              <span className="entry-index">{i + 1}</span>
+              <strong>{e.en || e.zh}</strong>
+              <span>{e.en ? e.zh : e.pinyin}</span>
+              {e.en && e.pinyin && <span className="small muted">{e.pinyin}</span>}
+              {e.hint && <span className="small muted">提示：{e.hint}</span>}
+              <span className="small muted voice-tag">
+                {e.readings.en || e.readings.zh || e.reading
+                  ? `指定读音：${e.readings.en || e.readings.zh || e.reading}`
+                  : "自动匹配真人/合成读音"}
+              </span>
+              <button
+                type="button"
+                className="subtle icon-btn"
+                aria-label={`试听第 ${i + 1} 词`}
+                onClick={() => void previewEntryVoice(e)}
+              >
+                <Volume2 size={14} aria-hidden="true" />
+                试听
+              </button>
+            </div>
+          ))}
+        </div>
       </section>
       <div className="row">
         <button
@@ -214,13 +344,14 @@ export function BatchDetail({
             setQr(await QRCode.toDataURL(url.href, { width: 220, margin: 2 }));
           }}
         >
-          分享链接 / 二维码
+          本账号链接 / 二维码
         </button>
         <button
           type="button"
           className="danger subtle"
           onClick={async () => {
-            if (!confirm("确定删除这份词表？删除后分享链接将失效。")) return;
+            if (!confirm("确定删除这份词表？删除后本账号链接将失效，但已派发的任务不受影响。"))
+              return;
             try {
               await api.remove(batch);
               onBack();
@@ -234,11 +365,11 @@ export function BatchDetail({
       </div>
       {share && (
         <section className="panel share-panel">
-          <h2>分享这份听写</h2>
-          <p>任何持有链接的人都能读取完整词表。请勿分享隐私内容。</p>
-          {qr && <img src={qr} width={220} height={220} alt="听写分享二维码" />}
+          <h2>在另一台设备打开</h2>
+          <p>此链接仅当前账号登录后可打开。</p>
+          {qr && <img src={qr} width={220} height={220} alt="本账号听写二维码" />}
           <label className="field">
-            分享链接
+            本账号链接
             <input readOnly value={share} />
           </label>
           <div className="row">
@@ -247,9 +378,9 @@ export function BatchDetail({
               onClick={async () => {
                 try {
                   await navigator.clipboard.writeText(share);
-                  onNotice("分享链接已复制");
+                  onNotice("本账号链接已复制");
                 } catch {
-                  onNotice("复制失败，请手动选择分享链接");
+                  onNotice("复制失败，请手动选择本账号链接");
                 }
               }}
             >
@@ -262,7 +393,7 @@ export function BatchDetail({
                 setQr("");
               }}
             >
-              关闭分享
+              关闭链接
             </button>
           </div>
         </section>

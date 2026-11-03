@@ -1,26 +1,91 @@
-import { timingSafeEqual } from "node:crypto";
+import { resolve } from "node:path";
 import { getConnInfo } from "@hono/node-server/conninfo";
+import { serveStatic } from "@hono/node-server/serve-static";
+import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/server";
+import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { deleteCookie, getCookie, setCookie } from "hono/cookie";
+import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
-  batchInputSchema,
+  type Account,
+  agentValidationInputSchema,
+  attemptCompleteSchema,
+  attemptReturnSchema,
+  audioPreparationSchema,
+  correctionSchema,
+  credentialsSchema,
+  entrySchema,
+  examRequestSchema,
+  exportSchema,
   idSchema,
+  manualLearningSchema,
   ocrRequestSchema,
+  passwordChangeSchema,
+  passwordVerificationSchema,
+  pronunciationInputSchema,
+  startTaskSchema,
+  taskInputSchema,
+  taskWithdrawSchema,
   ttsRequestSchema,
-  updateSchema,
 } from "../../../packages/contract/src/index";
+import { validateEntries } from "../../../packages/core/src/import";
+import { projectTask } from "../../../packages/core/src/tasks";
+import { createMcpServer } from "../../../packages/mcp/src/server";
+import { Auth } from "./auth";
+import { Drafts } from "./drafts";
+import { Learning } from "./learning";
+import { Pronunciation } from "./pronunciation";
 import type { OcrInput, TtsInput } from "./providers";
+import { words } from "./schema";
 import { Conflict, type Store } from "./store";
+import { Tasks } from "./tasks";
+import { Tokens } from "./tokens";
 
 interface Options {
-  writeToken: string;
+  allowRegistration?: boolean;
+  pronunciation?: Pronunciation;
+  audioDir?: string;
   ocr?: (image: OcrInput) => Promise<string>;
   tts?: (item: TtsInput) => Promise<string>;
   trustProxy?: boolean;
+  basePath?: string;
 }
+
+function isChildRouteAllowed(method: string, path: string) {
+  if (
+    method === "GET" &&
+    (path === "/api/auth/me" || path === "/api/child/overview" || path === "/api/tasks")
+  )
+    return true;
+  if (method === "GET" && /^\/api\/child\/batches\/[^/]+\/listen$/.test(path)) return true;
+  if (method === "GET" && /^\/api\/tasks\/[^/]+\/play$/.test(path)) return true;
+  if (method === "POST" && /^\/api\/tasks\/[^/]+\/audio$/.test(path)) return true;
+  if (method === "POST" && /^\/api\/tasks\/[^/]+\/start$/.test(path)) return true;
+  if (method === "PUT" && /^\/api\/attempts\/[^/]+$/.test(path)) return true;
+  if (method === "GET" && /^\/api\/attempts\/[^/]+$/.test(path)) return true;
+  if (method === "POST" && /^\/api\/attempts\/[^/]+\/complete$/.test(path)) return true;
+  if (method === "POST" && /^\/api\/attempts\/[^/]+\/corrections$/.test(path)) return true;
+  if (method === "POST" && path === "/api/pronunciation/preview") return true;
+  if (method === "GET" && /^\/audio\/[^/]+$/.test(path)) return true;
+  return false;
+}
+
 export function createApp(store: Store, options: Options) {
-  const app = new Hono();
+  const app = new Hono<{ Variables: { account: Account; childMode: boolean } }>();
+  const auth = new Auth(store);
+  const tokens = new Tokens(store);
+  const drafts = new Drafts(store);
+  const tasks = new Tasks(store);
+  const learning = new Learning(store);
+  const pronunciation =
+    options.pronunciation ??
+    new Pronunciation({
+      dir: options.audioDir ?? resolve(store.dir, "audio"),
+      publicDictionary: false,
+      tts: options.tts,
+    });
   const buckets = new Map<string, { count: number; expires: number }>();
   function limited(key: string, limit: number, ms: number) {
     const now = Date.now();
@@ -66,12 +131,6 @@ export function createApp(store: Store, options: Options) {
       const ip = options.trustProxy ? (c.req.header("x-real-ip") ?? remote) : remote;
       if (limited(`write:${ip}`, 120, 60000))
         return c.json({ error: "操作太频繁，请稍后重试" }, 429);
-      if (options.writeToken) {
-        const supplied = Buffer.from(c.req.header("Authorization") ?? "");
-        const expected = Buffer.from(`Bearer ${options.writeToken}`);
-        if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected))
-          return c.json({ error: "请输入正确的管理口令" }, 401);
-      }
       if (c.req.path.includes("/ocr") && limited(`ocr:${ip}`, 40, 3600000))
         return c.json({ error: "图片识别次数过多，请稍后重试" }, 429);
       if (c.req.path.includes("/tts") && limited(`tts:${ip}`, 120, 3600000))
@@ -96,40 +155,184 @@ export function createApp(store: Store, options: Options) {
         400,
       );
     if (error instanceof SyntaxError) return c.json({ error: "JSON 格式无效，请检查后重试" }, 400);
+    if (error instanceof HTTPException) return c.json({ error: error.message }, error.status);
     if (error instanceof Conflict) return c.json({ error: error.message }, 409);
     console.error("[dictation]", error instanceof Error ? error.message : "未知错误");
     return c.json({ error: "服务暂时不可用，请保留草稿后重试" }, 500);
+  });
+  const publicPaths = new Set(["/api/health", "/api/auth/register", "/api/auth/login"]);
+  app.use("*", async (c, next) => {
+    c.set("childMode", false);
+    if (
+      publicPaths.has(c.req.path) ||
+      (!c.req.path.startsWith("/api/") && !c.req.path.startsWith("/audio/"))
+    )
+      return next();
+    if (c.req.path.startsWith("/api/agent/")) {
+      const actor = tokens.authenticate(
+        (c.req.header("Authorization") ?? "").replace(/^Bearer /, ""),
+      );
+      if (!actor) return c.json({ error: "AI 令牌无效或已过期" }, 401);
+      const path = c.req.path,
+        method = c.req.method;
+      const read = method === "GET" && /^\/api\/agent\/wordlists(?:\/[^/]+)?$/.test(path);
+      const writeDraft =
+        method === "POST" && ["/api/agent/validate", "/api/agent/drafts"].includes(path);
+      const schema = method === "GET" && path === "/api/agent/schema";
+      if (
+        !(
+          schema ||
+          (read && actor.scopes.includes("wordlists:read")) ||
+          (writeDraft && actor.scopes.includes("drafts:write"))
+        )
+      )
+        return c.json({ error: "这个 AI 令牌没有此项权限" }, 403);
+      c.set("account", actor.account);
+      return next();
+    }
+    const bearer = (c.req.header("Authorization") ?? "").replace(/^Bearer /, "");
+    const headerChildToken =
+      c.req.header("X-Child-Token") ?? (bearer.startsWith("ct_") ? bearer : "");
+    const sessionAccount = auth.current(getCookie(c, "dictation_session") ?? "");
+    const cookieChildToken = !sessionAccount ? (getCookie(c, "dictation_child") ?? "") : "";
+    const activeChildToken = headerChildToken || cookieChildToken;
+    if (activeChildToken) {
+      const childActor = tokens.authenticateChild(
+        activeChildToken,
+        c.req.header("User-Agent") ?? "",
+      );
+      if (!childActor) {
+        if (sessionAccount && !headerChildToken) {
+          c.set("account", sessionAccount);
+          return next();
+        }
+        return c.json({ error: "孩子区链接已失效或已重置，请找家长重新扫码" }, 401);
+      }
+      if (!isChildRouteAllowed(c.req.method, c.req.path)) {
+        return c.json({ error: "孩子区无权执行此家长管理操作" }, 403);
+      }
+      if (headerChildToken && !cookieChildToken) {
+        setCookie(c, "dictation_child", headerChildToken, {
+          httpOnly: true,
+          sameSite: "Lax",
+          path: "/",
+          maxAge: 30 * 86400,
+          secure:
+            c.req.url.startsWith("https:") || (c.req.header("Origin") ?? "").startsWith("https:"),
+        });
+      }
+      c.set("account", childActor.account);
+      c.set("childMode", true);
+      return next();
+    }
+    if (!sessionAccount) return c.json({ error: "请先登录" }, 401);
+    if (c.req.header("X-Child-Mode") === "1" && !isChildRouteAllowed(c.req.method, c.req.path)) {
+      return c.json({ error: "孩子区无权执行此家长管理操作" }, 403);
+    }
+    if (c.req.header("X-Child-Mode") === "1") c.set("childMode", true);
+    c.set("account", sessionAccount);
+    await next();
+  });
+  app.post("/api/auth/register", async (c) => {
+    if (options.allowRegistration === false)
+      return c.json({ error: "本站已关闭注册，请联系部署者" }, 403);
+    const input = credentialsSchema.parse(await c.req.json());
+    const account = await auth.register(input.username, input.password);
+    if (!account) return c.json({ error: "用户名已存在" }, 409);
+    setCookie(c, "dictation_session", auth.createSession(account.id), {
+      httpOnly: true,
+      sameSite: "Lax",
+      path: "/",
+      maxAge: 30 * 86400,
+      secure: c.req.url.startsWith("https:") || (c.req.header("Origin") ?? "").startsWith("https:"),
+    });
+    return c.json({ account }, 201);
+  });
+  app.post("/api/auth/login", async (c) => {
+    const input = credentialsSchema.parse(await c.req.json());
+    const account = await auth.login(input.username, input.password);
+    if (!account) return c.json({ error: "用户名或密码不正确" }, 401);
+    setCookie(c, "dictation_session", auth.createSession(account.id), {
+      httpOnly: true,
+      sameSite: "Lax",
+      path: "/",
+      maxAge: 30 * 86400,
+      secure: c.req.url.startsWith("https:") || (c.req.header("Origin") ?? "").startsWith("https:"),
+    });
+    return c.json({ account });
+  });
+  app.get("/api/auth/me", (c) => c.json({ account: c.get("account") }));
+  app.post("/api/auth/logout", (c) => {
+    auth.logout(getCookie(c, "dictation_session") ?? "");
+    deleteCookie(c, "dictation_session", { path: "/" });
+    deleteCookie(c, "dictation_child", { path: "/" });
+    return c.json({ ok: true });
+  });
+  app.post("/api/auth/verify-password", async (c) => {
+    const input = passwordVerificationSchema.parse(await c.req.json());
+    if (!(await auth.login(c.get("account").username, input.password)))
+      return c.json({ error: "账号密码不正确" }, 400);
+    return c.json({ ok: true });
+  });
+  app.post("/api/auth/password", async (c) => {
+    const input = passwordChangeSchema.parse(await c.req.json());
+    if (!(await auth.changePassword(c.get("account").id, input.currentPassword, input.newPassword)))
+      return c.json({ error: "当前密码不正确" }, 400);
+    deleteCookie(c, "dictation_session", { path: "/" });
+    return c.json({ ok: true });
+  });
+  app.use("/audio/:file", async (c, next) => {
+    const file = c.req.param("file");
+    if (!/^[a-f0-9]{40}\.(?:mp3|ogg|wav)$/.test(file) || !store.hasAudio(c.get("account").id, file))
+      return c.notFound();
+    return serveStatic({
+      root: options.audioDir ?? resolve(store.dir, "audio"),
+      rewriteRequestPath: () => file,
+    })(c, next);
   });
   app.get("/api/health", (c) =>
     c.json({
       ok: true,
       ocr: !!options.ocr,
       tts: !!options.tts,
-      writeProtected: !!options.writeToken,
+      allowRegistration: options.allowRegistration !== false,
     }),
   );
+  app.get("/api/child-token", (c) =>
+    c.json({ active: tokens.listChildTokens(c.get("account").id) }),
+  );
+  app.post("/api/child-token", (c) => c.json(tokens.createChildToken(c.get("account").id), 201));
+  app.post("/api/child-token/rotate", (c) => c.json(tokens.rotateChildToken(c.get("account").id)));
+  app.get("/api/child/overview", (c) => c.json(tasks.childOverview(c.get("account").id)));
+  app.get("/api/child/batches/:id/listen", (c) =>
+    c.json(tasks.childListenBatch(c.get("account").id, idSchema.parse(c.req.param("id")))),
+  );
+  app.get("/api/audit-logs", (c) => c.json({ logs: store.listAudit(c.get("account").id) }));
   app.get("/api/batches", (c) =>
     c.json({
-      batches: store.list().map(({ entries, ...batch }) => ({ ...batch, count: entries.length })),
+      batches: store
+        .list(c.get("account").id)
+        .map(({ entries, ...batch }) => ({ ...batch, count: entries.length })),
     }),
   );
   app.post("/api/batches", async (c) =>
-    c.json({ batch: store.create(batchInputSchema.parse(await c.req.json())) }, 201),
+    c.json({ batch: store.create(c.get("account").id, await c.req.json()) }, 201),
   );
   app.get("/api/batches/:id", (c) => {
-    const b = store.get(idSchema.parse(c.req.param("id")));
-    return b ? c.json({ batch: b }) : c.json({ error: "词表不存在，请检查分享链接" }, 404);
+    const b = store.get(c.get("account").id, idSchema.parse(c.req.param("id")));
+    return b ? c.json({ batch: b }) : c.json({ error: "词表不存在，请检查本账号链接" }, 404);
   });
   app.put("/api/batches/:id", async (c) => {
     const b = store.update(
+      c.get("account").id,
       idSchema.parse(c.req.param("id")),
-      updateSchema.parse(await c.req.json()),
+      await c.req.json(),
     );
     return b ? c.json({ batch: b }) : c.json({ error: "词表不存在，草稿仍在本机" }, 404);
   });
   app.delete("/api/batches/:id", (c) => {
     const revision = z.coerce.number().int().positive().parse(c.req.query("revision"));
-    return store.delete(idSchema.parse(c.req.param("id")), revision)
+    return store.delete(c.get("account").id, idSchema.parse(c.req.param("id")), revision)
       ? c.json({ ok: true })
       : c.json({ error: "词表不存在" }, 404);
   });
@@ -149,7 +352,9 @@ export function createApp(store: Store, options: Options) {
     const result = [];
     for (const item of items) {
       try {
-        result.push({ text: item.text, lang: item.lang, url: await tts(item) });
+        const url = await tts(item);
+        store.grantAudio(c.get("account").id, url.slice("audio/".length));
+        result.push({ text: item.text, lang: item.lang, url });
       } catch {
         result.push({
           text: item.text,
@@ -160,6 +365,307 @@ export function createApp(store: Store, options: Options) {
       }
     }
     return c.json({ items: result });
+  });
+  app.post("/api/pronunciation/options", async (c) => {
+    const input = pronunciationInputSchema.parse(await c.req.json());
+    try {
+      return c.json({ voices: await pronunciation.voices(input) });
+    } catch {
+      return c.json({ error: "词典暂不可用，请稍后重试" }, 502);
+    }
+  });
+  app.post("/api/pronunciation/preview", async (c) => {
+    const accountId = c.get("account").id;
+    const input = pronunciationInputSchema.parse(await c.req.json());
+    let resolvedInput = input;
+    let maskOutput = false;
+    if (input.wordId) {
+      const row = store.db
+        .select()
+        .from(words)
+        .where(and(eq(words.id, input.wordId), eq(words.accountId, accountId)))
+        .get();
+      if (row) {
+        const realEntry = entrySchema.parse(JSON.parse(row.payload));
+        const realText = realEntry[input.lang];
+        if (realText) {
+          resolvedInput = {
+            ...input,
+            text: realText,
+            reading: realEntry.readings[input.lang] || realEntry.reading || input.reading,
+            pinyin: input.lang === "zh" ? realEntry.pinyin : input.pinyin,
+          };
+        }
+        if (c.get("childMode") && tasks.lockedWordIds(accountId).has(input.wordId)) {
+          maskOutput = true;
+        }
+      }
+    }
+    const voice = await pronunciation.prepare(resolvedInput, resolvedInput.synthetic);
+    if (voice.url) store.grantAudio(accountId, voice.url.slice("audio/".length));
+    if (maskOutput) {
+      return c.json({
+        voice: {
+          ...voice,
+          title: "待考词盲听",
+          reading: "",
+        },
+      });
+    }
+    return c.json({ voice });
+  });
+  app.post("/api/tasks/:id/audio", async (c) => {
+    const input = audioPreparationSchema.parse(await c.req.json());
+    const audio = await tasks.prepareAudio(
+      c.get("account").id,
+      c.req.param("id"),
+      pronunciation,
+      input.fallbackIds,
+    );
+    return c.json({ audio });
+  });
+  app.get("/api/tokens", (c) => c.json({ tokens: tokens.list(c.get("account").id) }));
+  app.post("/api/tokens", async (c) =>
+    c.json(tokens.create(c.get("account").id, await c.req.json()), 201),
+  );
+  app.delete("/api/tokens/:id", (c) => {
+    tokens.revoke(c.get("account").id, c.req.param("id"));
+    return c.json({ ok: true });
+  });
+  app.get("/api/drafts", (c) => c.json({ drafts: drafts.list(c.get("account").id) }));
+  app.get("/api/drafts/:id", (c) =>
+    c.json({ draft: drafts.get(c.get("account").id, c.req.param("id")) }),
+  );
+  app.delete("/api/drafts/:id", (c) => {
+    drafts.remove(c.get("account").id, c.req.param("id"));
+    return c.json({ ok: true });
+  });
+  app.post("/api/drafts/:id/publish", async (c) =>
+    c.json(
+      { batch: drafts.publish(c.get("account").id, c.req.param("id"), await c.req.json()) },
+      201,
+    ),
+  );
+  app.get("/api/agent/schema", (c) => c.json(z.toJSONSchema(exportSchema, { io: "input" })));
+  app.post("/api/agent/validate", async (c) => {
+    const input = agentValidationInputSchema.parse(await c.req.json());
+    const result = exportSchema.safeParse(input.wordlist);
+    return c.json(
+      result.success
+        ? {
+            valid: true,
+            issues: validateEntries(result.data.entries).map((issue) => ({
+              level: issue.level,
+              path: issue.id,
+              message: issue.message,
+            })),
+          }
+        : {
+            valid: false,
+            issues: result.error.issues.map((issue) => ({
+              level: "error",
+              path: issue.path.join("."),
+              message: issue.message,
+            })),
+          },
+    );
+  });
+  app.get("/api/agent/wordlists", (c) =>
+    c.json({
+      batches: store
+        .list(c.get("account").id)
+        .map(({ entries, ...batch }) => ({ ...batch, count: entries.length })),
+    }),
+  );
+  app.get("/api/agent/wordlists/:id", (c) => {
+    const batch = store.get(c.get("account").id, c.req.param("id"));
+    return batch ? c.json({ batch }) : c.json({ error: "词表不存在" }, 404);
+  });
+  app.post("/api/agent/drafts", async (c) =>
+    c.json({ draft: drafts.create(c.get("account").id, await c.req.json()) }, 201),
+  );
+  app.all("/mcp", async (c) => {
+    const token = (c.req.header("Authorization") ?? "").replace(/^Bearer /, "");
+    if (!tokens.authenticate(token)) return c.json({ error: "AI 令牌无效或已过期" }, 401);
+    const requestUrl = new URL(c.req.url);
+    const origin =
+      c.req.header("Origin") ??
+      `${c.req.header("x-forwarded-proto") ?? requestUrl.protocol.slice(0, -1)}://${requestUrl.host}`;
+    const linkBase = `${origin}${options.basePath ?? ""}/`;
+    const server = createMcpServer(async (path, body) => {
+      const headers = new Headers({ Authorization: `Bearer ${token}` });
+      if (body !== undefined) headers.set("Content-Type", "application/json");
+      const response = await app.fetch(
+        new Request(new URL(`/api/agent/${path}`, "http://internal"), {
+          method: body === undefined ? "GET" : "POST",
+          headers,
+          body: body === undefined ? undefined : JSON.stringify(body),
+        }),
+      );
+      const result: unknown = await response.json();
+      if (!response.ok) {
+        const failure = z.object({ error: z.string() }).safeParse(result);
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text" as const,
+              text: failure.success ? failure.data.error : `请求失败（${response.status}）`,
+            },
+          ],
+        };
+      }
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result) }],
+        structuredContent: result,
+      };
+    }, linkBase);
+    const transport = new WebStandardStreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+    });
+    await server.connect(transport);
+    return transport.handleRequest(c.req.raw);
+  });
+  app.get("/api/preferences", (c) =>
+    c.json({ preferences: learning.preferences(c.get("account").id) }),
+  );
+  app.put("/api/preferences", async (c) =>
+    c.json({ preferences: learning.setPreferences(c.get("account").id, await c.req.json()) }),
+  );
+  app.get("/api/learning", (c) => c.json({ items: learning.list(c.get("account").id) }));
+  app.put("/api/learning/:wordId", async (c) => {
+    const input = manualLearningSchema.parse(await c.req.json());
+    return c.json({
+      state: learning.manual(c.get("account").id, c.req.param("wordId"), input.mode, input.status),
+    });
+  });
+  app.get("/api/history", (c) => c.json({ items: learning.history(c.get("account").id) }));
+  app.get("/api/weekly", (c) => c.json(learning.weekly(c.get("account").id)));
+  app.post("/api/learning/exam", async (c) => {
+    const input = examRequestSchema.parse(await c.req.json());
+    return c.json({ items: learning.exam(c.get("account").id, input.from, input.to, input.mode) });
+  });
+  app.post("/api/tasks/preview", async (c) =>
+    c.json({ task: tasks.preview(c.get("account").id, await c.req.json()) }),
+  );
+  app.post("/api/attempts/:id/corrections", async (c) => {
+    const input = correctionSchema.parse(await c.req.json());
+    return c.json({
+      attempt: tasks.correct(
+        c.get("account").id,
+        c.req.param("id"),
+        input.revision,
+        input.wordIds,
+        c.get("childMode"),
+      ),
+    });
+  });
+  app.get("/api/tasks", (c) =>
+    c.json({
+      tasks: tasks.summarize(c.get("account").id),
+    }),
+  );
+  app.post("/api/tasks", async (c) =>
+    c.json({ task: tasks.create(c.get("account").id, await c.req.json()) }, 201),
+  );
+  app.get("/api/tasks/:id", (c) =>
+    c.json({ task: tasks.require(c.get("account").id, c.req.param("id")) }),
+  );
+  app.put("/api/tasks/:id", async (c) => {
+    const { revision, ...input } = taskInputSchema
+      .extend({ revision: z.number().int().positive() })
+      .parse(await c.req.json());
+    return c.json({ task: tasks.update(c.get("account").id, c.req.param("id"), revision, input) });
+  });
+  app.post("/api/tasks/:id/withdraw", async (c) => {
+    const input = taskWithdrawSchema.parse(await c.req.json().catch(() => ({})));
+    return c.json({
+      task: tasks.withdraw(c.get("account").id, c.req.param("id"), input.revision),
+    });
+  });
+  app.post("/api/tasks/:id/reschedule", (c) =>
+    c.json({
+      task: tasks.reschedule(c.get("account").id, c.req.param("id")),
+    }),
+  );
+  app.get("/api/tasks/:id/play", (c) => {
+    const task = tasks.require(c.get("account").id, c.req.param("id"));
+    const attempts = tasks.listAttempts(c.get("account").id, task.id);
+    return c.json({
+      task: projectTask(task),
+      attempt:
+        attempts.find((attempt) => !attempt.completedAt && !attempt.interruptedAt) ??
+        attempts.filter((attempt) => attempt.completedAt).at(-1) ??
+        attempts.at(-1) ??
+        null,
+    });
+  });
+  app.post("/api/tasks/:id/start", async (c) => {
+    const input = startTaskSchema.parse(await c.req.json());
+    return c.json({
+      attempt: tasks.start(
+        c.get("account").id,
+        c.req.param("id"),
+        input.onlyHomework,
+        input.deviceId,
+        input.forceTakeover,
+        c.get("childMode"),
+      ),
+    });
+  });
+  app.put("/api/attempts/:id", async (c) =>
+    c.json({
+      attempt: tasks.save(
+        c.get("account").id,
+        c.req.param("id"),
+        await c.req.json(),
+        c.get("childMode"),
+      ),
+    }),
+  );
+  app.post("/api/attempts/:id/return", async (c) => {
+    const input = attemptReturnSchema.parse(await c.req.json());
+    return c.json({
+      attempt: tasks.returnForRedo(
+        c.get("account").id,
+        c.req.param("id"),
+        input.revision,
+        input.resetIndex,
+      ),
+    });
+  });
+  app.post("/api/attempts/:id/redispatch", (c) =>
+    c.json(
+      {
+        task: tasks.redispatchWrong(c.get("account").id, c.req.param("id")),
+      },
+      201,
+    ),
+  );
+  app.get("/api/attempts/:id", (c) => {
+    const accountId = c.get("account").id;
+    const attempt = tasks.attempt(accountId, c.req.param("id"));
+    const task = tasks.require(accountId, attempt.taskId);
+    if (
+      c.get("childMode") &&
+      !attempt.completedAt &&
+      !(task.allowSelfReview && attempt.phase === "review")
+    ) {
+      return c.json({ error: "请等待家长批改完成后再查看答案详情" }, 403);
+    }
+    return c.json({ attempt, task });
+  });
+  app.post("/api/attempts/:id/complete", async (c) => {
+    const input = attemptCompleteSchema.parse(await c.req.json());
+    return c.json({
+      attempt: tasks.complete(
+        c.get("account").id,
+        c.req.param("id"),
+        input.revision,
+        input.confirmRemaining,
+        c.get("childMode"),
+      ),
+    });
   });
   app.notFound((c) => c.json({ error: "入口不存在，请检查地址" }, 404));
   return app;

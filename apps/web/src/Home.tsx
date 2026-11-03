@@ -1,6 +1,5 @@
 import { BookOpen, Headphones, Plus, Search } from "lucide-react";
-import type { BatchSummary, Draft, Progress } from "../../../packages/contract/src/index";
-import { MODES } from "../../../packages/contract/src/index";
+import type { BatchSummary, Draft } from "../../../packages/contract/src/index";
 import { download } from "./api";
 import { blankDraft } from "./Editor";
 
@@ -10,36 +9,25 @@ interface Props {
   query: string;
   setQuery: (s: string) => void;
   draft: { value: Draft | null; write: (d: Draft) => boolean };
-  progress: { value: Progress | null };
   edit: () => void;
   open: (id: string) => void;
   onResume: () => void;
 }
-export function Home({
-  list,
-  filtered,
-  query,
-  setQuery,
-  draft,
-  progress,
-  edit,
-  open,
-  onResume,
-}: Props) {
+export function Home({ list, filtered, query, setQuery, draft, edit, open, onResume }: Props) {
   return (
     <>
       <section className="hero">
         <div>
           <p className="eyebrow">一份词表，多种练法</p>
           <h1>
-            今天的听写，
+            准备一份词表，
             <br />
-            自己也能完成。
+            派发到孩子听写区。
           </h1>
           <p>
-            网页来报词，孩子用纸笔写。
+            家长在手机或电脑整理词表、确认读音；
             <br className="mobile-break" />
-            核对答案，再把错词练一遍。
+            孩子在平板独立听写，写完交卷由家长核对。
           </p>
           <button type="button" className="primary" onClick={() => edit()}>
             <Plus size={18} aria-hidden="true" />
@@ -52,7 +40,7 @@ export function Home({
             <strong>apple</strong>
             <span>苹果 · 苹 果</span>
             <div className="paper-lines" />
-            <span className="paper-note">听见 → 写下 → 记住</span>
+            <span className="paper-note">派发 → 听写 → 核对</span>
           </div>
           <div className="audio-badge">
             <Headphones size={24} />
@@ -76,19 +64,6 @@ export function Home({
               导出备份
             </button>
           </div>
-        </section>
-      )}
-      {progress.value && (
-        <section className="resume-banner">
-          <div>
-            <strong>上次的听写进度已保留</strong>
-            <p>
-              第 {progress.value.index + 1} 词 · {MODES[progress.value.mode].label}
-            </p>
-          </div>
-          <button type="button" onClick={() => open(progress.value?.batchId ?? "")}>
-            查看上次词表
-          </button>
         </section>
       )}
       <div className="library-heading">
@@ -127,7 +102,7 @@ export function Home({
                   })}
                 </span>
                 <button type="button" onClick={() => open(b.id)}>
-                  去听写 →
+                  查看与派发 →
                 </button>
               </div>
             </article>

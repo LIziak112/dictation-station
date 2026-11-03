@@ -206,6 +206,54 @@ export function validateEntries(entries: Entry[]) {
   }
   return issues;
 }
-export function buildAgentPrompt(raw: string) {
-  return `请将下方原文整理成听写 JSON，只输出 JSON。格式：{"version":1,"title":"词表标题","entries":[{"en":"英文或空串","zh":"中文","pinyin":"带调拼音或空串","hint":"歧义语境或空串"}]}。不要添加原文没有的词；一词多义拆条；不确定的词标记在 hint 中；多音字按语境核对，不猜测。\n原文：\n${raw}`;
+export function buildAgentPrompt(
+  raw: string,
+  metadata: { title: string; grade: string; unit: string; textbook: string } = {
+    title: "",
+    grade: "",
+    unit: "",
+    textbook: "",
+  },
+) {
+  const titleHint = metadata.title.trim() || "未填写，请从原文识别（原文没有则留空串）";
+  const gradeHint = metadata.grade.trim() || "未填写，请从原文识别（原文没有则留空串）";
+  const unitHint = metadata.unit.trim() || "未填写，请从原文识别（原文没有则留空串）";
+  const textbookHint = metadata.textbook.trim() || "未填写，请从原文识别（原文没有则留空串）";
+  return [
+    "请将下方【作业原文】整理成听写词表 JSON，只输出合法 JSON，不要附带额外解释。",
+    "",
+    "【一、词表基本信息】（请逐项写入 JSON 顶层字段；原文没有的字段留空串，不要凭记忆编造教材信息，也不要把这些信息混入 entries 词条）：",
+    `- 词表名称 ("title")：${titleHint}`,
+    `- 年级 ("grade")：${gradeHint}`,
+    `- 单元 ("unit")：${unitHint}`,
+    `- 教材或来源 ("textbook")：${textbookHint}`,
+    "",
+    "【二、输出 JSON 格式模板】：",
+    "{",
+    '  "version": 1,',
+    `  "title": ${JSON.stringify(metadata.title.trim() || "词表名称")},`,
+    `  "grade": ${JSON.stringify(metadata.grade.trim() || "年级")},`,
+    `  "unit": ${JSON.stringify(metadata.unit.trim() || "单元")},`,
+    `  "textbook": ${JSON.stringify(metadata.textbook.trim() || "教材或来源")},`,
+    '  "entries": [',
+    "    {",
+    '      "kind": "word",',
+    '      "en": "英文或空串",',
+    '      "zh": "中文",',
+    '      "pinyin": "带调拼音或空串",',
+    '      "hint": "歧义语境或空串"',
+    "    }",
+    "  ]",
+    "}",
+    "",
+    "【三、词条整理规范】：",
+    "1. 保持原作业顺序和词义，不遗漏、不添加原文没有的内容。",
+    "2. kind 仅限：character（生字）、word（词语）、phrase（短语）、sentence（句子）；短语和句子保持完整，不要拆散。",
+    "3. 中文词条须提供按语境核对的带调拼音（如 píng guǒ），以便查询整词真人发音（拼音不直接控制合成语音）。",
+    "4. 多音字、一词多义请保留语境，不确定之处写入 hint 并提醒人工核对，不猜测。",
+    "5. 不提供任意外部音频 URL。若使用 MCP 工具，只调用 create_wordlist_draft 创建待确认草稿并返回核对链接，不自动发布，不修改学习状态。",
+    "",
+    "【四、作业原文】：",
+    raw || "（在此粘贴老师布置的作业原文）",
+  ].join("\n");
 }

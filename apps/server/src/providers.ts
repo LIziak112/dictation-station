@@ -73,7 +73,9 @@ export function createTts(dir: string) {
       throw new Error("服务器语音未启用，请使用设备朗读");
     const voice =
       item.lang === "en"
-        ? (process.env.VOICE_EN ?? "en-US-AriaNeural")
+        ? item.accent === "uk"
+          ? (process.env.VOICE_EN_UK ?? "en-GB-SoniaNeural")
+          : (process.env.VOICE_EN ?? "en-US-AriaNeural")
         : (process.env.VOICE_ZH ?? "zh-CN-XiaoxiaoNeural");
     // 保留旧缓存键，已有音频可以继续使用。
     const key = createHash("sha1").update(`${voice}|${item.rate}|${item.text}`).digest("hex");

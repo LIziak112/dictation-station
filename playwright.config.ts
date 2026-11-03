@@ -1,8 +1,9 @@
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
-const data = join(tmpdir(), `dictation-e2e-${process.pid}`);
+const data = mkdtempSync(join(tmpdir(), "dictation-e2e-"));
 export default defineConfig({
   testDir: "e2e",
   fullyParallel: false,
@@ -16,7 +17,13 @@ export default defineConfig({
   reporter: process.env.CI ? "github" : "list",
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
-    { name: "webkit", use: { ...devices["iPad (gen 7)"], browserName: "webkit" } },
+    {
+      name: "webkit",
+      // Windows WebKit 的多页面流程比 Chromium 慢；保留完整交互，给它单独的时间预算。
+      timeout: 60000,
+      expect: { timeout: 15000 },
+      use: { ...devices["iPad (gen 7)"], browserName: "webkit" },
+    },
   ],
   webServer: {
     command: "node server.js",
@@ -27,9 +34,11 @@ export default defineConfig({
       PORT: "8898",
       BASE_PATH: "/tingxie/",
       DATA_DIR: data,
-      WRITE_TOKEN: "",
+      ALLOW_REGISTRATION: "true",
       PADDLEOCR_TOKEN: "",
       ENABLE_SERVER_TTS: "false",
+      PUBLIC_DICTIONARY: "false",
+      TRUST_PROXY: "true",
       HOST: "127.0.0.1",
     },
   },

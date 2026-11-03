@@ -1,7 +1,26 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test } from "./fixtures";
+
+test("本机落盘失败时保留编辑内容，不允许退出丢稿", async ({ page }) => {
+  await page.goto("./#library");
+  await page.getByRole("button", { name: "新建听写", exact: true }).click();
+  await page.evaluate(() => {
+    Storage.prototype.setItem = () => {
+      throw new Error("合成存储失败");
+    };
+  });
+  await page.getByRole("textbox", { name: "作业原文", exact: true }).fill("sun 太阳");
+  await page.getByText("账号", { exact: true }).click();
+  await page.getByRole("button", { name: "退出登录" }).click();
+  await expect(page.getByRole("textbox", { name: "作业原文", exact: true })).toHaveValue(
+    "sun 太阳",
+  );
+  await expect(page.getByText("有尚未保存或同步的内容，请先恢复保存或导出备份。")).toBeVisible();
+  expect((await page.request.get("api/auth/me")).status()).toBe(200);
+});
 
 test("保存期间保留操作焦点并锁定输入，离开后的迟到回执不改变当前页", async ({ page }) => {
-  await page.goto("./");
+  await page.goto("./#library");
   await page.getByRole("button", { name: "新建听写", exact: true }).click();
   await page.getByRole("button", { name: "手动添加词条", exact: false }).click();
   await page.getByRole("textbox", { name: "中文", exact: true }).fill("太阳");
@@ -38,11 +57,11 @@ test("保存期间保留操作焦点并锁定输入，离开后的迟到回执�
         requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
       ),
   );
-  await expect(page.getByRole("heading", { name: /今天的听写/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "今日任务", exact: true })).toBeVisible();
 });
 
 test("页面切换更新标题和焦点，空词条保存能定位错误，删除支持撤销", async ({ page }) => {
-  await page.goto("./");
+  await page.goto("./#library");
   await page.getByRole("button", { name: "新建听写", exact: true }).focus();
   await page.keyboard.press("Enter");
   await expect(page).toHaveTitle(/新建听写/);
@@ -64,7 +83,7 @@ test("页面切换更新标题和焦点，空词条保存能定位错误，删�
 });
 
 test("筛选空态能清除搜索，输入字号随浏览器字体放大，切页回到正文", async ({ page }) => {
-  await page.goto("./");
+  await page.goto("./#library");
   await page.getByRole("textbox", { name: "搜索词表", exact: true }).fill("不会存在的合成搜索内容");
   await page.getByRole("button", { name: "清除搜索", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "搜索词表", exact: true })).toHaveValue("");
@@ -83,4 +102,15 @@ test("筛选空态能清除搜索，输入字号随浏览器字体放大，切�
     path: test.info().outputPath("editor-320-large-text.png"),
     fullPage: true,
   });
+});
+
+test("AI 提示词与核对词表的名称、年级、单元和来源字段一致", async ({ page }) => {
+  await page.goto("./#library");
+  await page.getByRole("button", { name: "新建听写", exact: true }).click();
+  await page.getByText("使用自己的 AI 整理", { exact: true }).click();
+  const prompt = await page.getByRole("textbox", { name: "整理提示词", exact: true }).inputValue();
+  for (const field of ["title", "grade", "unit", "textbook"])
+    expect(prompt).toContain(`"${field}"`);
+  expect(prompt).toContain("教材或来源");
+  expect(prompt).toContain("原文没有的字段留空串");
 });

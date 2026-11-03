@@ -10,18 +10,20 @@
   "scripts": {
     "dev": "tsx watch apps/server/src/index.ts",
     "dev:web": "vite --host 127.0.0.1",
-    "build": "vite build && esbuild apps/server/src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/server.js",
+    "build": "vite build && esbuild apps/server/src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/server.js && esbuild packages/mcp/src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/mcp.js",
     "start": "node server.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "e2e": "playwright test",
     "lint": "biome check .",
     "format": "biome check --write .",
+    "account:reset-password": "tsx scripts/reset-password.ts",
     "db:generate": "drizzle-kit generate",
     "schema:export": "tsx scripts/export-schema.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",
+    "@modelcontextprotocol/server": "2.4.0",
     "better-sqlite3": "13.0.3",
     "drizzle-orm": "0.45.3",
     "hono": "^4.13.9",
@@ -33,6 +35,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.14",
+    "@modelcontextprotocol/client": "2.4.0",
     "@playwright/test": "^1.63.0",
     "@types/better-sqlite3": "9.6.0",
     "@types/node": "^24.19.0",

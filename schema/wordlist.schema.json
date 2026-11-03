@@ -53,6 +53,38 @@
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{1,80}$"
           },
+          "wordId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,80}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "character",
+              "word",
+              "phrase",
+              "sentence"
+            ]
+          },
+          "reading": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "readings": {
+            "type": "object",
+            "properties": {
+              "en": {
+                "default": "",
+                "type": "string",
+                "maxLength": 120
+              },
+              "zh": {
+                "default": "",
+                "type": "string",
+                "maxLength": 120
+              }
+            }
+          },
           "en": {
             "type": "string",
             "maxLength": 300
