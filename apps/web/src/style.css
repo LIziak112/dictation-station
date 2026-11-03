@@ -993,7 +993,238 @@ button[aria-disabled="true"] {
 }
 
 .login-page {
-  max-width: 520px;
+  max-width: none;
+  margin: 0;
+  min-height: 100svh;
+  padding: clamp(24px, 6vh, 64px) 20px;
+  display: grid;
+  align-content: safe center;
+  justify-content: center;
+  background:
+    radial-gradient(
+      1100px 620px at 88% -12%,
+      color-mix(in srgb, var(--brand) 13%, transparent),
+      transparent 62%
+    ),
+    radial-gradient(
+      900px 540px at -10% 112%,
+      color-mix(in srgb, var(--brand) 8%, transparent),
+      transparent 58%
+    ),
+    var(--page);
+}
+.auth-shell {
+  width: min(1040px, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: clamp(32px, 6vw, 80px);
+  align-items: center;
+}
+.auth-intro {
+  max-width: 480px;
+  display: grid;
+  gap: 20px;
+  justify-self: start;
+  padding-inline: clamp(0px, 2vw, 24px);
+}
+.auth-brand,
+.auth-mobile-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.auth-brand .brand-mark {
+  width: 52px;
+  height: 52px;
+  border-radius: 15px;
+}
+.auth-brand strong,
+.auth-mobile-brand strong {
+  display: block;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+}
+.auth-brand strong {
+  font-size: 1.375rem;
+}
+.auth-headline {
+  font-size: clamp(1.875rem, 3.4vw, 2.625rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.35;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+.auth-lede {
+  color: var(--muted);
+  max-width: 36ch;
+}
+.auth-points {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+  font-size: 0.9375rem;
+  color: var(--label);
+}
+.auth-points li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.auth-points svg {
+  color: var(--brand);
+}
+.auth-mobile-brand {
+  display: none;
+  margin-bottom: 24px;
+}
+.auth-mobile-brand .brand-mark {
+  width: 44px;
+  height: 44px;
+}
+.auth-mobile-brand strong {
+  font-size: 1.125rem;
+}
+.auth-card {
+  width: 100%;
+  max-width: 440px;
+  justify-self: end;
+  margin: 0;
+  padding: clamp(26px, 3.4vw, 38px);
+  border-radius: 24px;
+  box-shadow:
+    0 1px 2px #2028200d,
+    0 18px 48px -18px #2028202e;
+}
+.auth-title {
+  font-size: clamp(1.625rem, 2.8vw, 2rem);
+  letter-spacing: -0.03em;
+}
+.auth-sub {
+  color: var(--muted);
+  margin-top: 10px;
+  font-size: 0.9375rem;
+}
+.auth-form {
+  margin-top: 26px;
+}
+.auth-field {
+  display: grid;
+  gap: 7px;
+  font-size: 0.875rem;
+  color: var(--label);
+}
+.auth-field > label {
+  font-weight: 600;
+}
+.auth-field input {
+  min-height: 48px;
+  border-radius: 10px;
+}
+.field-help {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+.password-field {
+  position: relative;
+}
+.password-field input {
+  padding-inline-end: 52px;
+}
+.password-toggle {
+  position: absolute;
+  inset-inline-end: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+}
+.password-toggle:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.auth-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--error) 45%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--error) 8%, var(--surface));
+  color: var(--error);
+  font-size: 0.875rem;
+}
+.auth-error svg {
+  margin-top: 3px;
+}
+.auth-submit {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 10px;
+  font-size: 1rem;
+}
+.auth-switch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+.auth-switch-button {
+  min-height: 0;
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--brand);
+  font-weight: 600;
+}
+.auth-switch-button:hover {
+  text-decoration: underline;
+}
+:root[data-theme="dark"] .auth-card {
+  border-color: var(--line);
+  box-shadow:
+    0 1px 2px #0006,
+    0 18px 48px -18px #0009;
+}
+:root[data-theme="dark"] .auth-brand .brand-mark,
+:root[data-theme="dark"] .auth-mobile-brand .brand-mark {
+  color: #13271c;
+}
+@media (max-width: 900px) {
+  .auth-shell {
+    grid-template-columns: minmax(0, 1fr);
+    width: min(460px, 100%);
+  }
+  .auth-intro {
+    display: none;
+  }
+  .auth-card {
+    max-width: none;
+    justify-self: stretch;
+  }
+  .auth-mobile-brand {
+    display: flex;
+  }
+}
+@media (max-width: 580px) {
+  .login-page {
+    padding: 20px 14px;
+  }
+  .auth-card {
+    padding: 26px 22px;
+    border-radius: 20px;
+  }
 }
 .login-page fieldset,
 .access fieldset {
@@ -1002,6 +1233,9 @@ button[aria-disabled="true"] {
   min-width: 0;
   display: grid;
   gap: 16px;
+}
+.auth-form fieldset {
+  gap: 18px;
 }
 .account-name {
   max-width: 100%;
@@ -1082,6 +1316,60 @@ button[aria-disabled="true"] {
 .source-audio-list p,
 .notice p {
   overflow-wrap: anywhere;
+}
+.mcp-steps {
+  margin: 14px 0 0;
+  padding-inline-start: 1.4em;
+  display: grid;
+  gap: 6px;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 0.875em;
+  padding: 0.15em 0.35em;
+  border-radius: 5px;
+  background: var(--soft);
+  overflow-wrap: anywhere;
+}
+.code-block {
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--soft);
+  overflow: hidden;
+}
+.code-block-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--label);
+}
+.code-block-head button {
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 0.8125rem;
+}
+.code-block pre {
+  margin: 0;
+  padding: 16px;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  tab-size: 2;
+}
+.code-block .error-text {
+  padding: 0 16px 12px;
 }
 
 :root[data-theme="dark"] {

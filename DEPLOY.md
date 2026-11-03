@@ -47,6 +47,8 @@ location /tingxie/ {
 
 要启用 TRUST_PROXY，反代必须覆盖用户提供的 x-real-ip。多用户部署应在反代另设 IP 限流、连接数/超时及磁盘配额；应用不信任客户端任意转发头。
 
+远程 MCP 端点与网站同域：根路径部署为 `/mcp`，保留前缀时为 `/tingxie/mcp`，沿用现有 location 转发即可；客户端用「AI 连接」页生成的 Bearer 配置连接，不需要额外端口或 CORS 设置。
+
 同域主应用若有 scope=/ 的 Service Worker，需要在主应用 navigateFallbackDenylist 中排除 `/tingxie/` 并等待旧 SW 更新，或使用独立子域。本仓库不会修改线上主应用 SW。
 
 ## 首次启用账号与备份

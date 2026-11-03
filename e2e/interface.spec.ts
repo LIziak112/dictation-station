@@ -103,3 +103,14 @@ test("筛选空态能清除搜索，输入字号随浏览器字体放大，切�
     fullPage: true,
   });
 });
+
+test("AI 提示词与核对词表的名称、年级、单元和来源字段一致", async ({ page }) => {
+  await page.goto("./#library");
+  await page.getByRole("button", { name: "新建听写", exact: true }).click();
+  await page.getByText("使用自己的 AI 整理", { exact: true }).click();
+  const prompt = await page.getByRole("textbox", { name: "整理提示词", exact: true }).inputValue();
+  for (const field of ["title", "grade", "unit", "textbook"])
+    expect(prompt).toContain(`"${field}"`);
+  expect(prompt).toContain("教材或来源");
+  expect(prompt).toContain("原文没有的字段留空串");
+});

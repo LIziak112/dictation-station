@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { batchInputSchema, defaultSettings, normalizeEntry } from "../packages/contract/src/index";
-import { parseList, validateEntries } from "../packages/core/src/import";
+import { buildAgentPrompt, parseList, validateEntries } from "../packages/core/src/import";
 import { createQueue, Playback } from "../packages/core/src/player";
 import samples from "../public/samples.json";
 
@@ -13,6 +13,20 @@ describe("词表契约与导入", () => {
     expect(() =>
       parseList('{"entries":[{"id":"same","zh":"太阳"},{"id":"same","zh":"月亮"}]}'),
     ).toThrow("ID");
+  });
+  it("AI 提示词的元信息字段能与核对表单对应", () => {
+    const prompt = buildAgentPrompt("Unit 3 单词听写\napple 苹果");
+    for (const field of ["title", "grade", "unit", "textbook"])
+      expect(prompt).toContain(`"${field}"`);
+    const meta = parseList(
+      '{"version":1,"title":"Unit 3 单词听写","grade":"小学三年级","unit":"Unit 3","textbook":"人教版 PEP","entries":[{"en":"apple","zh":"苹果"}]}',
+    ).meta;
+    expect(meta).toMatchObject({
+      title: "Unit 3 单词听写",
+      grade: "小学三年级",
+      unit: "Unit 3",
+      textbook: "人教版 PEP",
+    });
   });
   it("保留 OCR 表格单元格内的分号并解析拼音", () => {
     const result = parseList(

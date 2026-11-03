@@ -29,6 +29,7 @@ const api = createApp(store, {
   trustProxy: process.env.TRUST_PROXY === "true",
   ocr: process.env.PADDLEOCR_TOKEN ? paddleOcr : undefined,
   tts,
+  basePath: base,
 });
 const app = new Hono();
 api.get("*", serveStatic({ root: "dist/web" }));

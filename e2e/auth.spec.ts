@@ -8,6 +8,7 @@ test("注册、同账号跨设备读取、不同账号隔离及本机草稿隔�
   await page.getByRole("button", { name: "创建账号", exact: true }).click();
   await page.getByLabel("用户名", { exact: true }).fill(username);
   await page.getByLabel("密码", { exact: true }).fill(password);
+  await page.getByLabel("确认密码", { exact: true }).fill(password);
   await page.getByRole("button", { name: "注册并登录" }).click();
   await page.getByRole("button", { name: "词库", exact: true }).click();
   await expect(page.getByRole("button", { name: "新建听写", exact: true })).toBeVisible();
@@ -42,6 +43,7 @@ test("注册、同账号跨设备读取、不同账号隔离及本机草稿隔�
   await page.getByRole("button", { name: "创建账号", exact: true }).click();
   await page.getByLabel("用户名", { exact: true }).fill(`${username}_third`);
   await page.getByLabel("密码", { exact: true }).fill(password);
+  await page.getByLabel("确认密码", { exact: true }).fill(password);
   await page.getByRole("button", { name: "注册并登录" }).click();
   await page.getByRole("button", { name: "词库", exact: true }).click();
   await expect(page.getByRole("button", { name: "新建听写", exact: true })).toBeVisible();

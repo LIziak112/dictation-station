@@ -6,6 +6,20 @@ test("网页创建令牌、Agent 建草稿、网页核对后才生成正式词�
   await page.getByRole("button", { name: "AI 连接", exact: true }).click();
   await page.getByRole("button", { name: "创建令牌", exact: true }).click();
   const token = await page.getByLabel("新令牌", { exact: true }).inputValue();
+  const config = await page.locator(".code-block pre").textContent();
+  expect(config).not.toBeNull();
+  expect(config).toContain('"mcpServers"');
+  expect(config).toContain('"type": "http"');
+  expect(config).toContain("/tingxie/mcp");
+  expect(config).toContain(`Bearer ${token}`);
+  const unauthorizedMcp = await page.request.post("mcp", { data: {} });
+  expect(unauthorizedMcp.status()).toBe(401);
+  const authorizedMcp = await page.request.post("mcp", {
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    data: { jsonrpc: "2.0", id: 1, method: "ping" },
+  });
+  expect(authorizedMcp.status()).not.toBe(404);
+  expect(authorizedMcp.status()).not.toBe(401);
   const response = await page.request.post("api/agent/drafts", {
     headers: { Authorization: `Bearer ${token}` },
     data: {

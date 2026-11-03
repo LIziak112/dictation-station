@@ -1,3 +1,4 @@
+import { Check, Copy } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
 import {
@@ -35,6 +36,21 @@ export function Connections({ onDraft }: { onDraft: (id: string) => void }) {
     void refresh(controller.signal);
     return () => controller.abort();
   }, [refresh]);
+  const serverUrl = new URL(".", location.href).href;
+  const mcpUrl = new URL("mcp", serverUrl).href;
+  const mcpConfig = JSON.stringify(
+    {
+      mcpServers: {
+        "ownclass-dictation": {
+          type: "http",
+          url: mcpUrl,
+          headers: { Authorization: `Bearer ${rawToken || "<在此粘贴刚创建的令牌>"}` },
+        },
+      },
+    },
+    null,
+    2,
+  );
   return (
     <main>
       <div className="page-heading">
@@ -227,17 +243,89 @@ export function Connections({ onDraft }: { onDraft: (id: string) => void }) {
         ))}
       </section>
       <section className="panel">
-        <h2>连接本地 MCP</h2>
+        <h2>连接远程 MCP</h2>
         <p>
-          构建项目后，让支持本地 stdio MCP 的客户端启动 <code>node /项目绝对路径/dist/mcp.js</code>
-          ，环境变量设置 <code>DICTATION_URL</code> 和 <code>DICTATION_TOKEN</code>
-          。服务地址应包含部署子路径。
+          支持 Streamable HTTP 的 MCP
+          客户端可以直接连接本站，读取词表格式、校验词表、创建待确认草稿并查询自己的词表。正式词表仍需由你在网页核对保存。
         </p>
-        <p>
-          四项工具：获取词表格式、校验词表、创建草稿、查询自己的词表。具体配置见仓库
-          docs/AI接入.md；只支持远程 HTTP MCP 的客户端本轮需使用 JSON 或 API。
+        <ol className="mcp-steps">
+          <li>在上方创建令牌；只需要建草稿时可只勾选“校验与创建草稿”。</li>
+          <li>
+            复制下面的配置到客户端，地址已包含当前部署路径和 <code>/mcp</code>。
+          </li>
+          <li>连接后应能看到获取格式、校验词表、创建草稿、查询词表四项工具。</li>
+        </ol>
+        <ConfigBlock
+          label="通用 MCP 配置（mcpServers）"
+          text={mcpConfig}
+          ariaLabel="复制通用 MCP 配置 JSON"
+          example={!rawToken}
+        />
+        <p className="small muted">
+          {rawToken
+            ? "配置已代入刚创建的令牌和当前服务地址；令牌只在本次创建后显示，请保存到客户端配置。"
+            : "尚未创建令牌，配置中的 Authorization 是占位符；创建后会自动代入。"}
         </p>
+        <details>
+          <summary>连接说明与排查</summary>
+          <p>
+            地址由当前页面地址加 <code>mcp</code> 组成；子路径部署时是 <code>/tingxie/mcp</code>
+            。令牌撤销或过期后，客户端需要更新 Authorization 头。
+          </p>
+          <p>
+            只支持本地 stdio 的客户端，可以运行构建出的 <code>dist/mcp.js</code>，并用{" "}
+            <code>DICTATION_URL</code>、<code>DICTATION_TOKEN</code> 环境变量接入，说明见仓库
+            docs/AI接入.md。令牌不要提交到仓库或发给模型聊天。
+          </p>
+        </details>
       </section>
     </main>
+  );
+}
+
+function ConfigBlock({
+  label,
+  text,
+  ariaLabel,
+  example,
+}: {
+  label: string;
+  text: string;
+  ariaLabel: string;
+  example: boolean;
+}) {
+  const [result, setResult] = useState<{ text: string; ok: boolean } | null>(null);
+  const copied = result?.text === text && result.ok;
+  const failed = result?.text === text && !result.ok;
+  return (
+    <div className="code-block">
+      <div className="code-block-head">
+        <span>{label}</span>
+        <button
+          type="button"
+          aria-label={ariaLabel}
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(text);
+              setResult({ text, ok: true });
+            } catch {
+              setResult({ text, ok: false });
+            }
+          }}
+        >
+          {copied ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
+          {copied ? "已复制" : example ? "复制示例" : "复制"}
+        </button>
+      </div>
+      <pre>{text}</pre>
+      <p className="sr-only" role="status">
+        {copied ? "配置已复制" : ""}
+      </p>
+      {failed && (
+        <p role="alert" className="small error-text">
+          复制失败，请选中内容手动复制。
+        </p>
+      )}
+    </div>
   );
 }

@@ -207,5 +207,5 @@ export function validateEntries(entries: Entry[]) {
   return issues;
 }
 export function buildAgentPrompt(raw: string) {
-  return `请将下方原文整理成听写 JSON，只输出 JSON。格式：{"version":1,"title":"词表标题","entries":[{"en":"英文或空串","zh":"中文","pinyin":"带调拼音或空串","hint":"歧义语境或空串"}]}。保持原作业顺序和词义，不添加原文没有的内容，不凭记忆补造教材。kind 使用 character（生字）、word（词语）、phrase（短语）、sentence（句子）；短语和句子保持完整。中文提供按语境核对的带调拼音，以便查询整词真人发音，但拼音不直接控制合成语音。多音字、一词多义保留语境，不确定之处写入 hint 并提醒人工核对，不猜测。不提供任意音频 URL。若使用 MCP，只建草稿并返回核对链接，不自动发布，不修改学习状态。\n原文：\n${raw}`;
+  return `请将下方原文整理成听写 JSON，只输出 JSON。格式：{"version":1,"title":"词表名称","grade":"年级","unit":"单元","textbook":"教材或来源","entries":[{"kind":"word","en":"英文或空串","zh":"中文","pinyin":"带调拼音或空串","hint":"歧义语境或空串"}]}。词表名称、年级、单元、教材或来源从原文中读取；原文没有的字段留空串，不要凭记忆编造教材信息。保持原作业顺序和词义，不添加原文没有的内容。kind 使用 character（生字）、word（词语）、phrase（短语）、sentence（句子）；短语和句子保持完整。中文提供按语境核对的带调拼音，以便查询整词真人发音，但拼音不直接控制合成语音。多音字、一词多义保留语境，不确定之处写入 hint 并提醒人工核对，不猜测。不提供任意音频 URL。若使用 MCP，只建草稿并返回核对链接，不自动发布，不修改学习状态。\n原文：\n${raw}`;
 }

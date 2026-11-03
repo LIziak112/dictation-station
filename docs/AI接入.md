@@ -8,9 +8,29 @@ AI 只负责材料整理。网站不代调用模型，不扩展图片识别入�
 
 一个令牌属于一个账号。它不能发布词表、建任务、改记录、改掌握状态或管理其他令牌；也不读取 OCR 原文。确认和发布入口只接受网页登录会话。
 
-## 本地 MCP 配置
+## HTTP MCP（服务器部署）
 
-需要 Node.js 24+。在项目中 pnpm install 和 pnpm build 后，使用支持本地 stdio MCP 的客户端运行构建出的 dist/mcp.js。通用配置形状如下，实际文件位置以所用客户端说明为准：
+登录后打开“AI 连接”→“连接远程 MCP”，页面会按当前部署地址生成可复制的通用配置；在本次会话中刚创建的令牌会直接代入。客户端需要支持 Streamable HTTP：
+
+```json
+{
+  "mcpServers": {
+    "ownclass-dictation": {
+      "type": "http",
+      "url": "https://www.example.com/tingxie/mcp",
+      "headers": {
+        "Authorization": "Bearer 在本机填写你的令牌"
+      }
+    }
+  }
+}
+```
+
+根路径部署时地址为 `https://站点/mcp`，子路径部署时为 `https://站点/tingxie/mcp`。服务端对每个 MCP 请求重新校验 Bearer 令牌与 scope，撤销后客户端立即无法调用。令牌不要提交到仓库或发给模型聊天。
+
+## 本地 stdio（可选）
+
+需要 Node.js 24+。在项目中 pnpm install 和 pnpm build 后，使用只支持本地 stdio MCP 的客户端运行构建出的 dist/mcp.js。通用配置形状如下，实际文件位置以所用客户端说明为准：
 
 ```json
 {
@@ -27,7 +47,7 @@ AI 只负责材料整理。网站不代调用模型，不扩展图片识别入�
 }
 ```
 
-DICTATION_URL 是网站服务地址，必须包含真实子路径；根路径部署用 http://127.0.0.1:8083/。客户端不需要共享网站 Cookie。不要把真实令牌提交到仓库或发给模型聊天；只写入客户端本机环境配置。stdout 保留给 MCP 协议，不通过 pnpm 脚本横插日志。
+DICTATION_URL 是网站服务地址，必须包含真实子路径；根路径部署用 http://127.0.0.1:8083/。客户端不需要共享网站 Cookie。stdout 保留给 MCP 协议，不通过 pnpm 脚本横插日志。
 
 四项工具：
 
@@ -38,7 +58,7 @@ DICTATION_URL 是网站服务地址，必须包含真实子路径；根路径部
 | create_wordlist_draft | 建草稿，返回含 #draft= 的核对链接        |
 | list_wordlists        | 不传 id 列出自己的词表，传 id 读取该词表 |
 
-网站使用 opaque Bearer token，而非 OAuth。桥接只提供本地 stdio，不冒充远程 OAuth MCP。仅支持远程连接的客户端请使用下面的 API 或复制 JSON。
+网站使用 opaque Bearer token，而非 OAuth。HTTP 端点与本地桥接共用同一套工具和权限校验，不冒充远程 OAuth MCP。仅支持远程连接的客户端使用上面的 HTTP 配置，或使用下面的 API。
 
 ## API 入口
 

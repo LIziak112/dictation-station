@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import { serveStatic } from "@hono/node-server/serve-static";
+import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/server";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
@@ -27,6 +28,7 @@ import {
 } from "../../../packages/contract/src/index";
 import { validateEntries } from "../../../packages/core/src/import";
 import { projectTask } from "../../../packages/core/src/tasks";
+import { createMcpServer } from "../../../packages/mcp/src/server";
 import { Auth } from "./auth";
 import { Drafts } from "./drafts";
 import { Learning } from "./learning";
@@ -43,6 +45,7 @@ interface Options {
   ocr?: (image: OcrInput) => Promise<string>;
   tts?: (item: TtsInput) => Promise<string>;
   trustProxy?: boolean;
+  basePath?: string;
 }
 export function createApp(store: Store, options: Options) {
   const app = new Hono<{ Variables: { account: Account } }>();
@@ -372,6 +375,48 @@ export function createApp(store: Store, options: Options) {
   app.post("/api/agent/drafts", async (c) =>
     c.json({ draft: drafts.create(c.get("account").id, await c.req.json()) }, 201),
   );
+  app.all("/mcp", async (c) => {
+    const token = (c.req.header("Authorization") ?? "").replace(/^Bearer /, "");
+    if (!tokens.authenticate(token)) return c.json({ error: "AI 令牌无效或已过期" }, 401);
+    const requestUrl = new URL(c.req.url);
+    const origin =
+      c.req.header("Origin") ??
+      `${c.req.header("x-forwarded-proto") ?? requestUrl.protocol.slice(0, -1)}://${requestUrl.host}`;
+    const linkBase = `${origin}${options.basePath ?? ""}/`;
+    const server = createMcpServer(async (path, body) => {
+      const headers = new Headers({ Authorization: `Bearer ${token}` });
+      if (body !== undefined) headers.set("Content-Type", "application/json");
+      const response = await app.fetch(
+        new Request(new URL(`/api/agent/${path}`, "http://internal"), {
+          method: body === undefined ? "GET" : "POST",
+          headers,
+          body: body === undefined ? undefined : JSON.stringify(body),
+        }),
+      );
+      const result: unknown = await response.json();
+      if (!response.ok) {
+        const failure = z.object({ error: z.string() }).safeParse(result);
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text" as const,
+              text: failure.success ? failure.data.error : `请求失败（${response.status}）`,
+            },
+          ],
+        };
+      }
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result) }],
+        structuredContent: result,
+      };
+    }, linkBase);
+    const transport = new WebStandardStreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+    });
+    await server.connect(transport);
+    return transport.handleRequest(c.req.raw);
+  });
   app.get("/api/preferences", (c) =>
     c.json({ preferences: learning.preferences(c.get("account").id) }),
   );

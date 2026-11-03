@@ -1,41 +1,18 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 
-export function createBridge(baseUrl: string, token: string) {
-  const base = new URL(baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`);
+export type AgentCall = (
+  path: string,
+  body?: unknown,
+) => Promise<{
+  isError?: boolean;
+  content: { type: "text"; text: string }[];
+  structuredContent?: unknown;
+}>;
+
+export function createMcpServer(call: AgentCall, linkBase: string) {
+  const base = new URL(linkBase.endsWith("/") ? linkBase : `${linkBase}/`);
   const server = new McpServer({ name: "ownclass-dictation", version: "0.1.0" });
-  async function call(path: string, body?: unknown) {
-    try {
-      const response = await fetch(new URL(`api/agent/${path}`, base), {
-        method: body === undefined ? "GET" : "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: AbortSignal.timeout(15000),
-      });
-      const result: unknown = await response.json();
-      if (!response.ok) {
-        const failure = z.object({ error: z.string() }).safeParse(result);
-        return {
-          isError: true,
-          content: [
-            {
-              type: "text" as const,
-              text: failure.success ? failure.data.error : `请求失败（${response.status}）`,
-            },
-          ],
-        };
-      }
-      return {
-        content: [{ type: "text" as const, text: JSON.stringify(result) }],
-        structuredContent: result,
-      };
-    } catch {
-      return {
-        isError: true,
-        content: [{ type: "text" as const, text: "无法连接听写小站，请检查服务地址和网络" }],
-      };
-    }
-  }
   server.registerTool(
     "get_wordlist_schema",
     {
@@ -95,4 +72,41 @@ export function createBridge(baseUrl: string, token: string) {
     async ({ id }) => call(id ? `wordlists/${encodeURIComponent(id)}` : "wordlists"),
   );
   return server;
+}
+
+export function createBridge(baseUrl: string, token: string) {
+  const base = new URL(baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`);
+  const call: AgentCall = async (path, body) => {
+    try {
+      const response = await fetch(new URL(`api/agent/${path}`, base), {
+        method: body === undefined ? "GET" : "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(15000),
+      });
+      const result: unknown = await response.json();
+      if (!response.ok) {
+        const failure = z.object({ error: z.string() }).safeParse(result);
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text" as const,
+              text: failure.success ? failure.data.error : `请求失败（${response.status}）`,
+            },
+          ],
+        };
+      }
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result) }],
+        structuredContent: result,
+      };
+    } catch {
+      return {
+        isError: true,
+        content: [{ type: "text" as const, text: "无法连接听写小站，请检查服务地址和网络" }],
+      };
+    }
+  };
+  return createMcpServer(call, base.href);
 }
