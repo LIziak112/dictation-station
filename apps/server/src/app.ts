@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/server";
+import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
@@ -11,9 +12,11 @@ import {
   type Account,
   agentValidationInputSchema,
   attemptCompleteSchema,
+  attemptReturnSchema,
   audioPreparationSchema,
   correctionSchema,
   credentialsSchema,
+  entrySchema,
   examRequestSchema,
   exportSchema,
   idSchema,
@@ -24,6 +27,7 @@ import {
   pronunciationInputSchema,
   startTaskSchema,
   taskInputSchema,
+  taskWithdrawSchema,
   ttsRequestSchema,
 } from "../../../packages/contract/src/index";
 import { validateEntries } from "../../../packages/core/src/import";
@@ -34,6 +38,7 @@ import { Drafts } from "./drafts";
 import { Learning } from "./learning";
 import { Pronunciation } from "./pronunciation";
 import type { OcrInput, TtsInput } from "./providers";
+import { words } from "./schema";
 import { Conflict, type Store } from "./store";
 import { Tasks } from "./tasks";
 import { Tokens } from "./tokens";
@@ -47,8 +52,28 @@ interface Options {
   trustProxy?: boolean;
   basePath?: string;
 }
+
+function isChildRouteAllowed(method: string, path: string) {
+  if (
+    method === "GET" &&
+    (path === "/api/auth/me" || path === "/api/child/overview" || path === "/api/tasks")
+  )
+    return true;
+  if (method === "GET" && /^\/api\/child\/batches\/[^/]+\/listen$/.test(path)) return true;
+  if (method === "GET" && /^\/api\/tasks\/[^/]+\/play$/.test(path)) return true;
+  if (method === "POST" && /^\/api\/tasks\/[^/]+\/audio$/.test(path)) return true;
+  if (method === "POST" && /^\/api\/tasks\/[^/]+\/start$/.test(path)) return true;
+  if (method === "PUT" && /^\/api\/attempts\/[^/]+$/.test(path)) return true;
+  if (method === "GET" && /^\/api\/attempts\/[^/]+$/.test(path)) return true;
+  if (method === "POST" && /^\/api\/attempts\/[^/]+\/complete$/.test(path)) return true;
+  if (method === "POST" && /^\/api\/attempts\/[^/]+\/corrections$/.test(path)) return true;
+  if (method === "POST" && path === "/api/pronunciation/preview") return true;
+  if (method === "GET" && /^\/audio\/[^/]+$/.test(path)) return true;
+  return false;
+}
+
 export function createApp(store: Store, options: Options) {
-  const app = new Hono<{ Variables: { account: Account } }>();
+  const app = new Hono<{ Variables: { account: Account; childMode: boolean } }>();
   const auth = new Auth(store);
   const tokens = new Tokens(store);
   const drafts = new Drafts(store);
@@ -137,6 +162,7 @@ export function createApp(store: Store, options: Options) {
   });
   const publicPaths = new Set(["/api/health", "/api/auth/register", "/api/auth/login"]);
   app.use("*", async (c, next) => {
+    c.set("childMode", false);
     if (
       publicPaths.has(c.req.path) ||
       (!c.req.path.startsWith("/api/") && !c.req.path.startsWith("/audio/"))
@@ -164,9 +190,47 @@ export function createApp(store: Store, options: Options) {
       c.set("account", actor.account);
       return next();
     }
-    const account = auth.current(getCookie(c, "dictation_session") ?? "");
-    if (!account) return c.json({ error: "请先登录" }, 401);
-    c.set("account", account);
+    const bearer = (c.req.header("Authorization") ?? "").replace(/^Bearer /, "");
+    const headerChildToken =
+      c.req.header("X-Child-Token") ?? (bearer.startsWith("ct_") ? bearer : "");
+    const sessionAccount = auth.current(getCookie(c, "dictation_session") ?? "");
+    const cookieChildToken = !sessionAccount ? (getCookie(c, "dictation_child") ?? "") : "";
+    const activeChildToken = headerChildToken || cookieChildToken;
+    if (activeChildToken) {
+      const childActor = tokens.authenticateChild(
+        activeChildToken,
+        c.req.header("User-Agent") ?? "",
+      );
+      if (!childActor) {
+        if (sessionAccount && !headerChildToken) {
+          c.set("account", sessionAccount);
+          return next();
+        }
+        return c.json({ error: "孩子区链接已失效或已重置，请找家长重新扫码" }, 401);
+      }
+      if (!isChildRouteAllowed(c.req.method, c.req.path)) {
+        return c.json({ error: "孩子区无权执行此家长管理操作" }, 403);
+      }
+      if (headerChildToken && !cookieChildToken) {
+        setCookie(c, "dictation_child", headerChildToken, {
+          httpOnly: true,
+          sameSite: "Lax",
+          path: "/",
+          maxAge: 30 * 86400,
+          secure:
+            c.req.url.startsWith("https:") || (c.req.header("Origin") ?? "").startsWith("https:"),
+        });
+      }
+      c.set("account", childActor.account);
+      c.set("childMode", true);
+      return next();
+    }
+    if (!sessionAccount) return c.json({ error: "请先登录" }, 401);
+    if (c.req.header("X-Child-Mode") === "1" && !isChildRouteAllowed(c.req.method, c.req.path)) {
+      return c.json({ error: "孩子区无权执行此家长管理操作" }, 403);
+    }
+    if (c.req.header("X-Child-Mode") === "1") c.set("childMode", true);
+    c.set("account", sessionAccount);
     await next();
   });
   app.post("/api/auth/register", async (c) => {
@@ -201,6 +265,7 @@ export function createApp(store: Store, options: Options) {
   app.post("/api/auth/logout", (c) => {
     auth.logout(getCookie(c, "dictation_session") ?? "");
     deleteCookie(c, "dictation_session", { path: "/" });
+    deleteCookie(c, "dictation_child", { path: "/" });
     return c.json({ ok: true });
   });
   app.post("/api/auth/verify-password", async (c) => {
@@ -233,6 +298,16 @@ export function createApp(store: Store, options: Options) {
       allowRegistration: options.allowRegistration !== false,
     }),
   );
+  app.get("/api/child-token", (c) =>
+    c.json({ active: tokens.listChildTokens(c.get("account").id) }),
+  );
+  app.post("/api/child-token", (c) => c.json(tokens.createChildToken(c.get("account").id), 201));
+  app.post("/api/child-token/rotate", (c) => c.json(tokens.rotateChildToken(c.get("account").id)));
+  app.get("/api/child/overview", (c) => c.json(tasks.childOverview(c.get("account").id)));
+  app.get("/api/child/batches/:id/listen", (c) =>
+    c.json(tasks.childListenBatch(c.get("account").id, idSchema.parse(c.req.param("id")))),
+  );
+  app.get("/api/audit-logs", (c) => c.json({ logs: store.listAudit(c.get("account").id) }));
   app.get("/api/batches", (c) =>
     c.json({
       batches: store
@@ -300,9 +375,43 @@ export function createApp(store: Store, options: Options) {
     }
   });
   app.post("/api/pronunciation/preview", async (c) => {
+    const accountId = c.get("account").id;
     const input = pronunciationInputSchema.parse(await c.req.json());
-    const voice = await pronunciation.prepare(input, input.synthetic);
-    if (voice.url) store.grantAudio(c.get("account").id, voice.url.slice("audio/".length));
+    let resolvedInput = input;
+    let maskOutput = false;
+    if (input.wordId) {
+      const row = store.db
+        .select()
+        .from(words)
+        .where(and(eq(words.id, input.wordId), eq(words.accountId, accountId)))
+        .get();
+      if (row) {
+        const realEntry = entrySchema.parse(JSON.parse(row.payload));
+        const realText = realEntry[input.lang];
+        if (realText) {
+          resolvedInput = {
+            ...input,
+            text: realText,
+            reading: realEntry.readings[input.lang] || realEntry.reading || input.reading,
+            pinyin: input.lang === "zh" ? realEntry.pinyin : input.pinyin,
+          };
+        }
+        if (c.get("childMode") && tasks.lockedWordIds(accountId).has(input.wordId)) {
+          maskOutput = true;
+        }
+      }
+    }
+    const voice = await pronunciation.prepare(resolvedInput, resolvedInput.synthetic);
+    if (voice.url) store.grantAudio(accountId, voice.url.slice("audio/".length));
+    if (maskOutput) {
+      return c.json({
+        voice: {
+          ...voice,
+          title: "待考词盲听",
+          reading: "",
+        },
+      });
+    }
     return c.json({ voice });
   });
   app.post("/api/tasks/:id/audio", async (c) => {
@@ -442,16 +551,18 @@ export function createApp(store: Store, options: Options) {
   app.post("/api/attempts/:id/corrections", async (c) => {
     const input = correctionSchema.parse(await c.req.json());
     return c.json({
-      attempt: tasks.correct(c.get("account").id, c.req.param("id"), input.revision, input.wordIds),
+      attempt: tasks.correct(
+        c.get("account").id,
+        c.req.param("id"),
+        input.revision,
+        input.wordIds,
+        c.get("childMode"),
+      ),
     });
   });
   app.get("/api/tasks", (c) =>
     c.json({
-      tasks: tasks.list(c.get("account").id).map(({ items, audio: _audio, ...task }) => ({
-        ...task,
-        count: items.length,
-        reviewCount: items.filter((item) => item.source === "review").length,
-      })),
+      tasks: tasks.summarize(c.get("account").id),
     }),
   );
   app.post("/api/tasks", async (c) =>
@@ -466,26 +577,83 @@ export function createApp(store: Store, options: Options) {
       .parse(await c.req.json());
     return c.json({ task: tasks.update(c.get("account").id, c.req.param("id"), revision, input) });
   });
+  app.post("/api/tasks/:id/withdraw", async (c) => {
+    const input = taskWithdrawSchema.parse(await c.req.json().catch(() => ({})));
+    return c.json({
+      task: tasks.withdraw(c.get("account").id, c.req.param("id"), input.revision),
+    });
+  });
+  app.post("/api/tasks/:id/reschedule", (c) =>
+    c.json({
+      task: tasks.reschedule(c.get("account").id, c.req.param("id")),
+    }),
+  );
   app.get("/api/tasks/:id/play", (c) => {
     const task = tasks.require(c.get("account").id, c.req.param("id"));
     const attempts = tasks.listAttempts(c.get("account").id, task.id);
     return c.json({
       task: projectTask(task),
-      attempt: attempts.find((attempt) => !attempt.completedAt) ?? attempts.at(-1) ?? null,
+      attempt:
+        attempts.find((attempt) => !attempt.completedAt && !attempt.interruptedAt) ??
+        attempts.filter((attempt) => attempt.completedAt).at(-1) ??
+        attempts.at(-1) ??
+        null,
     });
   });
   app.post("/api/tasks/:id/start", async (c) => {
     const input = startTaskSchema.parse(await c.req.json());
     return c.json({
-      attempt: tasks.start(c.get("account").id, c.req.param("id"), input.onlyHomework),
+      attempt: tasks.start(
+        c.get("account").id,
+        c.req.param("id"),
+        input.onlyHomework,
+        input.deviceId,
+        input.forceTakeover,
+        c.get("childMode"),
+      ),
     });
   });
   app.put("/api/attempts/:id", async (c) =>
-    c.json({ attempt: tasks.save(c.get("account").id, c.req.param("id"), await c.req.json()) }),
+    c.json({
+      attempt: tasks.save(
+        c.get("account").id,
+        c.req.param("id"),
+        await c.req.json(),
+        c.get("childMode"),
+      ),
+    }),
+  );
+  app.post("/api/attempts/:id/return", async (c) => {
+    const input = attemptReturnSchema.parse(await c.req.json());
+    return c.json({
+      attempt: tasks.returnForRedo(
+        c.get("account").id,
+        c.req.param("id"),
+        input.revision,
+        input.resetIndex,
+      ),
+    });
+  });
+  app.post("/api/attempts/:id/redispatch", (c) =>
+    c.json(
+      {
+        task: tasks.redispatchWrong(c.get("account").id, c.req.param("id")),
+      },
+      201,
+    ),
   );
   app.get("/api/attempts/:id", (c) => {
-    const attempt = tasks.attempt(c.get("account").id, c.req.param("id"));
-    return c.json({ attempt, task: tasks.require(c.get("account").id, attempt.taskId) });
+    const accountId = c.get("account").id;
+    const attempt = tasks.attempt(accountId, c.req.param("id"));
+    const task = tasks.require(accountId, attempt.taskId);
+    if (
+      c.get("childMode") &&
+      !attempt.completedAt &&
+      !(task.allowSelfReview && attempt.phase === "review")
+    ) {
+      return c.json({ error: "请等待家长批改完成后再查看答案详情" }, 403);
+    }
+    return c.json({ attempt, task });
   });
   app.post("/api/attempts/:id/complete", async (c) => {
     const input = attemptCompleteSchema.parse(await c.req.json());
@@ -495,6 +663,7 @@ export function createApp(store: Store, options: Options) {
         c.req.param("id"),
         input.revision,
         input.confirmRemaining,
+        c.get("childMode"),
       ),
     });
   });

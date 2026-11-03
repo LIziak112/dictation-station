@@ -21,9 +21,13 @@ export function VoicePicker({
   const [voices, setVoices] = useState<Voice[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const selected = entry.readings[lang];
   return (
     <details>
-      <summary>真人读音与来源</summary>
+      <summary>
+        真人读音与来源 ·{" "}
+        {selected ? `已指定 ${selected}` : voices.length ? "已找到候选" : "尚未查询"}
+      </summary>
       <div className="form-grid">
         <label className="field">
           发音语言

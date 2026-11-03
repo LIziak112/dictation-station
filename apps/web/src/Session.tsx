@@ -2,7 +2,7 @@ import { CircleAlert, CircleCheck, Eye, EyeOff, Headphones } from "lucide-react"
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { type Account, accountResponseSchema } from "../../../packages/contract/src/index";
-import { ApiError, api, request } from "./api";
+import { ApiError, api, captureChildTokenFromUrl, request } from "./api";
 import { Portal } from "./Portal";
 
 export function Session() {
@@ -11,6 +11,7 @@ export function Session() {
   const [error, setError] = useState("");
   const [allowRegistration, setAllowRegistration] = useState(false);
   useEffect(() => {
+    captureChildTokenFromUrl();
     Promise.all([
       api.health(),
       request("api/auth/me", accountResponseSchema).catch((e: unknown) => {
@@ -163,21 +164,19 @@ function Login({
                 <input
                   id="auth-username"
                   name="username"
-                  aria-describedby={register ? "auth-username-help" : undefined}
+                  aria-describedby="auth-username-help"
                   autoComplete="username"
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
                   required
-                  minLength={register ? 2 : undefined}
+                  minLength={2}
                   maxLength={40}
-                  pattern={register ? "[A-Za-z0-9_-]+" : undefined}
+                  pattern="[A-Za-z0-9_-]+"
                 />
-                {register && (
-                  <span id="auth-username-help" className="field-help">
-                    2–40 个字符，可用字母、数字、下划线或短横线
-                  </span>
-                )}
+                <span id="auth-username-help" className="field-help">
+                  2–40 个字符，只能使用字母、数字、下划线或短横线
+                </span>
               </div>
               <div className="auth-field">
                 <label htmlFor="auth-password">密码</label>
@@ -186,10 +185,10 @@ function Login({
                     id="auth-password"
                     name="password"
                     type={showPassword ? "text" : "password"}
-                    aria-describedby={register ? "auth-password-help" : undefined}
+                    aria-describedby="auth-password-help"
                     autoComplete={register ? "new-password" : "current-password"}
                     required
-                    minLength={register ? 8 : undefined}
+                    minLength={8}
                     maxLength={128}
                   />
                   <button
@@ -206,11 +205,9 @@ function Login({
                     )}
                   </button>
                 </div>
-                {register && (
-                  <span id="auth-password-help" className="field-help">
-                    8–128 个字符，区分大小写
-                  </span>
-                )}
+                <span id="auth-password-help" className="field-help">
+                  8–128 个字符，区分大小写
+                </span>
               </div>
               {register && (
                 <div className="auth-field">

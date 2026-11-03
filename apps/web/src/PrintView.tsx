@@ -28,9 +28,7 @@ export function PrintView({
             >
               <option value="blank">听写空白纸</option>
               <option value="pinyin">看拼音写词语纸</option>
-              <option value="review" disabled={!attempt}>
-                待巩固练习纸
-              </option>
+              <option value="review">待巩固练习纸</option>
             </select>
           </label>
           <label className="check">
@@ -43,7 +41,7 @@ export function PrintView({
           </label>
         </div>
         <p className="small muted">
-          浏览器打印窗口可另存 PDF。答案页默认关闭；句子会预留更多书写空间。
+          已按标准 A4 紧凑多栏排版设计，节省纸张空间；浏览器打印窗口可直接打印或另存为 PDF。
         </p>
         <div className="row">
           <button className="primary" type="button" onClick={() => window.print()}>
@@ -55,17 +53,33 @@ export function PrintView({
         </div>
       </div>
       <article className="print-sheet">
-        <header>
-          <p>OwnClass · 听写小站</p>
-          <h1>{task.title}</h1>
-          <p>
-            {task.date}　姓名：________________　{rows.length} 项
+        <header className="print-header">
+          <div className="print-title-group">
+            <h1>{task.title}</h1>
+            <span className="print-subtitle">
+              OwnClass 听写小站 · {MODES[task.mode].label} ·{" "}
+              {template === "blank"
+                ? "听写空白纸"
+                : template === "pinyin"
+                  ? "看拼音写词语纸"
+                  : "待巩固练习纸"}
+            </span>
+          </div>
+          <p className="print-meta">
+            日期：{task.date}　姓名：____________　得分：______ / {rows.length}
           </p>
         </header>
         <ol className="worksheet">
           {rows.map((row) => (
-            <li key={row.number} value={row.number}>
-              <span>{row.prompt}</span>
+            <li
+              key={row.number}
+              value={row.number}
+              className={row.lines === 3 ? "worksheet-item sentence-item" : "worksheet-item"}
+            >
+              <div className="worksheet-prompt">
+                <span className="worksheet-num">{row.number}.</span>
+                <span>{row.prompt}</span>
+              </div>
               <div className="writing-line" />
               {row.lines === 3 && (
                 <>
@@ -76,15 +90,18 @@ export function PrintView({
             </li>
           ))}
         </ol>
-        {!rows.length && <p>本次没有需要打印的待巩固项。</p>}
+        {!rows.length && <p>本次全部答对，没有需要打印的待巩固项。</p>}
         {answers && (
           <section className="print-answers" data-testid="print-answers">
-            <h2>答案页 · 请与练习纸分开</h2>
-            {rows.map((row) => (
-              <p key={row.number}>
-                {row.number}. {task.items[row.number - 1].entry[MODES[task.mode].answer]}
-              </p>
-            ))}
+            <h2>答案对照区（可沿虚线裁剪或分页打印）</h2>
+            <div className="print-answers-grid">
+              {rows.map((row) => (
+                <p key={row.number}>
+                  <strong>{row.number}.</strong>{" "}
+                  {task.items[row.number - 1].entry[MODES[task.mode].answer]}
+                </p>
+              ))}
+            </div>
           </section>
         )}
       </article>

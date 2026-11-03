@@ -31,7 +31,11 @@ it("同日订正不计通过，三个不同日期通过后掌握，再错重新�
   expect(state?.status).toBe("pending");
   expect(state?.streak).toBe(0);
   expect(advanceLearning(null, "unchecked", "2026-11-01", 3)).toBeNull();
+  const uncertainFirst = advanceLearning(null, "uncertain", "2026-11-01", 3);
+  expect(uncertainFirst?.status).toBe("pending");
+  expect(uncertainFirst?.dueDate).toBe("2026-11-02");
   expect(advanceLearning(state, "uncertain", "2026-11-14", 3)?.streak).toBe(0);
+  expect(advanceLearning(state, "uncertain", "2026-11-14", 3)?.status).toBe("pending");
 });
 it("穿插保留作业原顺序，剩余复习置于末尾", () => {
   expect(interleaveReview([1, 2, 3, 4, 5, 6], [7, 8], "interleave")).toEqual([

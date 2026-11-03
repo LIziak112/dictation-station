@@ -49,8 +49,10 @@ test("核对进入待巩固，生成阶段复习与记录周报，订正不增�
   await page.getByRole("button", { name: "汇总这个阶段" }).click();
   await expect(page.getByRole("button", { name: "生成阶段复习任务" })).toBeEnabled();
   await page.getByRole("button", { name: "生成阶段复习任务" }).click();
-  await expect(page.getByRole("button", { name: "开始任务", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "今天只完成作业" })).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "已派发到孩子听写区，等待孩子开始" }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "开始任务", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "记录", exact: true }).click();
   await expect(page.getByRole("heading", { name: "这周的三件事" })).toBeVisible();
   await page.getByRole("button", { name: "查看核对与订正" }).click();

@@ -8,10 +8,12 @@ import { prepareVoice } from "./prepared-voice";
 export function ListeningPractice({
   batch,
   follow,
+  lockedWordIds = [],
   onBack,
 }: {
   batch: Batch;
   follow: boolean;
+  lockedWordIds?: string[];
   onBack: () => void;
 }) {
   const [language, setLanguage] = useState<"en" | "zh" | "both">(
@@ -122,6 +124,7 @@ export function ListeningPractice({
             queue.slice(offset, offset + 3).map(async (item) => {
               const prepared = await prepareVoice(
                 {
+                  wordId: item.entry.wordId,
                   text: item.audioText,
                   lang: item.lang,
                   reading: item.reading,
@@ -323,7 +326,11 @@ export function ListeningPractice({
         <p className="eyebrow" aria-live="polite">
           {queue.length ? `${index + 1} / ${queue.length}` : "0 / 0"}
         </p>
-        <h2 className="practice-word">{queue[index]?.audioText}</h2>
+        <h2 className="practice-word">
+          {queue[index]?.entry.wordId && lockedWordIds.includes(queue[index].entry.wordId)
+            ? "🔒 今日听写待考词（交卷批改后解锁文字）"
+            : queue[index]?.audioText}
+        </h2>
         <div className="row">
           <button
             type="button"

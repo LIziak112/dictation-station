@@ -8,33 +8,31 @@ import {
   draftSchema,
   MODES,
   type Mode,
-  type Progress,
-  progressSchema,
   type Settings,
   serverDraftResponseSchema,
 } from "../../../packages/contract/src/index";
-import { createQueue } from "../../../packages/core/src/player";
 import { api, download, request } from "./api";
 import { BatchDetail } from "./BatchDetail";
 import { blankDraft, Editor } from "./Editor";
 import { Home } from "./Home";
 import { PasswordForm } from "./PasswordForm";
-import { Player } from "./Player";
 import { loadSettings, rememberSettings } from "./preferences";
 import { localKey, useLocal } from "./storage";
 
-type View = "home" | "batch" | "editor" | "player";
+type View = "home" | "batch" | "editor";
 export function App({
   account,
   onLogout,
   embedded = false,
   onTask,
+  onDispatched,
   onPractice,
 }: {
   account: Account;
   onLogout: () => void;
   embedded?: boolean;
   onTask?: (batch: Batch) => void;
+  onDispatched?: (taskId: string) => void;
   onPractice?: (batch: Batch, follow: boolean) => void;
 }) {
   const [view, setView] = useState<View>("home");
@@ -47,24 +45,18 @@ export function App({
   const [notice, setNotice] = useState("");
   const [mode, setMode] = useState<Mode>("en2en");
   const [settings, setSettings] = useState<Settings>(defaultSettings);
-  const [startImmediately, setStartImmediately] = useState(false);
   const draft = useLocal(localKey("draft", account.id), draftSchema);
-  const progress = useLocal(localKey("progress", account.id), progressSchema);
-  const draftRef = useRef({ draft, progress });
-  draftRef.current = { draft, progress };
-  const screenKey = view === "player" ? `${view}-${progress.value?.phase ?? "player"}` : view;
+  const draftRef = useRef({ draft });
+  draftRef.current = { draft };
+  const screenKey = view;
   const screenTitle =
     view === "editor"
       ? draft.value?.batchId
         ? "编辑词表"
         : "新建听写"
-      : view === "player"
-        ? progress.value?.phase === "result"
-          ? "核对答案"
-          : MODES[progress.value?.mode ?? mode].label
-        : view === "batch"
-          ? (batch?.title ?? "听写词表")
-          : "听写词表";
+      : view === "batch"
+        ? (batch?.title ?? "听写词表")
+        : "听写词表";
   useEffect(() => {
     document.title = `${screenTitle} · 听写小站 · OwnClass`;
   }, [screenTitle]);
@@ -82,7 +74,7 @@ export function App({
   }, []);
   useEffect(() => {
     function protect(event: Event) {
-      if (draftRef.current.draft.error || draftRef.current.progress.error) {
+      if (draftRef.current.draft.error) {
         event.preventDefault();
       }
     }
@@ -210,104 +202,55 @@ export function App({
     }
     if (draft.write(blankDraft(b))) setView("editor");
   }
-  function start(onlyWrong = false) {
-    if (!batch) return;
-    if (progress.blocked) {
-      setNotice("本机进度尚未恢复，请先处理顶部提示");
-      return;
-    }
-    let entries = batch.entries;
-    if (onlyWrong) {
-      const previous = progress.value;
-      const ids = previous?.batchId === batch.id ? previous.wrongIds : [];
-      entries = entries.filter((e) => ids.includes(e.id));
-    }
-    let ids = createQueue(entries, mode).map((q) => q.entry.id);
-    if (!ids.length) {
-      setNotice("这个模式下没有可用词条，请选择其他模式");
-      return;
-    }
-    if (settings.shuffle) {
-      ids = [...ids];
-      for (let i = ids.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [ids[i], ids[j]] = [ids[j], ids[i]];
-      }
-    }
-    const next: Progress = {
-      version: 1,
-      batchId: batch.id,
-      revision: batch.revision,
-      mode,
-      settings,
-      ids,
-      index: 0,
-      results: {},
-      wrongIds: progress.value?.batchId === batch.id ? progress.value.wrongIds : [],
-      phase: "player",
-    };
-    if (progress.write(next)) {
-      setStartImmediately(true);
-      setView("player");
-      setNotice("");
-    }
-  }
-  const compatible =
-    !!batch &&
-    progress.value?.batchId === batch.id &&
-    progress.value.revision === batch.revision &&
-    progress.value.ids.every((id) =>
-      batch.entries.some((e) => e.id === id && e.modes.includes(progress.value?.mode ?? "en2en")),
-    );
-  const wrongCount =
-    progress.value?.batchId === batch?.id ? (progress.value?.wrongIds.length ?? 0) : 0;
   const filtered = list.filter((b) =>
     `${b.title} ${b.grade} ${b.unit}`.toLowerCase().includes(query.toLowerCase()),
   );
   return (
     <>
-      <button
-        type="button"
-        className="skip-link"
-        onClick={(event) => {
-          event.preventDefault();
-          document.getElementById("main")?.focus();
-        }}
-      >
-        跳到正文
-      </button>
       {!embedded && (
-        <header className="site-header">
-          <div className="header-inner">
-            <button type="button" className="brand subtle" onClick={home}>
-              <span className="brand-mark">
-                <Headphones size={22} aria-hidden="true" />
-              </span>
-              <span>
-                <strong>OwnClass</strong>
-                <span className="brand-sub">听写小站</span>
-              </span>
-            </button>
-            <span className="header-note">把时间，留给学习。</span>
-            <span className="account-name">{account.username}</span>
-            <details className="access">
-              <summary>账号</summary>
-              <PasswordForm onChanged={onLogout} disabled={!!draft.error || !!progress.error} />
-            </details>
-            <button
-              type="button"
-              onClick={() => {
-                if (draft.error || progress.error) {
-                  setNotice("请先导出或恢复保存失败的本机内容，再退出登录");
-                  return;
-                }
-                onLogout();
-              }}
-            >
-              退出登录
-            </button>
-          </div>
-        </header>
+        <>
+          <button
+            type="button"
+            className="skip-link"
+            onClick={(event) => {
+              event.preventDefault();
+              document.getElementById("main")?.focus();
+            }}
+          >
+            跳到正文
+          </button>
+          <header className="site-header">
+            <div className="header-inner">
+              <button type="button" className="brand subtle" onClick={home}>
+                <span className="brand-mark">
+                  <Headphones size={22} aria-hidden="true" />
+                </span>
+                <span>
+                  <strong>OwnClass</strong>
+                  <span className="brand-sub">听写小站</span>
+                </span>
+              </button>
+              <span className="header-note">把时间，留给学习。</span>
+              <span className="account-name">{account.username}</span>
+              <details className="access">
+                <summary>账号</summary>
+                <PasswordForm onChanged={onLogout} disabled={!!draft.error} />
+              </details>
+              <button
+                type="button"
+                onClick={() => {
+                  if (draft.error) {
+                    setNotice("请先导出或恢复保存失败的本机内容，再退出登录");
+                    return;
+                  }
+                  onLogout();
+                }}
+              >
+                退出登录
+              </button>
+            </div>
+          </header>
+        </>
       )}
       <main id="main" data-screen={screenKey} tabIndex={-1}>
         {draft.error && (
@@ -331,31 +274,6 @@ export function App({
                 }}
               >
                 清理本机草稿
-              </button>
-            </div>
-          </section>
-        )}
-        {progress.error && (
-          <section className="notice error" role="alert">
-            <p>{progress.error}</p>
-            <div className="row">
-              <button
-                type="button"
-                disabled={progress.value === null && progress.raw === null}
-                onClick={() => download("听写进度备份.json", progress.value ?? progress.raw)}
-              >
-                导出进度备份
-              </button>
-              <button type="button" onClick={progress.retry}>
-                重试保存
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (confirm("确定清理本机进度？请先导出备份。")) progress.reset();
-                }}
-              >
-                清理本机进度
               </button>
             </div>
           </section>
@@ -399,7 +317,6 @@ export function App({
                 query={query}
                 setQuery={setQuery}
                 draft={draft}
-                progress={progress}
                 edit={() => edit()}
                 open={open}
                 onResume={() => setView("editor")}
@@ -416,17 +333,10 @@ export function App({
                   setSettings(s);
                   rememberSettings(batch.id, s, account.id);
                 }}
-                progress={progress.value}
-                compatible={compatible}
-                wrongCount={wrongCount}
                 onEdit={() => edit(batch)}
                 onTask={() => onTask?.(batch)}
+                onDispatched={onDispatched}
                 onPractice={onPractice ? (follow) => onPractice(batch, follow) : undefined}
-                onResume={() => {
-                  setStartImmediately(false);
-                  setView("player");
-                }}
-                onStart={start}
                 onBack={home}
                 onNotice={setNotice}
               />
@@ -444,19 +354,6 @@ export function App({
                 onBack={() => (batch ? setView("batch") : home())}
                 ocrEnabled={health.ocr}
                 blocked={draft.blocked}
-              />
-            )}
-            {view === "player" && batch && progress.value && compatible && (
-              <Player
-                batch={batch}
-                progress={progress.value}
-                onChange={(p) => {
-                  rememberSettings(p.batchId, p.settings, account.id);
-                  return progress.write(p);
-                }}
-                onBack={() => setView("batch")}
-                ttsEnabled={health.tts}
-                autoStart={startImmediately}
               />
             )}
           </>

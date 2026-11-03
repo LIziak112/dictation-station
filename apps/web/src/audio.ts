@@ -2,6 +2,7 @@ import type { AudioDriver } from "../../../packages/core/src/player";
 
 export class BrowserAudio implements AudioDriver {
   private audio = new Audio();
+  utterance: SpeechSynthesisUtterance | null = null;
   private pending: (() => void) | null = null;
   private urls = new Map<string, string>();
   constructor(private accent: "us" | "uk" = "us") {}
@@ -17,6 +18,7 @@ export class BrowserAudio implements AudioDriver {
   cancel() {
     this.pending?.();
     this.pending = null;
+    this.utterance = null;
     this.audio.pause();
     this.audio.removeAttribute("src");
     this.audio.load();
@@ -39,12 +41,14 @@ export class BrowserAudio implements AudioDriver {
         done = true;
         clearTimeout(timer);
         this.pending = null;
+        this.utterance = null;
         if (error) reject(new Error(error));
         else resolve();
       };
       this.pending = () => finish();
       const timer = setTimeout(() => finish("朗读超时，请重试或切换语音方式"), 60000);
-      const url = this.urls.get(audioKey ?? `${lang}|${text}`);
+      const url =
+        (audioKey ? this.urls.get(audioKey) : undefined) ?? this.urls.get(`${lang}|${text}`);
       if (url) {
         this.audio.src = url;
         this.audio.playbackRate = speed;
@@ -56,11 +60,17 @@ export class BrowserAudio implements AudioDriver {
           finish("当前设备不支持朗读，请使用服务器语音或其他浏览器");
           return;
         }
+        if (speechSynthesis.paused) speechSynthesis.resume();
         const u = new SpeechSynthesisUtterance(text);
+        this.utterance = u;
         u.lang = lang === "en" ? (this.accent === "uk" ? "en-GB" : "en-US") : "zh-CN";
         u.rate = 0.9 * speed;
         u.onend = () => finish();
-        u.onerror = () => finish("设备朗读失败，请点击播放重试");
+        u.onerror = (event: SpeechSynthesisErrorEvent) => {
+          const code = event?.error;
+          if (code === "canceled" || code === "interrupted") finish();
+          else finish("设备朗读失败，请点击播放重试");
+        };
         speechSynthesis.speak(u);
       }
     });

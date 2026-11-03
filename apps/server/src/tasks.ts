@@ -5,30 +5,96 @@ import {
   type Attempt,
   attemptSchema,
   attemptUpdateSchema,
+  type ChildCorrectionItem,
+  type ChildOverview,
   entrySchema,
   MODES,
   type Task,
   type TaskAudio,
+  type TaskSummary,
   taskInputSchema,
   taskSchema,
 } from "../../../packages/contract/src/index";
-import { interleaveReview } from "../../../packages/core/src/scheduling";
+import { addDays, interleaveReview, localDate } from "../../../packages/core/src/scheduling";
 import { Learning } from "./learning";
 import type { Pronunciation } from "./pronunciation";
 import { attempts, tasks, words } from "./schema";
 import { Conflict, type Store } from "./store";
 
 const id = () => randomBytes(12).toString("base64url");
+const LEASE_TIMEOUT_MS = 30_000;
+
 export class Tasks {
   constructor(readonly store: Store) {}
   list(accountId: string) {
+    const preferences = new Learning(this.store).preferences(accountId);
+    const today = localDate(new Date(), preferences.timezone);
     return this.store.db
       .select()
       .from(tasks)
       .where(eq(tasks.accountId, accountId))
       .all()
-      .map((row) => taskSchema.parse(JSON.parse(row.payload)))
+      .map((row) => {
+        const parsed = taskSchema.parse(JSON.parse(row.payload));
+        if (parsed.status === "pending" && today > addDays(parsed.date, 1)) {
+          const expired: Task = { ...parsed, status: "expired", revision: parsed.revision + 1 };
+          this.write(accountId, expired);
+          this.store.logAudit(
+            accountId,
+            "task.expired",
+            `任务跨日未开始自动过期：${parsed.title}`,
+            "system",
+          );
+          return expired;
+        }
+        return parsed;
+      })
       .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+  }
+  summarize(accountId: string): TaskSummary[] {
+    const taskList = this.list(accountId);
+    const allAttempts = this.listAttempts(accountId);
+    return taskList.map(({ items, audio: _audio, ...task }) => {
+      const taskAttempts = allAttempts.filter((a) => a.taskId === task.id);
+      const active = taskAttempts.find((a) => !a.completedAt && !a.interruptedAt);
+      const latestCompleted = taskAttempts.filter((a) => a.completedAt).at(-1);
+      const latestInterrupted = taskAttempts.filter((a) => a.interruptedAt).at(-1);
+      const wrongCount = latestCompleted
+        ? items.filter(
+            (item) =>
+              latestCompleted.results[item.wordId] === "wrong" ||
+              latestCompleted.results[item.wordId] === "uncertain",
+          ).length
+        : undefined;
+      const uncorrectedCount = latestCompleted
+        ? items.filter(
+            (item) =>
+              (latestCompleted.results[item.wordId] === "wrong" ||
+                latestCompleted.results[item.wordId] === "uncertain") &&
+              !latestCompleted.corrections.includes(item.wordId),
+          ).length
+        : undefined;
+      const spotCheckWords =
+        latestCompleted && latestCompleted.spotCheckWordIds.length > 0
+          ? items
+              .filter((item) => latestCompleted.spotCheckWordIds.includes(item.wordId))
+              .map((item) => item.entry.en || item.entry.zh)
+          : undefined;
+      return {
+        ...task,
+        count: items.length,
+        reviewCount: items.filter((item) => item.source === "review").length,
+        progressIndex: active
+          ? active.index
+          : latestInterrupted
+            ? latestInterrupted.index
+            : undefined,
+        activeAttemptId: (active ?? latestCompleted ?? latestInterrupted)?.id,
+        wrongCount,
+        uncorrectedCount,
+        spotCheckWords,
+      };
+    });
   }
   get(accountId: string, taskId: string) {
     const row = this.store.db
@@ -131,6 +197,12 @@ export class Tasks {
       .insert(tasks)
       .values({ id: task.id, accountId, payload: JSON.stringify(task) })
       .run();
+    this.store.logAudit(
+      accountId,
+      "task.dispatched",
+      `派发任务：${task.title}（${task.items.length} 词）`,
+      "parent",
+    );
     return task;
   }
   update(accountId: string, taskId: string, revision: number, value: unknown) {
@@ -148,6 +220,55 @@ export class Tasks {
       };
       this.write(accountId, task);
       return task;
+    });
+  }
+  withdraw(accountId: string, taskId: string, revision?: number) {
+    return this.store.db.transaction(() => {
+      const task = this.require(accountId, taskId);
+      if (revision !== undefined && task.revision !== revision) throw new Conflict();
+      if (task.status !== "pending" && task.status !== "in_progress")
+        throw new HTTPException(400, { message: "只有待开始或进行中的任务可以撤回" });
+      const active = this.listAttempts(accountId, taskId).find(
+        (attempt) => !attempt.completedAt && !attempt.interruptedAt,
+      );
+      if (active) {
+        this.writeAttempt(accountId, {
+          ...active,
+          interruptedAt: new Date().toISOString(),
+          revision: active.revision + 1,
+        });
+      }
+      const next: Task = {
+        ...task,
+        status: "withdrawn",
+        revision: task.revision + 1,
+      };
+      this.write(accountId, next);
+      this.store.logAudit(
+        accountId,
+        "task.withdrawn",
+        `撤回任务：${task.title}${active ? `（已完成至第 ${active.index + 1}/${task.items.length} 词，已按中断留档）` : ""}`,
+        "parent",
+      );
+      return next;
+    });
+  }
+  reschedule(accountId: string, taskId: string) {
+    return this.store.db.transaction(() => {
+      const task = this.require(accountId, taskId);
+      if (task.status !== "expired" && task.status !== "withdrawn")
+        throw new HTTPException(400, { message: "只有已过期或已撤回的任务可以重派" });
+      const preferences = new Learning(this.store).preferences(accountId);
+      const today = localDate(new Date(), preferences.timezone);
+      const next: Task = {
+        ...task,
+        date: today,
+        status: "pending",
+        revision: task.revision + 1,
+      };
+      this.write(accountId, next);
+      this.store.logAudit(accountId, "task.dispatched", `重派任务到今日：${task.title}`, "parent");
+      return next;
     });
   }
   listAttempts(accountId: string, taskId?: string) {
@@ -171,11 +292,54 @@ export class Tasks {
     if (!row) throw new HTTPException(404, { message: "听写记录不存在" });
     return attemptSchema.parse(JSON.parse(row.payload));
   }
-  start(accountId: string, taskId: string, onlyHomework: boolean) {
+  start(
+    accountId: string,
+    taskId: string,
+    onlyHomework: boolean,
+    deviceId = "",
+    forceTakeover = false,
+    isChildMode = false,
+  ) {
     return this.store.db.transaction(() => {
       const task = this.require(accountId, taskId);
-      const active = this.listAttempts(accountId, taskId).find((attempt) => !attempt.completedAt);
-      if (active) return active;
+      if (task.status === "withdrawn")
+        throw new HTTPException(400, { message: "该任务已被家长撤回" });
+      if (task.status === "expired")
+        throw new HTTPException(400, { message: "该任务已过期，请找家长重派后再开始" });
+      const otherActive = this.list(accountId).find(
+        (other) => other.id !== taskId && other.status === "in_progress",
+      );
+      if (otherActive)
+        throw new HTTPException(409, {
+          message: `同一时间只能进行一份任务，请先完成或交卷「${otherActive.title}」`,
+        });
+      const active = this.listAttempts(accountId, taskId).find(
+        (attempt) => !attempt.completedAt && !attempt.interruptedAt,
+      );
+      if (active) {
+        if (
+          deviceId &&
+          active.activeDeviceId &&
+          active.activeDeviceId !== deviceId &&
+          !forceTakeover
+        ) {
+          const lastBeat = active.heartbeatAt ? new Date(active.heartbeatAt).getTime() : 0;
+          if (Date.now() - lastBeat < LEASE_TIMEOUT_MS)
+            throw new Conflict(
+              `任务正在另一台设备进行（第 ${active.index + 1}/${task.items.length} 项），是否在此设备接管？`,
+            );
+        }
+        if (deviceId && (active.activeDeviceId !== deviceId || forceTakeover)) {
+          const taken: Attempt = {
+            ...active,
+            activeDeviceId: deviceId,
+            heartbeatAt: new Date().toISOString(),
+          };
+          this.writeAttempt(accountId, taken);
+          return taken;
+        }
+        return active;
+      }
       if (onlyHomework && task.status !== "pending")
         throw new HTTPException(400, { message: "已经开始的任务请复制后调整范围" });
       if (onlyHomework) {
@@ -186,6 +350,7 @@ export class Tasks {
       }
       if (!task.items.length) throw new HTTPException(400, { message: "任务没有可练内容" });
       this.write(accountId, { ...task, status: "in_progress", revision: task.revision + 1 });
+      const now = new Date().toISOString();
       const attempt: Attempt = {
         id: id(),
         taskId,
@@ -194,25 +359,48 @@ export class Tasks {
         phase: "player",
         results: {},
         corrections: [],
-        startedAt: new Date().toISOString(),
+        startedAt: now,
         completedAt: null,
+        interruptedAt: null,
+        activeDeviceId: deviceId,
+        heartbeatAt: now,
+        spotCheckWordIds: [],
       };
       this.store.db
         .insert(attempts)
         .values({ id: attempt.id, accountId, taskId, payload: JSON.stringify(attempt) })
         .run();
+      this.store.logAudit(
+        accountId,
+        "task.started",
+        `开始听写：${task.title}`,
+        isChildMode ? "child" : "parent",
+      );
       return attempt;
     });
   }
-  save(accountId: string, attemptId: string, value: unknown) {
+  save(accountId: string, attemptId: string, value: unknown, isChildMode = false) {
     const input = attemptUpdateSchema.parse(value);
     return this.store.db.transaction(() => {
       const previous = this.attempt(accountId, attemptId);
+      const task = this.require(accountId, previous.taskId);
+      if (task.status === "withdrawn" || previous.interruptedAt)
+        throw new Conflict("家长已撤回该任务，本次练习已停止");
+      if (
+        previous.phase === "player" &&
+        input.deviceId &&
+        previous.activeDeviceId &&
+        previous.activeDeviceId !== input.deviceId &&
+        !input.forceTakeover
+      ) {
+        const lastBeat = previous.heartbeatAt ? new Date(previous.heartbeatAt).getTime() : 0;
+        if (Date.now() - lastBeat < LEASE_TIMEOUT_MS)
+          throw new Conflict("该任务已在另一台设备接管，当前设备已暂停");
+      }
       if (previous.revision !== input.revision) throw new Conflict();
       if (previous.phase === "review" && input.phase === "player")
         throw new HTTPException(400, { message: "核对后请新建一次练习" });
       if (previous.completedAt) throw new HTTPException(400, { message: "已完成的记录不能覆盖" });
-      const task = this.require(accountId, previous.taskId);
       if (
         input.index >= task.items.length ||
         Object.keys(input.results).some(
@@ -220,9 +408,57 @@ export class Tasks {
         )
       )
         throw new HTTPException(400, { message: "核对内容或进度不属于本任务" });
-      const attempt = { ...previous, ...input, revision: previous.revision + 1 };
+      const now = new Date().toISOString();
+      const attempt: Attempt = {
+        ...previous,
+        index: input.index,
+        phase: input.phase,
+        results: isChildMode && !task.allowSelfReview ? previous.results : input.results,
+        activeDeviceId: input.deviceId || previous.activeDeviceId,
+        heartbeatAt: now,
+        revision: previous.revision + 1,
+      };
       this.writeAttempt(accountId, attempt);
+      if (
+        input.phase === "review" &&
+        previous.phase === "player" &&
+        (task.status === "in_progress" || task.status === "pending")
+      ) {
+        this.write(accountId, { ...task, status: "submitted", revision: task.revision + 1 });
+        this.store.logAudit(
+          accountId,
+          "attempt.submitted",
+          `完成听写并交卷：${task.title}`,
+          isChildMode ? "child" : "parent",
+        );
+      }
       return attempt;
+    });
+  }
+  returnForRedo(accountId: string, attemptId: string, revision: number, resetIndex = true) {
+    return this.store.db.transaction(() => {
+      const attempt = this.attempt(accountId, attemptId);
+      if (attempt.completedAt)
+        throw new HTTPException(400, { message: "已完成的任务不可退回，请使用错词重派" });
+      if (attempt.revision !== revision) throw new Conflict();
+      const task = this.require(accountId, attempt.taskId);
+      const nextAttempt: Attempt = {
+        ...attempt,
+        phase: "player",
+        index: resetIndex ? 0 : attempt.index,
+        results: resetIndex ? {} : attempt.results,
+        heartbeatAt: new Date().toISOString(),
+        revision: attempt.revision + 1,
+      };
+      this.writeAttempt(accountId, nextAttempt);
+      this.write(accountId, { ...task, status: "in_progress", revision: task.revision + 1 });
+      this.store.logAudit(
+        accountId,
+        "attempt.returned",
+        `家长退回任务重做：${task.title}`,
+        "parent",
+      );
+      return nextAttempt;
     });
   }
   writeAttempt(accountId: string, attempt: Attempt) {
@@ -232,24 +468,50 @@ export class Tasks {
       .where(and(eq(attempts.accountId, accountId), eq(attempts.id, attempt.id)))
       .run();
   }
-  complete(accountId: string, attemptId: string, revision: number, confirmRemaining: boolean) {
+  complete(
+    accountId: string,
+    attemptId: string,
+    revision: number,
+    confirmRemaining: boolean,
+    isChildMode = false,
+  ) {
     return this.store.db.transaction(() => {
       const attempt = this.attempt(accountId, attemptId);
       if (attempt.completedAt) return attempt;
       if (attempt.revision !== revision) throw new Conflict();
-      if (attempt.phase !== "review") throw new HTTPException(400, { message: "请先进入核对页面" });
       const task = this.require(accountId, attempt.taskId);
+      if (isChildMode && !task.allowSelfReview)
+        throw new HTTPException(403, { message: "该任务需由家长核对批改" });
+      if (attempt.phase !== "review") throw new HTTPException(400, { message: "请先进入核对页面" });
       for (const item of task.items)
         attempt.results[item.wordId] ??= confirmRemaining ? "correct" : "unchecked";
+      if (isChildMode && task.allowSelfReview) {
+        const correctIds = task.items
+          .map((item) => item.wordId)
+          .filter((wordId) => attempt.results[wordId] === "correct");
+        attempt.spotCheckWordIds = correctIds.slice(0, Math.min(2, correctIds.length));
+      }
       attempt.completedAt = new Date().toISOString();
       attempt.revision++;
       new Learning(this.store).apply(accountId, task, attempt);
       this.writeAttempt(accountId, attempt);
       this.write(accountId, { ...task, status: "completed", revision: task.revision + 1 });
+      this.store.logAudit(
+        accountId,
+        "attempt.completed",
+        `${isChildMode ? "孩子自主核对完成" : "家长完成批改"}：${task.title}`,
+        isChildMode ? "child" : "parent",
+      );
       return attempt;
     });
   }
-  correct(accountId: string, attemptId: string, revision: number, wordIds: string[]) {
+  correct(
+    accountId: string,
+    attemptId: string,
+    revision: number,
+    wordIds: string[],
+    isChildMode = false,
+  ) {
     return this.store.db.transaction(() => {
       const attempt = this.attempt(accountId, attemptId);
       if (!attempt.completedAt) throw new HTTPException(400, { message: "完成核对后才能记订正" });
@@ -264,8 +526,143 @@ export class Tasks {
         revision: attempt.revision + 1,
       };
       this.writeAttempt(accountId, next);
+      this.store.logAudit(
+        accountId,
+        "attempt.corrected",
+        `标记错词已订正：${task.title}（${wordIds.length} 项）`,
+        isChildMode ? "child" : "parent",
+      );
       return next;
     });
+  }
+  redispatchWrong(accountId: string, attemptId: string) {
+    const attempt = this.attempt(accountId, attemptId);
+    if (!attempt.completedAt)
+      throw new HTTPException(400, { message: "请先完成批改再派发错词复练" });
+    const task = this.require(accountId, attempt.taskId);
+    const wordIds = task.items
+      .map((item) => item.wordId)
+      .filter(
+        (wordId) => attempt.results[wordId] === "wrong" || attempt.results[wordId] === "uncertain",
+      );
+    if (!wordIds.length)
+      throw new HTTPException(400, { message: "本次听写没有错词或待确认项，无需重派" });
+    const preferences = new Learning(this.store).preferences(accountId);
+    const today = localDate(new Date(), preferences.timezone);
+    return this.create(accountId, {
+      title: `${task.title} · 错词复练`,
+      date: today,
+      mode: task.mode,
+      settings: task.settings,
+      selections: [],
+      wordIds,
+      reviewCount: 0,
+      allowSelfReview: task.allowSelfReview,
+      parentTaskId: task.id,
+    });
+  }
+  lockedWordIds(accountId: string) {
+    const locked = new Set<string>();
+    for (const task of this.list(accountId)) {
+      if (
+        task.status === "pending" ||
+        task.status === "in_progress" ||
+        task.status === "submitted"
+      ) {
+        for (const item of task.items) locked.add(item.wordId);
+      }
+    }
+    return locked;
+  }
+  childOverview(accountId: string): ChildOverview {
+    const summaries = this.summarize(accountId).filter(
+      (task) =>
+        task.status === "pending" ||
+        task.status === "in_progress" ||
+        task.status === "submitted" ||
+        task.status === "completed",
+    );
+    const statusOrder: Record<string, number> = {
+      in_progress: 0,
+      pending: 1,
+      submitted: 2,
+      completed: 3,
+    };
+    const sortedTasks = [...summaries].sort((a, b) => {
+      const orderDiff = (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9);
+      if (orderDiff !== 0) return orderDiff;
+      if (a.status === "pending") return a.createdAt.localeCompare(b.createdAt);
+      return b.createdAt.localeCompare(a.createdAt);
+    });
+    const allAttempts = this.listAttempts(accountId)
+      .filter((a) => a.completedAt !== null)
+      .sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? ""));
+    const corrections: ChildCorrectionItem[] = [];
+    for (const attempt of allAttempts) {
+      const task = this.get(accountId, attempt.taskId);
+      if (!task) continue;
+      const wrongWords = task.items.flatMap((item) => {
+        const res = attempt.results[item.wordId];
+        if (res !== "wrong" && res !== "uncertain") return [];
+        return [
+          {
+            wordId: item.wordId,
+            entry: item.entry,
+            result: res,
+            corrected: attempt.corrections.includes(item.wordId),
+          },
+        ];
+      });
+      if (wrongWords.length > 0) {
+        corrections.push({
+          attemptId: attempt.id,
+          attemptRevision: attempt.revision,
+          taskId: task.id,
+          taskTitle: task.title,
+          taskDate: task.date,
+          mode: task.mode,
+          completedAt: attempt.completedAt as string,
+          totalCount: task.items.length,
+          correctCount: task.items.filter((i) => attempt.results[i.wordId] === "correct").length,
+          words: wrongWords,
+        });
+      }
+    }
+    const locked = this.lockedWordIds(accountId);
+    const batches = this.store.list(accountId).map(({ entries, ...batch }) => ({
+      ...batch,
+      count: entries.length,
+      lockedCount: entries.filter((e) => e.wordId && locked.has(e.wordId)).length,
+    }));
+    return {
+      tasks: sortedTasks,
+      corrections: corrections.slice(0, 15),
+      batches,
+    };
+  }
+  childListenBatch(accountId: string, batchId: string) {
+    const batch = this.store.get(accountId, batchId);
+    if (!batch) throw new HTTPException(404, { message: "词表不存在" });
+    const locked = this.lockedWordIds(accountId);
+    const maskedEntries = batch.entries.map((entry) => {
+      if (entry.wordId && locked.has(entry.wordId)) {
+        return {
+          ...entry,
+          en: entry.en ? "🔒 待考词（盲听）" : "",
+          zh: entry.zh ? "🔒 待考词（盲听）" : "",
+          pinyin: "",
+          hint: "",
+          alt: [],
+          reading: "",
+          readings: { en: "", zh: "" },
+        };
+      }
+      return entry;
+    });
+    return {
+      batch: { ...batch, entries: maskedEntries },
+      lockedWordIds: [...locked].filter((wid) => batch.entries.some((e) => e.wordId === wid)),
+    };
   }
   async prepareAudio(
     accountId: string,
@@ -274,7 +671,8 @@ export class Tasks {
     fallbackIds: string[],
   ) {
     const task = this.require(accountId, taskId);
-    if (task.status !== "pending") return task.audio;
+    if (task.status !== "pending" && task.audio.length > 0 && !fallbackIds.length)
+      return task.audio;
     const mode = MODES[task.mode],
       audio: TaskAudio[] = [];
     if (!mode.audio) return audio;

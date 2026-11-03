@@ -38,8 +38,15 @@ export function advanceLearning(
       dueDate: addDays(date, 1),
       manual: false,
     };
+  if (result === "uncertain")
+    return {
+      ...state,
+      status: "pending",
+      dueDate:
+        state.dueDate && state.dueDate <= addDays(date, 1) ? state.dueDate : addDays(date, 1),
+      manual: false,
+    };
   if (
-    result === "uncertain" ||
     state.status === "mastered" ||
     state.lastQualifiedDate === date ||
     state.lastWrongDate === date

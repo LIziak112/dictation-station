@@ -51,7 +51,7 @@ test("真人文件无法解码时重新请求合成兜底，覆盖数字反映�
   await page.route("**/audio/unplayable.ogg", (route) =>
     route.fulfill({ status: 200, contentType: "audio/ogg", body: "synthetic broken file" }),
   );
-  await page.goto(`./#task=${task.id}`);
+  await page.goto(`./?child=1#task=${task.id}`);
   await expect(page.getByText("真人 0 · 合成 1 · 不可用 0", { exact: true })).toBeVisible();
   expect(downgraded).toBe(true);
   await expect(page.getByRole("button", { name: "开始任务", exact: true })).toBeEnabled();

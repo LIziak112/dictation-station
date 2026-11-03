@@ -4,7 +4,7 @@ import {
   type TaskAudio,
   type TaskPlay,
 } from "../../../packages/contract/src/index";
-import { request } from "./api";
+import { childHeaders, request } from "./api";
 
 export interface PreparedAudio {
   clips: { audio: TaskAudio; blob: Blob }[];
@@ -13,7 +13,7 @@ export interface PreparedAudio {
   needsConfirmation: boolean;
 }
 export async function loadAudio(url: string, signal?: AbortSignal) {
-  const response = await fetch(url, { signal });
+  const response = await fetch(url, { signal, headers: childHeaders() });
   if (!response.ok) throw new Error("音频读取失败");
   const blob = await response.blob(),
     temporary = URL.createObjectURL(blob),

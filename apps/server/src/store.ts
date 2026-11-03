@@ -6,6 +6,8 @@ import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import {
+  type AuditLogItem,
+  auditLogItemSchema,
   type Batch,
   batchInputSchema,
   batchSchema,
@@ -14,11 +16,11 @@ import {
   updateSchema,
 } from "../../../packages/contract/src/index";
 import { contentKey } from "../../../packages/core/src/tasks";
-import { audioAccess, batches, words } from "./schema";
+import { audioAccess, batches, metadata, words } from "./schema";
 
 export class Conflict extends Error {
-  constructor() {
-    super("词表版本已变化，请保留草稿并重新载入");
+  constructor(message = "词表版本已变化，请保留草稿并重新载入") {
+    super(message);
   }
 }
 export class Store {
@@ -148,6 +150,51 @@ export class Store {
       .from(audioAccess)
       .where(and(eq(audioAccess.accountId, accountId), eq(audioAccess.file, file)))
       .get();
+  }
+  logAudit(
+    accountId: string,
+    action: string,
+    detail: string,
+    actor: "parent" | "child" | "system" = "parent",
+  ) {
+    const key = `audit:${accountId}`;
+    const existing = this.listAudit(accountId);
+    const entry: AuditLogItem = {
+      id: randomBytes(12).toString("base64url"),
+      action,
+      detail,
+      actor,
+      createdAt: new Date().toISOString(),
+    };
+    const next = [entry, ...existing].slice(0, 100);
+    this.db
+      .insert(metadata)
+      .values({ key, value: JSON.stringify(next) })
+      .onConflictDoUpdate({
+        target: metadata.key,
+        set: { value: JSON.stringify(next) },
+      })
+      .run();
+    return entry;
+  }
+  listAudit(accountId: string): AuditLogItem[] {
+    const row = this.db
+      .select()
+      .from(metadata)
+      .where(eq(metadata.key, `audit:${accountId}`))
+      .get();
+    if (!row) return [];
+    try {
+      const parsed: unknown = JSON.parse(row.value);
+      return Array.isArray(parsed)
+        ? parsed.flatMap((item) => {
+            const checked = auditLogItemSchema.safeParse(item);
+            return checked.success ? [checked.data] : [];
+          })
+        : [];
+    } catch {
+      return [];
+    }
   }
   delete(accountId: string, id: string, revision: number) {
     return this.db.transaction((tx) => {

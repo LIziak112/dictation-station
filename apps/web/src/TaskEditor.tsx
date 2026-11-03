@@ -43,6 +43,7 @@ export function TaskEditor({
           mode: initialTask.mode,
           settings: initialTask.settings,
           reviewOnly: false,
+          allowSelfReview: initialTask.allowSelfReview ?? false,
           reviewCount: 0,
           selections: [],
           wordIds: initialTask.items.map((item) => item.wordId),
@@ -61,6 +62,7 @@ export function TaskEditor({
           settings: { ...defaultSettings },
           wordIds: [],
           reviewOnly: false,
+          allowSelfReview: false,
           selections: initialBatch
             ? [{ batchId: initialBatch.id, entryIds: initialBatch.entries.map((e) => e.id) }]
             : [],
@@ -206,6 +208,17 @@ export function TaskEditor({
                   try {
                     const { batch } = await api.batch(id);
                     setBatches((previous) => [...previous, batch]);
+                    const allIds = batch.entries
+                      .filter((entry) => entry.modes.includes(input.mode))
+                      .map((entry) => entry.id);
+                    if (allIds.length) {
+                      patch({
+                        selections: [
+                          ...input.selections.filter((s) => s.batchId !== batch.id),
+                          { batchId: batch.id, entryIds: allIds },
+                        ],
+                      });
+                    }
                   } catch (error) {
                     setMessage(error instanceof Error ? error.message : "词表读取失败");
                   }
@@ -230,10 +243,29 @@ export function TaskEditor({
           </label>
           {initialTask && (
             <section className="task-source">
-              <h2>从原任务复用</h2>
+              <div className="row between">
+                <h2>从原任务复用</h2>
+                <div className="row">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      patch({
+                        wordIds: initialTask.items
+                          .filter((item) => item.entry.modes.includes(input.mode))
+                          .map((item) => item.wordId),
+                      })
+                    }
+                  >
+                    全选
+                  </button>
+                  <button type="button" onClick={() => patch({ wordIds: [] })}>
+                    清空选择
+                  </button>
+                </div>
+              </div>
               <div className="word-selection">
                 {initialTask.items.map((item, index) => (
-                  <label key={item.wordId} className="check">
+                  <label key={item.wordId} className="check word-select-item">
                     <input
                       type="checkbox"
                       checked={input.wordIds.includes(item.wordId)}
@@ -246,7 +278,11 @@ export function TaskEditor({
                         })
                       }
                     />
-                    {index + 1}. {item.entry.en || item.entry.zh}
+                    <span className="entry-index">{index + 1}</span>
+                    <strong>{item.entry.en || item.entry.zh}</strong>
+                    <span className="muted">
+                      {item.entry.en ? item.entry.zh : item.entry.pinyin}
+                    </span>
                   </label>
                 ))}
               </div>
@@ -272,9 +308,21 @@ export function TaskEditor({
                   <button
                     type="button"
                     onClick={() => {
+                      choose(
+                        batch.entries.filter((e) => e.modes.includes(input.mode)).map((e) => e.id),
+                      );
+                      setMessage("");
+                    }}
+                  >
+                    全选
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
                       try {
+                        const effectiveRange = range.trim() || `1-${batch.entries.length}`;
                         choose(
-                          selectRange(batch.entries, range)
+                          selectRange(batch.entries, effectiveRange)
                             .filter((e) => e.modes.includes(input.mode))
                             .map((e) => e.id),
                         );
@@ -292,7 +340,7 @@ export function TaskEditor({
                 </div>
                 <div className="word-selection">
                   {batch.entries.map((entry, index) => (
-                    <label key={entry.id} className="check">
+                    <label key={entry.id} className="check word-select-item">
                       <input
                         type="checkbox"
                         disabled={!entry.modes.includes(input.mode)}
@@ -305,7 +353,10 @@ export function TaskEditor({
                           )
                         }
                       />
-                      {index + 1}. {entry.en || entry.zh} {entry.en ? entry.zh : entry.pinyin}
+                      <span className="entry-index">{index + 1}</span>
+                      <strong>{entry.en || entry.zh}</strong>
+                      <span className="muted">{entry.en ? entry.zh : entry.pinyin}</span>
+                      {entry.hint && <span className="small muted">（{entry.hint}）</span>}
                     </label>
                   ))}
                 </div>
@@ -484,6 +535,14 @@ export function TaskEditor({
                   }
                 />
                 自动下一项
+              </label>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={input.allowSelfReview}
+                  onChange={(e) => patch({ allowSelfReview: e.target.checked })}
+                />
+                允许孩子交卷后自主核对答案（家长抽查）
               </label>
             </div>
           </details>

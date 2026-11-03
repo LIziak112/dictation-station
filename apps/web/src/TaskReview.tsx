@@ -16,10 +16,14 @@ import { taskApi } from "./task-api";
 export function TaskReview({
   attemptId,
   accountId,
+  child = false,
+  onRedispatched,
   onBack,
 }: {
   attemptId: string;
   accountId: string;
+  child?: boolean;
+  onRedispatched?: (taskId: string) => void;
   onBack: () => void;
 }) {
   const [detail, setDetail] = useState<{ task: Task; attempt: Attempt } | null>(null);
@@ -50,6 +54,8 @@ export function TaskReview({
           accountId={accountId}
           initial={detail.attempt}
           task={detail.task}
+          child={child}
+          onRedispatched={onRedispatched}
           onBack={onBack}
         />
       ) : (
@@ -62,11 +68,15 @@ function ReviewSession({
   accountId,
   initial,
   task,
+  child,
+  onRedispatched,
   onBack,
 }: {
   accountId: string;
   initial: Attempt;
   task: Task;
+  child: boolean;
+  onRedispatched?: (taskId: string) => void;
   onBack: () => void;
 }) {
   const [saved, setSaved] = useState(initial);
@@ -256,28 +266,91 @@ function ReviewSession({
             已全部核对，其余正确
           </label>
           <p className="small muted">未确认时，其余项保留“未核对”，不会算作通过。</p>
-          <button
-            className="primary"
-            type="button"
-            disabled={busy || !!local.value || local.blocked}
-            onClick={async () => {
-              setBusy(true);
-              setMessage("");
-              try {
-                const result = await taskApi.complete(attempt.id, attempt.revision, confirmed);
-                setSaved(result.attempt);
-                setMessage("今天完成了，核对记录已保存。");
-              } catch (e) {
-                setMessage(e instanceof Error ? e.message : "完成失败，请重试");
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            保存核对并完成
-          </button>
+          <div className="row">
+            <button
+              className="primary"
+              type="button"
+              disabled={busy || !!local.value || local.blocked}
+              onClick={async () => {
+                setBusy(true);
+                setMessage("");
+                try {
+                  const result = await taskApi.complete(attempt.id, attempt.revision, confirmed);
+                  setSaved(result.attempt);
+                  setMessage("今天完成了，核对记录已保存。");
+                } catch (e) {
+                  setMessage(e instanceof Error ? e.message : "完成失败，请重试");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              保存核对并完成
+            </button>
+            {!child && (
+              <button
+                type="button"
+                disabled={busy || !!local.value}
+                onClick={async () => {
+                  if (!confirm("确定将任务退回给孩子重做吗？退回后任务将恢复为进行中状态。"))
+                    return;
+                  setBusy(true);
+                  try {
+                    await taskApi.returnForRedo(attempt.id, attempt.revision, true);
+                    onBack();
+                  } catch (e) {
+                    setMessage(e instanceof Error ? e.message : "退回失败");
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                退回让孩子重做
+              </button>
+            )}
+          </div>
         </section>
       )}
+      {attempt.completedAt && !child && attempt.spotCheckWordIds.length > 0 && (
+        <section className="notice" role="status">
+          <p>
+            孩子已完成自主核对 · 建议家长抽查纸面拼写：
+            <strong>
+              {task.items
+                .filter((i) => attempt.spotCheckWordIds.includes(i.wordId))
+                .map((i) => i.entry.en || i.entry.zh)
+                .join("、")}
+            </strong>
+          </p>
+        </section>
+      )}
+      {attempt.completedAt &&
+        !child &&
+        task.items.some(
+          (i) => attempt.results[i.wordId] === "wrong" || attempt.results[i.wordId] === "uncertain",
+        ) && (
+          <div className="row">
+            <button
+              type="button"
+              className="primary"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  const { task: created } = await taskApi.redispatchWrong(attempt.id);
+                  if (onRedispatched) onRedispatched(created.id);
+                  else onBack();
+                } catch (e) {
+                  setMessage(e instanceof Error ? e.message : "错词重派失败");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              错词再派发一次
+            </button>
+          </div>
+        )}
       {attempt.completedAt && <ReportCard task={task} attempt={attempt} />}
     </>
   );

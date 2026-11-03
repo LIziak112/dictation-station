@@ -272,6 +272,16 @@ export const draftSchema = z.strictObject({
 });
 export type Draft = z.infer<typeof draftSchema>;
 
+export const taskStatusSchema = z.enum([
+  "pending",
+  "in_progress",
+  "submitted",
+  "completed",
+  "withdrawn",
+  "expired",
+]);
+export type TaskStatus = z.infer<typeof taskStatusSchema>;
+
 export const taskInputSchema = z.strictObject({
   title: text(80).min(1),
   date: z.iso.date(),
@@ -284,6 +294,8 @@ export const taskInputSchema = z.strictObject({
   reviewCount: z.number().int().min(0).max(20).optional(),
   reviewPlacement: z.enum(["interleave", "end"]).optional(),
   reviewOnly: z.boolean().default(false),
+  allowSelfReview: z.boolean().default(false),
+  parentTaskId: idSchema.optional(),
 });
 export type TaskInput = z.infer<typeof taskInputSchema>;
 export const taskItemSchema = z.object({
@@ -299,15 +311,23 @@ export const taskSchema = z.object({
   mode: modeSchema,
   settings: settingsSchema,
   items: z.array(taskItemSchema).min(1).max(500),
-  status: z.enum(["pending", "in_progress", "completed"]),
+  status: taskStatusSchema,
+  allowSelfReview: z.boolean().default(false),
+  parentTaskId: idSchema.optional(),
   revision: z.number().int().positive(),
   createdAt: z.iso.datetime(),
   audio: z.array(z.lazy(() => taskAudioSchema)).default([]),
 });
 export type Task = z.infer<typeof taskSchema>;
-export const taskSummarySchema = taskSchema
-  .omit({ items: true, audio: true })
-  .extend({ count: z.number(), reviewCount: z.number() });
+export const taskSummarySchema = taskSchema.omit({ items: true, audio: true }).extend({
+  count: z.number(),
+  reviewCount: z.number(),
+  progressIndex: z.number().int().nonnegative().optional(),
+  activeAttemptId: idSchema.optional(),
+  wrongCount: z.number().int().nonnegative().optional(),
+  uncorrectedCount: z.number().int().nonnegative().optional(),
+  spotCheckWords: z.array(z.string()).optional(),
+});
 export type TaskSummary = z.infer<typeof taskSummarySchema>;
 export const taskListSchema = z.object({ tasks: z.array(taskSummarySchema) });
 export const taskResponseSchema = z.object({ task: taskSchema });
@@ -317,32 +337,52 @@ export const attemptUpdateSchema = z.strictObject({
   index: z.number().int().nonnegative(),
   phase: z.enum(["player", "review"]),
   results: z.record(idSchema, resultSchema),
+  deviceId: z.string().max(120).optional(),
+  forceTakeover: z.boolean().optional(),
 });
-export const attemptSchema = attemptUpdateSchema.extend({
+export const attemptSchema = z.object({
   id: idSchema,
   taskId: idSchema,
+  revision: z.number().int().positive(),
+  index: z.number().int().nonnegative(),
+  phase: z.enum(["player", "review"]),
+  results: z.record(idSchema, resultSchema),
   startedAt: z.iso.datetime(),
   completedAt: z.iso.datetime().nullable(),
+  interruptedAt: z.iso.datetime().nullable().default(null),
+  activeDeviceId: z.string().default(""),
+  heartbeatAt: z.iso.datetime().optional(),
+  spotCheckWordIds: z.array(idSchema).default([]),
   corrections: z.array(idSchema),
 });
 export type Attempt = z.infer<typeof attemptSchema>;
 export type AttemptUpdate = z.infer<typeof attemptUpdateSchema>;
 export const attemptResponseSchema = z.object({ attempt: attemptSchema });
-export const taskPlaySchema = taskSummarySchema.omit({ count: true, reviewCount: true }).extend({
-  homeworkCount: z.number().int().nonnegative(),
-  audio: z.array(z.lazy(() => taskAudioSchema)).default([]),
-  items: z.array(
-    z.object({
-      wordId: idSchema,
-      audioKey: idSchema,
-      prompt: z.string(),
-      audioText: z.string(),
-      lang: z.enum(["en", "zh"]).nullable(),
-      kind: z.string(),
-      reading: z.string(),
-    }),
-  ),
-});
+export const taskPlaySchema = taskSummarySchema
+  .omit({
+    count: true,
+    reviewCount: true,
+    progressIndex: true,
+    activeAttemptId: true,
+    wrongCount: true,
+    uncorrectedCount: true,
+    spotCheckWords: true,
+  })
+  .extend({
+    homeworkCount: z.number().int().nonnegative(),
+    audio: z.array(z.lazy(() => taskAudioSchema)).default([]),
+    items: z.array(
+      z.object({
+        wordId: idSchema,
+        audioKey: idSchema,
+        prompt: z.string(),
+        audioText: z.string(),
+        lang: z.enum(["en", "zh"]).nullable(),
+        kind: z.string(),
+        reading: z.string(),
+      }),
+    ),
+  });
 export type TaskPlay = z.infer<typeof taskPlaySchema>;
 export const taskPlayResponseSchema = z.object({
   task: taskPlaySchema,
@@ -353,7 +393,18 @@ export const attemptCompleteSchema = z.strictObject({
   revision: z.number().int().positive(),
   confirmRemaining: z.boolean(),
 });
-export const startTaskSchema = z.strictObject({ onlyHomework: z.boolean().default(false) });
+export const startTaskSchema = z.strictObject({
+  onlyHomework: z.boolean().default(false),
+  deviceId: z.string().max(120).default(""),
+  forceTakeover: z.boolean().default(false),
+});
+export const taskWithdrawSchema = z.strictObject({
+  revision: z.number().int().positive().optional(),
+});
+export const attemptReturnSchema = z.strictObject({
+  revision: z.number().int().positive(),
+  resetIndex: z.boolean().default(false),
+});
 export const attemptDetailSchema = z.object({ task: taskSchema, attempt: attemptSchema });
 export const correctionSchema = z.strictObject({
   revision: z.number().int().positive(),
@@ -417,6 +468,7 @@ export const manualLearningSchema = z.strictObject({
   status: z.enum(["pending", "mastered"]),
 });
 export const pronunciationInputSchema = z.strictObject({
+  wordId: idSchema.optional(),
   synthetic: z.boolean().optional(),
   pinyin: z.string().max(300).optional(),
   text: z.string().trim().min(1).max(300),
@@ -504,4 +556,65 @@ export const agentValidationSchema = z.object({
   issues: z.array(
     z.object({ level: z.enum(["error", "warn"]), path: z.string(), message: z.string() }),
   ),
+});
+
+export const childTokenInfoSchema = z.object({
+  id: idSchema,
+  createdAt: z.iso.datetime(),
+  expiresAt: z.iso.datetime(),
+  lastAccessedAt: z.iso.datetime().nullable().default(null),
+  lastAccessAgent: z.string().default(""),
+});
+export type ChildTokenInfo = z.infer<typeof childTokenInfoSchema>;
+export const childTokenStatusSchema = z.object({
+  active: z.array(childTokenInfoSchema),
+});
+export const childTokenCreatedSchema = z.object({
+  token: z.string(),
+  info: childTokenInfoSchema,
+});
+export const childCorrectionItemSchema = z.object({
+  attemptId: idSchema,
+  attemptRevision: z.number().int().positive(),
+  taskId: idSchema,
+  taskTitle: z.string(),
+  taskDate: z.iso.date(),
+  mode: modeSchema,
+  completedAt: z.iso.datetime(),
+  totalCount: z.number().int().nonnegative(),
+  correctCount: z.number().int().nonnegative(),
+  words: z.array(
+    z.object({
+      wordId: idSchema,
+      entry: entrySchema,
+      result: z.enum(["wrong", "uncertain"]),
+      corrected: z.boolean(),
+    }),
+  ),
+});
+export type ChildCorrectionItem = z.infer<typeof childCorrectionItemSchema>;
+export const childBatchSummarySchema = batchSummarySchema.extend({
+  lockedCount: z.number().int().nonnegative().default(0),
+});
+export type ChildBatchSummary = z.infer<typeof childBatchSummarySchema>;
+export const childOverviewSchema = z.object({
+  tasks: z.array(taskSummarySchema),
+  corrections: z.array(childCorrectionItemSchema),
+  batches: z.array(childBatchSummarySchema),
+});
+export type ChildOverview = z.infer<typeof childOverviewSchema>;
+export const childListenBatchSchema = z.object({
+  batch: batchSchema,
+  lockedWordIds: z.array(idSchema).default([]),
+});
+export const auditLogItemSchema = z.object({
+  id: idSchema,
+  action: z.string(),
+  detail: z.string(),
+  actor: z.enum(["parent", "child", "system"]),
+  createdAt: z.iso.datetime(),
+});
+export type AuditLogItem = z.infer<typeof auditLogItemSchema>;
+export const auditLogListSchema = z.object({
+  logs: z.array(auditLogItemSchema),
 });

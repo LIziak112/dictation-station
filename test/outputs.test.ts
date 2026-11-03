@@ -14,6 +14,7 @@ const task: Task = {
   mode: "zh_dictation",
   settings: defaultSettings,
   status: "completed",
+  allowSelfReview: false,
   revision: 1,
   createdAt: "2026-11-03T00:00:00Z",
   audio: [],
@@ -40,6 +41,9 @@ const attempt: Attempt = {
   phase: "review",
   startedAt: "2026-11-03T00:00:00Z",
   completedAt: "2026-11-03T00:01:00Z",
+  interruptedAt: null,
+  activeDeviceId: "",
+  spotCheckWordIds: [],
   results: { word1: "wrong" },
   corrections: ["word1"],
 };
