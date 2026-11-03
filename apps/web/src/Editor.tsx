@@ -385,10 +385,8 @@ export function Editor({
         <section className="panel" aria-labelledby="meta-title">
           <div className="section-head">
             <div>
-              <h2 id="meta-title">01 / 词表信息与导入原文</h2>
-              <p className="muted">
-                先填写或确认词表名称、年级、单元、教材或来源；使用 AI 整理时会自动带入提示词。
-              </p>
+              <h2 id="meta-title">01 / 词表信息</h2>
+              <p className="muted">确认名称；年级、单元和来源可选。</p>
             </div>
           </div>
           <div className="meta-grid">
@@ -433,153 +431,156 @@ export function Editor({
               />
             </label>
           </div>
-          <div className="import-grid">
-            <div className="import-col">
-              <label className="field">
-                作业原文
-                <textarea
-                  disabled={saving}
-                  id="source-text"
-                  rows={6}
-                  maxLength={20000}
-                  value={draft.raw}
-                  onChange={(e) => patch({ raw: e.target.value })}
-                  placeholder={"apple  苹果\nlibrary  图书馆"}
-                />
-              </label>
-              <div className="ocr-box">
+          <details open={!draft.batchId}>
+            <summary>导入文字、图片或 AI 整理结果</summary>
+            <div className="import-grid">
+              <div className="import-col">
                 <label className="field">
-                  选择作业图片
+                  作业原文
+                  <textarea
+                    disabled={saving}
+                    id="source-text"
+                    rows={6}
+                    maxLength={20000}
+                    value={draft.raw}
+                    onChange={(e) => patch({ raw: e.target.value })}
+                    placeholder={"apple  苹果\nlibrary  图书馆"}
+                  />
+                </label>
+                <div className="ocr-box">
+                  <label className="field">
+                    选择作业图片
+                    <input
+                      disabled={saving}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      multiple
+                      onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+                    />
+                  </label>
+                  {!!images.length && (
+                    <div className="source-images">
+                      {images.map((url, i) => (
+                        <a key={url} href={url} target="_blank" rel="noreferrer">
+                          <img src={url} alt={`作业原图 ${i + 1}，点击放大`} />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  <div className="row">
+                    <button
+                      type="button"
+                      disabled={!ocrEnabled || !files.length || busy}
+                      onClick={recognize}
+                    >
+                      {busy ? "处理中…" : "识别图片"}
+                    </button>
+                    <span className="small muted">
+                      {ocrEnabled
+                        ? "原图仅留在本页，点击识别才发送至 OCR 服务"
+                        : "图片识别尚未配置，可直接粘贴文字"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="import-col">
+                <details className="ai-organize-box">
+                  <summary>使用自己的 AI 整理</summary>
+                  <p className="small muted">
+                    提示词已分行写明<strong>词表名称、年级、单元、教材或来源</strong>及 JSON
+                    结构要求。复制给任意 AI，将返回的 JSON 粘贴到下方即可。
+                  </p>
+                  <dl className="prompt-context" aria-label="AI 整理上下文">
+                    <div>
+                      <dt>词表名称</dt>
+                      <dd>{draft.title || "待从原文识别"}</dd>
+                    </div>
+                    <div>
+                      <dt>年级</dt>
+                      <dd>{draft.grade || "待从原文识别"}</dd>
+                    </div>
+                    <div>
+                      <dt>单元</dt>
+                      <dd>{draft.unit || "待从原文识别"}</dd>
+                    </div>
+                    <div>
+                      <dt>教材或来源</dt>
+                      <dd>{draft.textbook || "待从原文识别"}</dd>
+                    </div>
+                  </dl>
+                  <div className="row">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(buildAgentPrompt(draft.raw, draft));
+                          setMessage("提示词已复制");
+                        } catch {
+                          setMessage("复制失败，请在下方选择并手动复制");
+                        }
+                      }}
+                    >
+                      复制整理提示词
+                    </button>
+                  </div>
+                  <textarea
+                    disabled={saving}
+                    className="prompt-textarea"
+                    aria-label="整理提示词"
+                    readOnly
+                    rows={8}
+                    value={buildAgentPrompt(draft.raw, draft)}
+                  />
+                </details>
+                <label className="field">
+                  整理后的文字或 JSON
+                  <textarea
+                    disabled={saving}
+                    rows={4}
+                    value={draft.input}
+                    maxLength={1000000}
+                    onChange={(e) => patch({ input: e.target.value })}
+                    placeholder="粘贴 AI 返回的 JSON，或留空直接整理左侧作业原文"
+                  />
+                </label>
+                <label className="field">
+                  导入 JSON 文件
                   <input
                     disabled={saving}
                     type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    multiple
-                    onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
-                  />
-                </label>
-                {!!images.length && (
-                  <div className="source-images">
-                    {images.map((url, i) => (
-                      <a key={url} href={url} target="_blank" rel="noreferrer">
-                        <img src={url} alt={`作业原图 ${i + 1}，点击放大`} />
-                      </a>
-                    ))}
-                  </div>
-                )}
-                <div className="row">
-                  <button
-                    type="button"
-                    disabled={!ocrEnabled || !files.length || busy}
-                    onClick={recognize}
-                  >
-                    {busy ? "处理中…" : "识别图片"}
-                  </button>
-                  <span className="small muted">
-                    {ocrEnabled
-                      ? "原图仅留在本页，点击识别才发送至 OCR 服务"
-                      : "图片识别尚未配置，可直接粘贴文字"}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="import-col">
-              <details className="ai-organize-box">
-                <summary>使用自己的 AI 整理</summary>
-                <p className="small muted">
-                  提示词已分行写明<strong>词表名称、年级、单元、教材或来源</strong>及 JSON
-                  结构要求。复制给任意 AI，将返回的 JSON 粘贴到下方即可。
-                </p>
-                <dl className="prompt-context" aria-label="AI 整理上下文">
-                  <div>
-                    <dt>词表名称</dt>
-                    <dd>{draft.title || "待从原文识别"}</dd>
-                  </div>
-                  <div>
-                    <dt>年级</dt>
-                    <dd>{draft.grade || "待从原文识别"}</dd>
-                  </div>
-                  <div>
-                    <dt>单元</dt>
-                    <dd>{draft.unit || "待从原文识别"}</dd>
-                  </div>
-                  <div>
-                    <dt>教材或来源</dt>
-                    <dd>{draft.textbook || "待从原文识别"}</dd>
-                  </div>
-                </dl>
-                <div className="row">
-                  <button
-                    type="button"
-                    onClick={async () => {
+                    accept=".json,application/json"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (file.size > 1000000) {
+                        setMessage("JSON 文件不能超过 1MB");
+                        return;
+                      }
                       try {
-                        await navigator.clipboard.writeText(buildAgentPrompt(draft.raw, draft));
-                        setMessage("提示词已复制");
+                        const input = await file.text();
+                        patch({ input });
                       } catch {
-                        setMessage("复制失败，请在下方选择并手动复制");
+                        setMessage("文件读取失败，请重新选择");
                       }
                     }}
-                  >
-                    复制整理提示词
-                  </button>
-                </div>
-                <textarea
-                  disabled={saving}
-                  className="prompt-textarea"
-                  aria-label="整理提示词"
-                  readOnly
-                  rows={8}
-                  value={buildAgentPrompt(draft.raw, draft)}
-                />
-              </details>
-              <label className="field">
-                整理后的文字或 JSON
-                <textarea
-                  disabled={saving}
-                  rows={4}
-                  value={draft.input}
-                  maxLength={1000000}
-                  onChange={(e) => patch({ input: e.target.value })}
-                  placeholder="粘贴 AI 返回的 JSON，或留空直接整理左侧作业原文"
-                />
-              </label>
-              <label className="field">
-                导入 JSON 文件
-                <input
-                  disabled={saving}
-                  type="file"
-                  accept=".json,application/json"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    if (file.size > 1000000) {
-                      setMessage("JSON 文件不能超过 1MB");
-                      return;
-                    }
-                    try {
-                      const input = await file.text();
-                      patch({ input });
-                    } catch {
-                      setMessage("文件读取失败，请重新选择");
-                    }
-                  }}
-                />
-              </label>
+                  />
+                </label>
+              </div>
             </div>
-          </div>
-          <div className="row import-actions">
-            <button
-              type="button"
-              className={entries.length ? undefined : "primary"}
-              disabled={busy}
-              onClick={parse}
-            >
-              整理并预览词表
-            </button>
-            <span className="small muted">
-              支持每行“英文 中文”、“词语 拼音”或结构化 JSON，整理后在下方列表逐行核对。
-            </span>
-          </div>
+            <div className="row import-actions">
+              <button
+                type="button"
+                className={entries.length ? undefined : "primary"}
+                disabled={busy}
+                onClick={parse}
+              >
+                整理并预览词表
+              </button>
+              <span className="small muted">
+                支持每行“英文 中文”、“词语 拼音”或结构化 JSON，整理后在下方列表逐行核对。
+              </span>
+            </div>
+          </details>
         </section>
 
         <section className="panel" aria-labelledby="entries-title">

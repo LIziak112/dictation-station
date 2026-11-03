@@ -1,11 +1,13 @@
 import { expect } from "@playwright/test";
-import { test } from "./fixtures";
+import { mockMissingSpeech, test } from "./fixtures";
 
 test("选择今日范围、孩子区独立入口与听写、跨设备接力与家长核对", async ({
   page,
   browser,
   baseURL,
 }) => {
+  // 两个独立上下文往返扫码、刷新和批改，Windows WebKit 需要完整流程预算。
+  test.slow();
   const created = await page.request.post("api/batches", {
     data: {
       title: "今日英语范围",
@@ -38,6 +40,7 @@ test("选择今日范围、孩子区独立入口与听写、跨设备接力与�
 
   // 使用无家长登录态的全新浏览器上下文模拟孩子独立平板免密扫码访问
   const childContext = await browser.newContext({ baseURL });
+  await childContext.addInitScript(mockMissingSpeech);
   const childPage = await childContext.newPage();
   try {
     await childPage.goto(childLink);
@@ -59,7 +62,7 @@ test("选择今日范围、孩子区独立入口与听写、跨设备接力与�
     await expect(childPage.getByText("月亮", { exact: true })).toHaveCount(0);
     await childPage.getByRole("button", { name: "我写好了，下一个", exact: true }).click();
     await expect(
-      childPage.getByRole("button", { name: "写完了，去核对", exact: true }),
+      childPage.getByRole("button", { name: "写完了，交卷", exact: true }),
     ).toBeEnabled();
 
     const data = await (await page.request.get(`api/tasks/${taskId}/play`)).json();
@@ -73,7 +76,7 @@ test("选择今日范围、孩子区独立入口与听写、跨设备接力与�
 
     await childPage.reload();
     await expect(childPage.getByText("第 2 / 2 项", { exact: true })).toBeVisible();
-    await childPage.getByRole("button", { name: "写完了，去核对", exact: true }).click();
+    await childPage.getByRole("button", { name: "写完了，交卷", exact: true }).click();
     await expect(childPage.getByText("月亮", { exact: true })).toHaveCount(0);
     await childPage.getByRole("button", { name: "返回任务列表", exact: true }).click();
     await expect(childPage.getByText("待批改", { exact: true })).toBeVisible();

@@ -17,7 +17,13 @@ export default defineConfig({
   reporter: process.env.CI ? "github" : "list",
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
-    { name: "webkit", use: { ...devices["iPad (gen 7)"], browserName: "webkit" } },
+    {
+      name: "webkit",
+      // Windows WebKit 的多页面流程比 Chromium 慢；保留完整交互，给它单独的时间预算。
+      timeout: 60000,
+      expect: { timeout: 15000 },
+      use: { ...devices["iPad (gen 7)"], browserName: "webkit" },
+    },
   ],
   webServer: {
     command: "node server.js",

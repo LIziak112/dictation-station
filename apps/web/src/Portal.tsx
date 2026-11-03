@@ -184,8 +184,13 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
           info = status.active[0];
         }
       }
-    } catch {
-      /* 测试环境如果拦截了接口，仍可回退生成 ?child=1 链接 */
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? `${error.message}。请重新打开孩子区链接重试。`
+          : "链接生成失败，请重试。",
+      );
+      return;
     }
     const url = new URL(location.href);
     url.search = token ? `child=1&ct=${encodeURIComponent(token)}` : "child=1";
@@ -304,7 +309,7 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
                 <p className="eyebrow">家长端与学生端隔离 · 免密受限入口</p>
                 <h2 id="child-share-title">孩子区专属链接与二维码</h2>
                 <p>
-                  此链接自带受限学生凭证（仅允许查看待办听写、交卷、订正错词与盲听磨耳朵，无权修改词库或偷看未批改答案）。孩子平板扫码即可免密直达！
+                  孩子用平板扫码或打开链接即可进入听写区，可以听写、订正和磨耳朵。请将链接保存在自己的设备上。
                 </p>
               </div>
               <button type="button" onClick={() => setChildShare(null)}>

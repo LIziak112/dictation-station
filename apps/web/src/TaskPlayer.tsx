@@ -63,9 +63,11 @@ export function TaskPlayer({
           });
     };
     refresh();
+    const timer = setInterval(refresh, 10000);
     document.addEventListener("visibilitychange", refresh);
     return () => {
       controller.abort();
+      clearInterval(timer);
       document.removeEventListener("visibilitychange", refresh);
     };
   }, [taskId]);
@@ -149,6 +151,20 @@ export function TaskPlayer({
           <button type="button" className="primary" onClick={onBack}>
             返回任务列表
           </button>
+        </section>
+      ) : child && data.task.status === "completed" ? (
+        <section className="panel">
+          <h2>本次听写已批改完成</h2>
+          <p>可以查看结果、订正错词。想再练一次，请家长安排新任务。</p>
+          {data.attempt && (
+            <button
+              type="button"
+              className="primary"
+              onClick={() => onReview(data.attempt?.id ?? "", true)}
+            >
+              查看核对记录
+            </button>
+          )}
         </section>
       ) : !child ? (
         <>
@@ -236,115 +252,74 @@ export function TaskPlayer({
             </div>
           </section>
         </>
-      ) : (
-        <>
-          <div hidden={isPlayingSession}>
-            <AudioPreparation
-              key={data.task.id}
-              task={data.task}
-              compact={child}
-              onPrepared={setPrepared}
-            />
+      ) : !data.attempt || data.attempt.interruptedAt ? (
+        <section className="panel">
+          <h2>准备好纸笔，就可以开始</h2>
+          <p>
+            {data.task.homeworkCount} 项作业 + {data.task.items.length - data.task.homeworkCount}{" "}
+            项复习
+          </p>
+          <p className="small muted">声音由家长准备；未准备的词会使用机器朗读。</p>
+          <div className="row">
+            <button
+              className="primary"
+              disabled={busy}
+              type="button"
+              onClick={() => void startTask(false)}
+            >
+              开始任务
+            </button>
+            {!data.attempt && data.task.homeworkCount > 0 && (
+              <button type="button" disabled={busy} onClick={() => void startTask(true)}>
+                今天只完成作业
+              </button>
+            )}
           </div>
-          {!isPlayingSession && prepared?.needsConfirmation && (
-            <>
-              <p role="alert">有指定读音未命中，请家长试听并确认兜底。</p>
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={confirmedVoice}
-                  onChange={(e) => setConfirmedVoice(e.target.checked)}
-                />
-                我已试听并确认本次兜底发音
-              </label>
-            </>
-          )}
-          {!data.attempt || data.attempt.completedAt || data.attempt.interruptedAt ? (
-            <section className="panel">
-              <h2>准备好纸笔，就可以开始</h2>
-              <p>
-                {data.task.homeworkCount} 项作业 +{" "}
-                {data.task.items.length - data.task.homeworkCount} 项复习
-              </p>
-              <div className="row">
-                <button
-                  className="primary"
-                  disabled={
-                    busy || !prepared?.ready || (!!prepared?.needsConfirmation && !confirmedVoice)
-                  }
-                  type="button"
-                  onClick={() => void startTask(false)}
-                >
-                  {data.attempt?.completedAt ? "再练一次" : "开始任务"}
-                </button>
-                {!data.attempt && data.task.homeworkCount > 0 && (
-                  <button
-                    type="button"
-                    disabled={
-                      busy || !prepared?.ready || (!!prepared?.needsConfirmation && !confirmedVoice)
-                    }
-                    onClick={() => void startTask(true)}
-                  >
-                    今天只完成作业
-                  </button>
-                )}
-                {data.attempt?.completedAt && (
-                  <button type="button" onClick={() => onReview(data.attempt?.id ?? "", true)}>
-                    查看核对记录
-                  </button>
-                )}
-              </div>
-            </section>
-          ) : conflictOnInitialLoad && !takeoverPrompt ? (
-            <section className="panel">
-              <h2>该任务正在另一台设备上进行</h2>
-              <p>
-                另一台设备正在听写第 {(data.attempt.index ?? 0) + 1} / {data.task.items.length}{" "}
-                项。如果换到了这台平板，请点击下方接管继续。
-              </p>
-              <div className="row">
-                <button
-                  type="button"
-                  className="primary"
-                  disabled={busy}
-                  onClick={() => void startTask(false, true)}
-                >
-                  在此设备接管并继续
-                </button>
-                <button type="button" onClick={onBack}>
-                  返回任务列表
-                </button>
-              </div>
-            </section>
-          ) : prepared?.ready ? (
-            <TaskSession
-              key={data.attempt.id}
-              task={data.task}
-              clips={prepared.clips}
-              attempt={data.attempt}
-              accountId={accountId}
-              autoStart={justStarted}
-              onSaved={(attempt) =>
-                setData((previous) => (previous ? { ...previous, attempt } : previous))
-              }
-              onReview={onReview}
-              onBack={onBack}
-              onDirty={(value) => {
-                dirty.current = value;
-              }}
-              onReload={async () => setData(await taskApi.play(taskId))}
-            />
-          ) : (
-            <p role="status">声音准备好后即可继续。</p>
-          )}
-        </>
+        </section>
+      ) : conflictOnInitialLoad && !takeoverPrompt ? (
+        <section className="panel">
+          <h2>该任务正在另一台设备上进行</h2>
+          <p>
+            另一台设备正在听写第 {(data.attempt.index ?? 0) + 1} / {data.task.items.length}{" "}
+            项。如果换到了这台平板，请点击下方接管继续。
+          </p>
+          <div className="row">
+            <button
+              type="button"
+              className="primary"
+              disabled={busy}
+              onClick={() => void startTask(false, true)}
+            >
+              在此设备接管并继续
+            </button>
+            <button type="button" onClick={onBack}>
+              返回任务列表
+            </button>
+          </div>
+        </section>
+      ) : (
+        <TaskSession
+          key={data.attempt.id}
+          task={data.task}
+          attempt={data.attempt}
+          accountId={accountId}
+          autoStart={justStarted}
+          onSaved={(attempt) =>
+            setData((previous) => (previous ? { ...previous, attempt } : previous))
+          }
+          onReview={onReview}
+          onBack={onBack}
+          onDirty={(value) => {
+            dirty.current = value;
+          }}
+          onReload={async () => setData(await taskApi.play(taskId))}
+        />
       )}
     </main>
   );
 }
 
 function TaskSession({
-  clips,
   task,
   attempt,
   accountId,
@@ -355,7 +330,6 @@ function TaskSession({
   onDirty,
   onReload,
 }: {
-  clips: PreparedAudio["clips"];
   task: TaskPlay;
   attempt: Attempt;
   accountId: string;
@@ -435,10 +409,12 @@ function TaskSession({
     driverRef.current?.setAccent(liveSettings.accent);
   }, [liveSettings.accent]);
   useEffect(() => {
-    for (const clip of clips) {
-      driverRef.current?.cache(clip.audio.text, clip.audio.lang, clip.blob, clip.audio.wordId);
-    }
-  }, [clips]);
+    driverRef.current?.setSources(
+      task.audio.flatMap((voice) =>
+        voice.url && voice.kind !== "unavailable" ? [{ key: voice.wordId, url: voice.url }] : [],
+      ),
+    );
+  }, [task.audio]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: 仅在点击开始任务进入会话时自动播报首词。
   useEffect(() => {
     if (autoStart && latest.current.phase === "player" && task.items[latest.current.index]?.lang) {
@@ -526,6 +502,7 @@ function TaskSession({
     if (task.items[target].lang) play(target);
   }
   async function next() {
+    if (busy || local.value) return;
     playback.current?.stop();
     clock.current.resume();
     const nextIndex = latest.current.index + 1;
@@ -545,7 +522,7 @@ function TaskSession({
   }
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (latest.current.phase !== "player" || rest) return;
+      if (latest.current.phase !== "player" || rest || busy || local.value || local.error) return;
       if (
         event.isComposing ||
         event.ctrlKey ||
@@ -638,13 +615,20 @@ function TaskSession({
         {current.phase === "review" ? (
           <>
             <h2>
-              {task.allowSelfReview ? "写完了，可以自主核对答案" : "写完了，已交卷给家长批改"}
+              {attempt.phase !== "review"
+                ? busy
+                  ? "正在交卷…"
+                  : "尚未交卷，请重试同步"
+                : task.allowSelfReview
+                  ? "写完了，可以自主核对答案"
+                  : "写完了，已交卷给家长批改"}
             </h2>
             <p>
-              练习进度已同步，家长端已收到“待批改”提醒；
-              {task.allowSelfReview
-                ? "本任务已开启自主核对，你可以点击下方直接对照答案核对。"
-                : "请把听写纸交给家长核对，批改完成后可在首页订正错词。"}
+              {attempt.phase !== "review"
+                ? "听写进度已保留在本机，请重试同步，成功后再把听写纸交给家长。"
+                : task.allowSelfReview
+                  ? "已交卷。可以对照纸面，自主核对答案。"
+                  : "已交卷。请把听写纸交给家长，批改后可以订正错词。"}
             </p>
             <div className="row">
               {task.allowSelfReview ? (
@@ -685,7 +669,7 @@ function TaskSession({
                 第 {current.index + 1} / {task.items.length} 项
               </span>
               <span className="small muted">
-                {clips.length > 0 ? "真人 / 合成语音已准备" : "本机设备朗读"}
+                {task.audio.some((voice) => voice.url) ? "优先使用已准备声音" : "本机设备朗读"}
                 {liveSettings.groupSize > 0
                   ? ` · 第 ${Math.floor(current.index / liveSettings.groupSize) + 1} / ${Math.ceil(task.items.length / liveSettings.groupSize)} 组`
                   : ""}
@@ -722,7 +706,7 @@ function TaskSession({
                 {playing ? "暂停" : "播放 / 再听一次"}
               </button>
               <button type="button" disabled={busy || !!local.value} onClick={() => void next()}>
-                {current.index + 1 < task.items.length ? "我写好了，下一个" : "写完了，去核对"}
+                {current.index + 1 < task.items.length ? "我写好了，下一个" : "写完了，交卷"}
               </button>
             </div>
             {!item.audioText && (
@@ -747,12 +731,13 @@ function TaskSession({
                 className="subtle"
                 disabled={busy || !!local.value}
                 onClick={() => {
+                  if (!confirm("还没写完，要提前交卷给家长吗？")) return;
                   playback.current?.stop();
                   clock.current.pause();
                   void save({ phase: "review" });
                 }}
               >
-                结束并核对答案
+                提前交卷
               </button>
             </div>
           </>

@@ -39,7 +39,14 @@ export function TaskEditor({
     initialTask
       ? {
           title: editExisting ? initialTask.title : `${initialTask.title}（再练）`,
-          date: initialTask.date,
+          date: editExisting
+            ? initialTask.date
+            : new Intl.DateTimeFormat("en-CA", {
+                timeZone: "Asia/Shanghai",
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+              }).format(new Date()),
           mode: initialTask.mode,
           settings: initialTask.settings,
           reviewOnly: false,
@@ -363,28 +370,35 @@ export function TaskEditor({
               </section>
             );
           })}
-          <div className="form-grid">
-            <label className="field">
-              本次带上几项到期复习
-              <input
-                type="number"
-                min={0}
-                max={20}
-                value={input.reviewCount ?? preferences.reviewCount}
-                onChange={(e) => patch({ reviewCount: Number(e.target.value) })}
-              />
-            </label>
-            <label className="field">
-              复习位置
-              <select
-                value={input.reviewPlacement ?? preferences.reviewPlacement}
-                onChange={(e) => patch({ reviewPlacement: e.target.value as "interleave" | "end" })}
-              >
-                <option value="interleave">每五项作业穿插一项</option>
-                <option value="end">放在作业后面</option>
-              </select>
-            </label>
-          </div>
+          <details className="task-options">
+            <summary>
+              复习设置 · 默认带上 {input.reviewCount ?? preferences.reviewCount} 项到期复习
+            </summary>
+            <div className="form-grid">
+              <label className="field">
+                本次带上几项到期复习
+                <input
+                  type="number"
+                  min={0}
+                  max={20}
+                  value={input.reviewCount ?? preferences.reviewCount}
+                  onChange={(e) => patch({ reviewCount: Number(e.target.value) })}
+                />
+              </label>
+              <label className="field">
+                复习位置
+                <select
+                  value={input.reviewPlacement ?? preferences.reviewPlacement}
+                  onChange={(e) =>
+                    patch({ reviewPlacement: e.target.value as "interleave" | "end" })
+                  }
+                >
+                  <option value="interleave">每五项作业穿插一项</option>
+                  <option value="end">放在作业后面</option>
+                </select>
+              </label>
+            </div>
+          </details>
           <button
             type="button"
             disabled={busy || !count}

@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import {
@@ -306,6 +306,8 @@ export class Tasks {
         throw new HTTPException(400, { message: "该任务已被家长撤回" });
       if (task.status === "expired")
         throw new HTTPException(400, { message: "该任务已过期，请找家长重派后再开始" });
+      if (task.status === "completed" || task.status === "submitted")
+        throw new HTTPException(400, { message: "任务已交卷，再练请由家长复制新任务" });
       const otherActive = this.list(accountId).find(
         (other) => other.id !== taskId && other.status === "in_progress",
       );
@@ -442,11 +444,21 @@ export class Tasks {
         throw new HTTPException(400, { message: "已完成的任务不可退回，请使用错词重派" });
       if (attempt.revision !== revision) throw new Conflict();
       const task = this.require(accountId, attempt.taskId);
+      if (task.status !== "submitted" || attempt.interruptedAt)
+        throw new HTTPException(400, { message: "只有待批改的任务可以退回重做" });
+      const otherActive = this.list(accountId).find(
+        (other) => other.id !== task.id && other.status === "in_progress",
+      );
+      if (otherActive)
+        throw new HTTPException(409, {
+          message: `请先完成或交卷「${otherActive.title}」，再退回这份任务`,
+        });
       const nextAttempt: Attempt = {
         ...attempt,
         phase: "player",
         index: resetIndex ? 0 : attempt.index,
-        results: resetIndex ? {} : attempt.results,
+        results: {},
+        activeDeviceId: "",
         heartbeatAt: new Date().toISOString(),
         revision: attempt.revision + 1,
       };
@@ -483,13 +495,18 @@ export class Tasks {
       if (isChildMode && !task.allowSelfReview)
         throw new HTTPException(403, { message: "该任务需由家长核对批改" });
       if (attempt.phase !== "review") throw new HTTPException(400, { message: "请先进入核对页面" });
-      for (const item of task.items)
-        attempt.results[item.wordId] ??= confirmRemaining ? "correct" : "unchecked";
+      for (const item of task.items) {
+        if (!attempt.results[item.wordId] || attempt.results[item.wordId] === "unchecked")
+          attempt.results[item.wordId] = confirmRemaining ? "correct" : "unchecked";
+      }
       if (isChildMode && task.allowSelfReview) {
         const correctIds = task.items
           .map((item) => item.wordId)
           .filter((wordId) => attempt.results[wordId] === "correct");
-        attempt.spotCheckWordIds = correctIds.slice(0, Math.min(2, correctIds.length));
+        attempt.spotCheckWordIds = [];
+        while (correctIds.length && attempt.spotCheckWordIds.length < 2) {
+          attempt.spotCheckWordIds.push(correctIds.splice(randomInt(correctIds.length), 1)[0]);
+        }
       }
       attempt.completedAt = new Date().toISOString();
       attempt.revision++;
@@ -644,23 +661,9 @@ export class Tasks {
     const batch = this.store.get(accountId, batchId);
     if (!batch) throw new HTTPException(404, { message: "词表不存在" });
     const locked = this.lockedWordIds(accountId);
-    const maskedEntries = batch.entries.map((entry) => {
-      if (entry.wordId && locked.has(entry.wordId)) {
-        return {
-          ...entry,
-          en: entry.en ? "🔒 待考词（盲听）" : "",
-          zh: entry.zh ? "🔒 待考词（盲听）" : "",
-          pinyin: "",
-          hint: "",
-          alt: [],
-          reading: "",
-          readings: { en: "", zh: "" },
-        };
-      }
-      return entry;
-    });
     return {
-      batch: { ...batch, entries: maskedEntries },
+      // 待考词仅在界面隐藏文字；设备朗读仍需要原文。
+      batch,
       lockedWordIds: [...locked].filter((wid) => batch.entries.some((e) => e.wordId === wid)),
     };
   }

@@ -90,10 +90,10 @@ export function PrintView({
             </li>
           ))}
         </ol>
-        {!rows.length && <p>本次全部答对，没有需要打印的待巩固项。</p>}
+        {!rows.length && <p>暂无可打印的待巩固项。请先完成批改，或选择听写空白纸。</p>}
         {answers && (
           <section className="print-answers" data-testid="print-answers">
-            <h2>答案对照区（可沿虚线裁剪或分页打印）</h2>
+            <h2>答案对照页</h2>
             <div className="print-answers-grid">
               {rows.map((row) => (
                 <p key={row.number}>

@@ -240,7 +240,7 @@ it("任务状态机完整流转：单活互斥、设备租约接管、撤回中�
   expect(batch.entries).toHaveLength(3);
 });
 
-it("childToken 白名单门禁、交卷前答案拦截、待考词磨耳朵盲听保护与一键重置", async () => {
+it("childToken 门禁、交卷前详情拦截、待考词界面提示与一键重置", async () => {
   const { store, account, auth, tasks, batch, input } = await setup();
   const task = tasks.create(account.id, input);
   const app = createApp(store, {});
@@ -269,7 +269,7 @@ it("childToken 白名单门禁、交卷前答案拦截、待考词磨耳朵盲�
     expect(blocked.status).toBe(403);
   }
 
-  // 3. 孩子区总览可读，待考词在磨耳朵接口中被盲听遮罩
+  // 3. 保留原文供设备朗读，待考词 ID 用于界面隐藏文字。
   const overviewRes = await app.request("/api/child/overview", { headers: childHeaders });
   expect(overviewRes.status).toBe(200);
   const overview = await overviewRes.json();
@@ -284,8 +284,8 @@ it("childToken 白名单门禁、交卷前答案拦截、待考词磨耳朵盲�
   // batch.entries[0] ("apple") 不在任务中，允许展示；entries[1..2] ("moon", "bank") 在任务中，必须遮罩
   expect(listenData.lockedWordIds).toHaveLength(2);
   expect(listenData.batch.entries[0].en).toBe("apple");
-  expect(listenData.batch.entries[1].en).toContain("待考词");
-  expect(listenData.batch.entries[1].zh).toContain("待考词");
+  expect(listenData.batch.entries[1].en).toBe("moon");
+  expect(listenData.batch.entries[1].zh).toBe("月亮");
 
   // 4. 孩子开始任务并交卷后，未开启 allowSelfReview 时禁止读取答案详情或自行完成核对
   const startRes = await app.request(`/api/tasks/${task.id}/start`, {
@@ -316,4 +316,60 @@ it("childToken 白名单门禁、交卷前答案拦截、待考词磨耳朵盲�
   expect(rotateRes.status).toBe(200);
   const expiredRes = await app.request("/api/child/overview", { headers: childHeaders });
   expect(expiredRes.status).toBe(401);
+});
+
+it("退回不产生两个进行中任务，继续补写保留位置并清除旧批改，完成后不能重开原任务", async () => {
+  const { account, tasks, input } = await setup();
+  const task = tasks.create(account.id, input);
+  const attempt = tasks.start(account.id, task.id, false);
+  expect(() => tasks.returnForRedo(account.id, attempt.id, attempt.revision)).toThrow("待批改");
+  const submitted = tasks.save(account.id, attempt.id, {
+    revision: attempt.revision,
+    index: 1,
+    phase: "review",
+    results: { [task.items[0].wordId]: "wrong" },
+  });
+  expect(() => tasks.start(account.id, task.id, false)).toThrow("已交卷");
+  const other = tasks.create(account.id, input);
+  tasks.start(account.id, other.id, false);
+  expect(() => tasks.returnForRedo(account.id, attempt.id, submitted.revision, false)).toThrow(
+    "请先完成",
+  );
+  expect(tasks.require(account.id, task.id).status).toBe("submitted");
+  tasks.withdraw(account.id, other.id);
+  const returned = tasks.returnForRedo(account.id, attempt.id, submitted.revision, false);
+  expect(returned.index).toBe(1);
+  expect(returned.results).toEqual({});
+  const resubmitted = tasks.save(account.id, attempt.id, {
+    revision: returned.revision,
+    index: 1,
+    phase: "review",
+    results: { [task.items[0].wordId]: "unchecked" },
+  });
+  const completed = tasks.complete(account.id, attempt.id, resubmitted.revision, true);
+  expect(Object.values(completed.results)).toEqual(["correct", "correct"]);
+  expect(() => tasks.start(account.id, task.id, false)).toThrow("复制新任务");
+  expect(tasks.require(account.id, task.id).status).toBe("completed");
+  expect(tasks.attempt(account.id, attempt.id)).toEqual(completed);
+});
+
+it("孩子自评抽查从正确项中选择，最多两项且不重复", async () => {
+  const { account, tasks, input, batch } = await setup();
+  const task = tasks.create(account.id, {
+    ...input,
+    allowSelfReview: true,
+    selections: [{ batchId: batch.id, entryIds: batch.entries.map((entry) => entry.id) }],
+  });
+  const attempt = tasks.start(account.id, task.id, false);
+  const submitted = tasks.save(account.id, attempt.id, {
+    revision: attempt.revision,
+    index: 2,
+    phase: "review",
+    results: {},
+  });
+  const completed = tasks.complete(account.id, attempt.id, submitted.revision, true, true);
+  expect(completed.spotCheckWordIds).toHaveLength(2);
+  expect(new Set(completed.spotCheckWordIds).size).toBe(2);
+  for (const wordId of completed.spotCheckWordIds)
+    expect(completed.results[wordId]).toBe("correct");
 });

@@ -137,7 +137,11 @@ export function AudioPreparation({
         return result;
       }
       let verified = await check(manifest);
-      if (failed.length && task.status === "pending" && !job.signal.aborted) {
+      if (
+        failed.length &&
+        ["pending", "in_progress"].includes(task.status) &&
+        !job.signal.aborted
+      ) {
         const fallback = await request(`api/tasks/${task.id}/audio`, audioManifestSchema, {
           method: "POST",
           body: JSON.stringify({ fallbackIds: failed }),
@@ -150,7 +154,7 @@ export function AudioPreparation({
       if (job.signal.aborted) return;
       setAudio(verified);
       const ready = verified.every((voice) => voice.kind !== "unavailable");
-      if (!ready) setMessage("部分声音暂不可用，请重试；已开始的任务可复制后重新准备。");
+      if (!ready) setMessage("部分声音暂不可用，请重新准备声音，再继续听写。");
       onPrepared({
         audio: verified,
         clips: clips.filter((clip) =>

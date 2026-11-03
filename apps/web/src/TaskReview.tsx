@@ -86,6 +86,7 @@ function ReviewSession({
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [resetIndex, setResetIndex] = useState(false);
   useUnsavedProtection(!!local.value || !!local.error);
   async function save(next: Attempt) {
     if (!local.write(next)) return;
@@ -288,25 +289,41 @@ function ReviewSession({
               保存核对并完成
             </button>
             {!child && (
-              <button
-                type="button"
-                disabled={busy || !!local.value}
-                onClick={async () => {
-                  if (!confirm("确定将任务退回给孩子重做吗？退回后任务将恢复为进行中状态。"))
-                    return;
-                  setBusy(true);
-                  try {
-                    await taskApi.returnForRedo(attempt.id, attempt.revision, true);
-                    onBack();
-                  } catch (e) {
-                    setMessage(e instanceof Error ? e.message : "退回失败");
-                  } finally {
-                    setBusy(false);
-                  }
-                }}
-              >
-                退回让孩子重做
-              </button>
+              <div className="redo-actions">
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={resetIndex}
+                    onChange={(event) => setResetIndex(event.target.checked)}
+                  />
+                  从头重写（默认继续补写）
+                </label>
+                <button
+                  type="button"
+                  disabled={busy || !!local.value}
+                  onClick={async () => {
+                    if (
+                      !confirm(
+                        resetIndex
+                          ? "退回并从第一项重新听写？已有批改标记会清除。"
+                          : "退回到交卷时的位置继续补写？已有批改标记会清除。",
+                      )
+                    )
+                      return;
+                    setBusy(true);
+                    try {
+                      await taskApi.returnForRedo(attempt.id, attempt.revision, resetIndex);
+                      onBack();
+                    } catch (e) {
+                      setMessage(e instanceof Error ? e.message : "退回失败");
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  退回让孩子重做
+                </button>
+              </div>
             )}
           </div>
         </section>

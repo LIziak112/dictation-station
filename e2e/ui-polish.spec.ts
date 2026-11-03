@@ -1,6 +1,19 @@
 import { expect } from "@playwright/test";
 import { test } from "./fixtures";
 
+test("孩子入口生成失败时显示重试提示，不提供无凭证链接", async ({ page }) => {
+  await page.route("**/api/child-token", (route) =>
+    route.fulfill({ status: 503, json: { error: "连接中断" } }),
+  );
+  await page.goto("./");
+  await page.getByRole("button", { name: "进入孩子区", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("重新打开孩子区链接重试");
+  await expect(page.getByLabel("孩子区独立链接")).toHaveCount(0);
+  await page.unroute("**/api/child-token");
+  await page.getByRole("button", { name: "进入孩子区", exact: true }).click();
+  await expect(page.getByLabel("孩子区独立链接")).toHaveValue(/ct=ct_/);
+});
+
 test("主流程在窄屏和双倍文字下完整显示，导航后焦点进入正文", async ({ page }) => {
   await page.goto("./");
   for (const width of [320, 768, 1280]) {

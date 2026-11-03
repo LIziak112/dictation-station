@@ -1773,8 +1773,10 @@ a {
   cursor: pointer;
   white-space: nowrap;
 }
-.return-parent-button:hover {
-  background: var(--hover);
+@media (hover: hover) {
+  .return-parent-button:hover {
+    background: var(--hover);
+  }
 }
 .top-alert-wrap,
 .child-share-wrap {
@@ -2294,5 +2296,73 @@ a {
   .worksheet,
   .print-answers-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.archive-toggle {
+  margin-block: 16px;
+}
+.redo-actions {
+  display: grid;
+  gap: 8px;
+  padding-block: 12px;
+}
+.task-options {
+  margin-block: 20px;
+}
+main > section + section {
+  margin-top: 24px;
+}
+@media (max-width: 580px) {
+  .prompt-textarea,
+  .entry-cell input,
+  .entry-cell select {
+    font-size: 1rem;
+  }
+  .task-card-actions > button {
+    flex: 1 1 130px;
+  }
+  .header-inner > nav {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+  .header-inner > nav button {
+    min-width: 0;
+    padding-inline: 4px;
+  }
+  .page-heading {
+    align-items: flex-start;
+  }
+  .task-session .play-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .task-session .play-controls .play-button {
+    grid-column: 1 / -1;
+  }
+  .task-session .play-controls button {
+    width: 100%;
+    min-width: 0;
+    min-height: 48px;
+  }
+  .result-item .row {
+    width: 100%;
+  }
+  .result-item .row > button {
+    flex: 1 1 auto;
+    padding-inline: 12px;
+  }
+  .practice-word:has(+ .practice-lock-note) {
+    font-size: 1.5rem;
+  }
+}
+@media print {
+  .worksheet {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .print-answers {
+    break-before: page;
   }
 }

@@ -328,9 +328,14 @@ export function ListeningPractice({
         </p>
         <h2 className="practice-word">
           {queue[index]?.entry.wordId && lockedWordIds.includes(queue[index].entry.wordId)
-            ? "🔒 今日听写待考词（交卷批改后解锁文字）"
+            ? "待考词 · 只听声音"
             : queue[index]?.audioText}
         </h2>
+        {queue[index]?.entry.wordId && lockedWordIds.includes(queue[index].entry.wordId) && (
+          <p className="small muted practice-lock-note">
+            批改后可以查看文字，当前可正常听示范或跟读。
+          </p>
+        )}
         <div className="row">
           <button
             type="button"

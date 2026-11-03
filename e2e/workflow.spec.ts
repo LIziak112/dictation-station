@@ -87,7 +87,7 @@ test("子路径完整流程：导入、草稿恢复、编辑、分享、播放�
   await page.reload();
   await expect(page.getByText("第 2 / 2 项", { exact: true })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath("player.png"), fullPage: true });
-  await page.getByRole("button", { name: "写完了，去核对", exact: true }).click();
+  await page.getByRole("button", { name: "写完了，交卷", exact: true }).click();
   await expect(page.getByRole("heading", { name: "写完了，已交卷给家长批改" })).toBeVisible();
   await page.getByRole("button", { name: "返回任务列表", exact: true }).click();
   await page.goto("./#today");

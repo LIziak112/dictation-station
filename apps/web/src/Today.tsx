@@ -46,6 +46,7 @@ export function Today({
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState("");
+  const [showArchive, setShowArchive] = useState(false);
   const refreshNow = useRef<() => void>(() => {});
   const audioRef = useRef<BrowserAudio | null>(null);
 
@@ -134,7 +135,7 @@ export function Today({
   async function handleWithdraw(task: TaskSummary) {
     const confirmText =
       task.status === "in_progress"
-        ? `孩子已听写到第 ${(task.progressIndex ?? 0) + 1}/${task.count} 词。撤回后孩子端将立即停止播音，已写进度按“已中断”留档，确定撤回吗？`
+        ? `孩子已听写到第 ${(task.progressIndex ?? 0) + 1}/${task.count} 项。撤回后孩子端将在刷新或同步时停止，进度会留档。确定撤回吗？`
         : `确定撤回任务「${task.title}」吗？撤回后将从孩子待办列表中移除。`;
     if (!confirm(confirmText)) return;
     setBusyId(task.id);
@@ -179,17 +180,28 @@ export function Today({
 
   const hasActiveTask = tasks.some((t) => t.status === "in_progress");
   const submittedTasks = tasks.filter((t) => t.status === "submitted");
+  const archivedStatuses = ["completed", "withdrawn", "expired"];
+  const archivedTasks = tasks.filter((task) => archivedStatuses.includes(task.status));
+  const statusOrder = child
+    ? { in_progress: 0, pending: 1, submitted: 2, completed: 3, withdrawn: 4, expired: 5 }
+    : { submitted: 0, in_progress: 1, pending: 2, completed: 3, withdrawn: 4, expired: 5 };
+  const visibleTasks = tasks
+    .filter((task) => showArchive || !archivedStatuses.includes(task.status))
+    .sort(
+      (a, b) =>
+        statusOrder[a.status] - statusOrder[b.status] || a.createdAt.localeCompare(b.createdAt),
+    );
 
   return (
     <main>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">{child ? "学生独立练习端" : "纸笔准备好了吗"}</p>
+          <p className="eyebrow">{child ? "孩子听写区" : "家长工作台"}</p>
           <h1>{child ? "今天练一点" : "今日任务"}</h1>
           <p>
             {child
               ? "选一份任务，跟着声音慢慢写；写完交卷后还能在这里订正错词、磨耳朵。"
-              : "手机或电脑派发任务，孩子平板打开即练，交卷后在此一键批改与重派错词。"}
+              : "安排听写，查看进度，收到听写纸后批改。"}
           </p>
         </div>
         {!child && (
@@ -273,7 +285,7 @@ export function Today({
             </div>
           )}
           <div className="batch-grid">
-            {tasks.map((task) => {
+            {visibleTasks.map((task) => {
               const statusLabel = STATUS_LABELS[task.status] ?? "待完成";
               const queuedBehindActive = child && task.status === "pending" && hasActiveTask;
               return (
@@ -299,7 +311,7 @@ export function Today({
                     <p className="small muted">
                       {task.wrongCount > 0
                         ? `待巩固错词 ${task.wrongCount} 项（${task.uncorrectedCount ? `待订正 ${task.uncorrectedCount} 项` : "已全部订正"}）`
-                        : "本次全部通过"}
+                        : "暂无待巩固项，核对情况见记录"}
                     </p>
                   )}
                   {!child && task.spotCheckWords && task.spotCheckWords.length > 0 && (
@@ -439,11 +451,16 @@ export function Today({
                     ) : (
                       <button
                         type="button"
+                        disabled={queuedBehindActive}
                         className={task.status === "completed" ? undefined : "primary"}
-                        onClick={() => onOpen(task.id)}
+                        onClick={() =>
+                          task.status === "completed" && task.activeAttemptId && onReview
+                            ? onReview(task.activeAttemptId)
+                            : onOpen(task.id)
+                        }
                       >
                         {task.status === "completed"
-                          ? "查看或再练"
+                          ? "查看核对记录"
                           : task.status === "pending"
                             ? "准备开始"
                             : "继续任务"}
@@ -454,6 +471,16 @@ export function Today({
               );
             })}
           </div>
+          {archivedTasks.length > 0 && (
+            <button
+              type="button"
+              className="subtle archive-toggle"
+              aria-expanded={showArchive}
+              onClick={() => setShowArchive(!showArchive)}
+            >
+              {showArchive ? "收起" : "查看"}已完成、已撤回和过期任务（{archivedTasks.length}）
+            </button>
+          )}
         </section>
       )}
       {child && overview && (
@@ -462,7 +489,7 @@ export function Today({
             <div className="section-head">
               <h2 id="child-corrections-heading">02 / 批改结果与错词订正</h2>
               <p className="small muted">
-                家长批改后的错词会列在这里。请先在纸上认真订正，再点击“我已订正”（订正打卡不直接增加掌握次数，需隔日独立听写通过才算掌握）。
+                先在纸上订正，再点“我已订正”。以后再独立听写，逐步巩固。
               </p>
             </div>
             {!overview.corrections.length ? (
@@ -543,7 +570,7 @@ export function Today({
             <div className="section-head">
               <h2 id="child-listen-heading">03 / 自主磨耳朵（纯听与跟读）</h2>
               <p className="small muted">
-                随时选择词表磨耳朵或跟读练口语（被动练习不改变掌握度；今日待考词在交卷批改前会自动隐藏拼写以防剧透）。
+                听示范，也可以录音跟读。这些练习不计入掌握次数，待考词暂时隐藏文字。
               </p>
             </div>
             {!overview.batches.length ? (
@@ -583,7 +610,7 @@ export function Today({
       {!child && logs.length > 0 && (
         <section className="panel">
           <details>
-            <summary>查看最近双端操作与安全日志（{logs.length}）</summary>
+            <summary>最近操作（{logs.length}）</summary>
             <div className="learning-table">
               {logs.slice(0, 15).map((log) => (
                 <div key={log.id} className="learning-row">
