@@ -1833,26 +1833,35 @@ a {
   background: var(--selected);
   color: var(--brand);
 }
-.status-in_progress,
+.status-in_progress {
+  background: color-mix(in srgb, var(--brand) 15%, var(--surface));
+  color: var(--brand);
+}
 .status-submitted {
   background: color-mix(in srgb, var(--warning) 16%, var(--surface));
   color: var(--warning);
 }
-.status-pending,
+.status-pending {
+  background: var(--soft);
+  color: var(--label);
+}
 .status-withdrawn,
 .status-expired {
   background: var(--soft);
   color: var(--muted);
 }
 .review-alert-banner {
-  border-color: color-mix(in srgb, var(--brand) 40%, var(--line));
-  background: color-mix(in srgb, var(--brand) 8%, var(--surface));
+  border-color: color-mix(in srgb, var(--warning) 40%, var(--line));
+  background: color-mix(in srgb, var(--warning) 8%, var(--surface));
   margin-bottom: 24px;
 }
-.review-alert-content {
+.review-alert-header {
   width: 100%;
-  flex-wrap: wrap;
-  gap: 12px;
+  align-items: center;
+}
+.review-alert-header h2 {
+  font-size: 1.15rem;
+  margin-top: 2px;
 }
 .task-card-top {
   width: 100%;

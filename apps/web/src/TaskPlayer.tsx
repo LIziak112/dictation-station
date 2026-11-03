@@ -46,9 +46,6 @@ export function TaskPlayer({
   } | null>(null);
   const [busy, setBusy] = useState(false);
   const [justStarted, setJustStarted] = useState(false);
-  const [playLocally, setPlayLocally] = useState(
-    () => child || (typeof window !== "undefined" && location.hash.includes("start=1")),
-  );
   const dirty = useRef(false);
   const loaded = !!data;
   useEffect(() => {
@@ -111,10 +108,7 @@ export function TaskPlayer({
     Date.now() - new Date(data.attempt.heartbeatAt).getTime() < 30_000;
 
   const isPlayingSession =
-    (child || playLocally) &&
-    !!data.attempt &&
-    !data.attempt.completedAt &&
-    !data.attempt.interruptedAt;
+    child && !!data.attempt && !data.attempt.completedAt && !data.attempt.interruptedAt;
 
   return (
     <main tabIndex={-1} id="main">
@@ -125,16 +119,7 @@ export function TaskPlayer({
           </p>
           <h1>{data.task.title}</h1>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            if (playLocally && !child) {
-              setPlayLocally(false);
-            } else {
-              onBack();
-            }
-          }}
-        >
+        <button type="button" onClick={onBack}>
           {isPlayingSession ? "暂存并返回" : "返回任务"}
         </button>
       </div>
@@ -165,7 +150,7 @@ export function TaskPlayer({
             返回任务列表
           </button>
         </section>
-      ) : !child && !playLocally ? (
+      ) : !child ? (
         <>
           <AudioPreparation
             key={data.task.id}
@@ -201,7 +186,7 @@ export function TaskPlayer({
               项复习
               {data.task.status === "in_progress" && data.attempt
                 ? ` · 当前进度：第 ${(data.attempt.index ?? 0) + 1} / ${data.task.items.length} 项`
-                : " · 随时可在当前设备直接开始听写，或让孩子在平板上扫码独立完成。"}
+                : " · 请让孩子在平板或学习设备上扫码打开「孩子听写区」独立完成听写"}
             </p>
             <div className="row">
               {data.task.status === "submitted" && data.attempt ? (
@@ -213,56 +198,19 @@ export function TaskPlayer({
                   立即批改
                 </button>
               ) : data.task.status === "completed" && data.attempt ? (
-                <>
-                  <button
-                    type="button"
-                    className="primary"
-                    onClick={() => onReview(data.attempt?.id ?? "", true)}
-                  >
-                    查看核对记录
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPlayLocally(true);
-                      void startTask(false);
-                    }}
-                  >
-                    在当前设备再练一次
-                  </button>
-                </>
-              ) : data.task.status === "in_progress" ? (
-                <>
-                  <button type="button" className="primary" onClick={() => setPlayLocally(true)}>
-                    在当前设备继续听写
-                  </button>
-                  {onShareChild && (
-                    <button type="button" onClick={onShareChild}>
-                      孩子区链接 / 二维码
-                    </button>
-                  )}
-                </>
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={() => onReview(data.attempt?.id ?? "", true)}
+                >
+                  查看核对记录
+                </button>
               ) : (
-                <>
-                  <button
-                    type="button"
-                    className="primary"
-                    disabled={
-                      busy || !prepared?.ready || (!!prepared?.needsConfirmation && !confirmedVoice)
-                    }
-                    onClick={() => {
-                      setPlayLocally(true);
-                      void startTask(false);
-                    }}
-                  >
-                    在当前设备开始听写
+                onShareChild && (
+                  <button type="button" className="primary" onClick={onShareChild}>
+                    孩子区链接 / 二维码
                   </button>
-                  {onShareChild && (
-                    <button type="button" onClick={onShareChild}>
-                      孩子区链接 / 二维码
-                    </button>
-                  )}
-                </>
+                )
               )}
               {onPrint && (
                 <button type="button" onClick={onPrint}>
@@ -279,6 +227,12 @@ export function TaskPlayer({
                   复制再练
                 </button>
               )}
+              {onShareChild &&
+                (data.task.status === "submitted" || data.task.status === "completed") && (
+                  <button type="button" onClick={onShareChild}>
+                    孩子区链接 / 二维码
+                  </button>
+                )}
             </div>
           </section>
         </>
@@ -365,7 +319,6 @@ export function TaskPlayer({
           ) : prepared?.ready ? (
             <TaskSession
               key={data.attempt.id}
-              child={child}
               task={data.task}
               clips={prepared.clips}
               attempt={data.attempt}
@@ -396,7 +349,6 @@ function TaskSession({
   attempt,
   accountId,
   autoStart = false,
-  child = false,
   onSaved,
   onReview,
   onBack,
@@ -408,7 +360,6 @@ function TaskSession({
   attempt: Attempt;
   accountId: string;
   autoStart?: boolean;
-  child?: boolean;
   onSaved: (attempt: Attempt) => void;
   onReview: (id: string, stayInChild?: boolean) => void;
   onBack: () => void;
@@ -687,37 +638,16 @@ function TaskSession({
         {current.phase === "review" ? (
           <>
             <h2>
-              {!child
-                ? "写完了，现在可以开始核对答案"
-                : task.allowSelfReview
-                  ? "写完了，可以自主核对答案"
-                  : "写完了，已交卷给家长批改"}
+              {task.allowSelfReview ? "写完了，可以自主核对答案" : "写完了，已交卷给家长批改"}
             </h2>
             <p>
-              {!child
-                ? "所有词语已播报完毕，进度已同步。请对照纸面书写直接开始批改。"
-                : `练习进度已同步，家长端已收到“待批改”提醒；${
-                    task.allowSelfReview
-                      ? "本任务已开启自主核对，你可以点击下方直接对照答案核对。"
-                      : "请把听写纸交给家长核对，批改完成后可在首页订正错词。"
-                  }`}
+              练习进度已同步，家长端已收到“待批改”提醒；
+              {task.allowSelfReview
+                ? "本任务已开启自主核对，你可以点击下方直接对照答案核对。"
+                : "请把听写纸交给家长核对，批改完成后可在首页订正错词。"}
             </p>
             <div className="row">
-              {!child ? (
-                <>
-                  <button
-                    className="primary"
-                    disabled={busy || !!local.value}
-                    type="button"
-                    onClick={() => onReview(current.id)}
-                  >
-                    立即批改与核对
-                  </button>
-                  <button type="button" onClick={onBack}>
-                    返回任务列表
-                  </button>
-                </>
-              ) : task.allowSelfReview ? (
+              {task.allowSelfReview ? (
                 <>
                   <button
                     className="primary"

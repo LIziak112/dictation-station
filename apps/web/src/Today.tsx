@@ -231,8 +231,8 @@ export function Today({
       )}
       <p role="status">{loading ? "正在读取任务…" : ""}</p>
       {!child && submittedTasks.length > 0 && (
-        <section className="notice review-alert-banner" aria-label="待批改任务提醒">
-          <div className="row between review-alert-content">
+        <section className="panel review-alert-banner" aria-label="待批改任务提醒">
+          <div className="row between review-alert-header">
             <div>
               <p className="eyebrow">孩子已交卷 · 待家长核对</p>
               <h2>有 {submittedTasks.length} 份听写已写完交卷，请对照纸面批改</h2>
@@ -374,13 +374,36 @@ export function Today({
                             </button>
                           )}
                         </>
-                      ) : (
+                      ) : task.status === "in_progress" ? (
                         <>
                           <button type="button" className="primary" onClick={() => onOpen(task.id)}>
-                            {task.status === "in_progress" ? "继续听写" : "进入听写"}
+                            监控进度
                           </button>
                           {onShareChild && (
                             <button type="button" onClick={() => onShareChild(task.id)}>
+                              孩子区链接
+                            </button>
+                          )}
+                          <button type="button" className="subtle" onClick={() => onOpen(task.id)}>
+                            打印纸
+                          </button>
+                          <button
+                            type="button"
+                            className="danger subtle"
+                            disabled={busyId === task.id}
+                            onClick={() => void handleWithdraw(task)}
+                          >
+                            撤回任务
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          {onShareChild && (
+                            <button
+                              type="button"
+                              className="primary"
+                              onClick={() => onShareChild(task.id)}
+                            >
                               发给孩子练
                             </button>
                           )}
