@@ -1,3 +1,4 @@
+import { pinyin as toPinyin } from "pinyin-pro";
 import { z } from "zod";
 import { type Entry, entryErrors, normalizeEntry } from "../../contract/src/index";
 
@@ -81,6 +82,15 @@ export function parseList(text: string) {
       .replace(/^[（(]?\d+[)）.、:：]?\s*/, "")
       .trim();
     if (!line) continue;
+    // 纯中文列表按词拆分，表格仍按单元格处理。
+    if (
+      !line.includes("\t") &&
+      /^[\u4e00-\u9fff]+(?:[\s，,、；;]+[\u4e00-\u9fff]+)+[，,、；;]?$/.test(line)
+    ) {
+      for (const word of line.split(/[\s，,、；;]+/).filter(Boolean))
+        entries.push(normalizeEntry({ zh: word, pinyin: toPinyin(word) }, entries.length));
+      continue;
+    }
     // 含制表符 = 表格单元格边界（OCR HTML 的 <td>/<th> 已转成制表符）：只按单元格切，
     // 不再把单元格内的「走；步行」「苹果，梨」当分隔符切开。
     const splitter = line.includes("\t") ? /\t+/ : /\t+|\s*[|｜]\s*|\s{2,}|\s*[，,；;]\s*/;
@@ -161,6 +171,7 @@ export function parseList(text: string) {
     if (!/[\u4e00-\u9fff]|[A-Za-z]{2,}/.test(en) && !/[\u4e00-\u9fff]|[A-Za-z]{2,}/.test(zh))
       continue;
     if (NOISE.test(en) || NOISE.test(zh) || BOPOMOFO.test(en) || BOPOMOFO.test(zh)) continue;
+    if (!en && !pinyin && /^[\u4e00-\u9fff]+$/.test(zh)) pinyin = toPinyin(zh);
     entries.push(normalizeEntry({ en, zh, pinyin }, entries.length));
   }
   if (!entries.length)

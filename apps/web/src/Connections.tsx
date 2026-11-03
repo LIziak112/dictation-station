@@ -17,7 +17,11 @@ export function Connections({ onDraft }: { onDraft: (id: string) => void }) {
   const [message, setMessage] = useState("");
   const [rawToken, setRawToken] = useState("");
   const [showToken, setShowToken] = useState(false);
-  const [scopes, setScopes] = useState<TokenScope[]>(["wordlists:read", "drafts:write"]);
+  const [scopes, setScopes] = useState<TokenScope[]>([
+    "wordlists:read",
+    "drafts:write",
+    "history:read",
+  ]);
   const [busy, setBusy] = useState(false);
   const [mcpTab, setMcpTab] = useState<"http" | "stdio">("http");
 
@@ -96,7 +100,7 @@ export function Connections({ onDraft }: { onDraft: (id: string) => void }) {
         <section className="panel">
           <h2>01 / 创建 AI 令牌</h2>
           <p className="muted">
-            令牌对应当前账号，默认仅限读取词表和创建待确认草稿，不能修改听写任务、记录或掌握状态。创建后将自动填入右侧
+            令牌对应当前账号，默认可读取词表、听写记录和创建待确认草稿，不能修改听写任务、记录或掌握状态。令牌长期有效，可随时撤销。创建后将自动填入右侧
             MCP 配置。
           </p>
           <form
@@ -111,7 +115,6 @@ export function Connections({ onDraft }: { onDraft: (id: string) => void }) {
                   body: JSON.stringify({
                     name: form.get("name"),
                     scopes,
-                    expiresInDays: Number(form.get("days")),
                   }),
                 });
                 setTokens((previous) => [...previous, created.info]);
@@ -129,16 +132,13 @@ export function Connections({ onDraft }: { onDraft: (id: string) => void }) {
                   连接名称
                   <input name="name" maxLength={60} defaultValue="我的 Agent" required />
                 </label>
-                <label className="field">
-                  有效天数
-                  <input name="days" type="number" min={1} max={365} defaultValue={30} required />
-                </label>
               </div>
               <div className="row">
                 {(
                   [
                     ["wordlists:read", "读取自己的词表"],
                     ["drafts:write", "校验与创建草稿"],
+                    ["history:read", "读取听写记录"],
                   ] as const
                 ).map(([scope, label]) => (
                   <label className="check" key={scope}>
@@ -208,9 +208,19 @@ export function Connections({ onDraft }: { onDraft: (id: string) => void }) {
                     <strong>{token.name}</strong>
                     <p className="small muted">
                       {token.scopes
-                        .map((scope) => (scope === "wordlists:read" ? "读词表" : "建草稿"))
+                        .map(
+                          (scope) =>
+                            ({
+                              "wordlists:read": "读词表",
+                              "drafts:write": "建草稿",
+                              "history:read": "读听写记录",
+                            })[scope],
+                        )
                         .join("、")}{" "}
-                      · {new Date(token.expiresAt).toLocaleDateString("zh-CN")} 到期
+                      ·{" "}
+                      {token.expiresAt
+                        ? `${new Date(token.expiresAt).toLocaleDateString("zh-CN")} 到期`
+                        : "长期有效"}
                     </p>
                   </div>
                   <button
@@ -294,6 +304,9 @@ export function Connections({ onDraft }: { onDraft: (id: string) => void }) {
               </li>
               <li>
                 <code>list_wordlists</code>：查询当前账号已有的词表列表或单份词表详情
+              </li>
+              <li>
+                <code>list_dictation_history</code>：查询听写记录和单次批改详情
               </li>
             </ul>
           </div>

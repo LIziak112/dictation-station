@@ -1,7 +1,7 @@
 import { createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { and, eq, gt } from "drizzle-orm";
-import { accounts, sessions } from "./schema";
+import { accounts, metadata, sessions } from "./schema";
 import type { Store } from "./store";
 
 const derive = promisify(scrypt);
@@ -18,6 +18,16 @@ async function matches(password: string, stored: string) {
 }
 export class Auth {
   constructor(private store: Store) {}
+  async setDevicePin(accountId: string, deviceId: string, pin: string) {
+    const key = `parent-pin:${accountId}:${deviceId}`;
+    const value = await hashPassword(pin);
+    this.store.db.insert(metadata).values({ key, value }).onConflictDoUpdate({ target: metadata.key, set: { value } }).run();
+  }
+  async verifyDevicePin(accountId: string, deviceId: string, pin: string) {
+    const key = `parent-pin:${accountId}:${deviceId}`;
+    const record = this.store.db.select().from(metadata).where(eq(metadata.key, key)).get();
+    return record ? await matches(pin, record.value) : null;
+  }
   async register(username: string, password: string) {
     const passwordHash = await hashPassword(password);
     return this.store.db

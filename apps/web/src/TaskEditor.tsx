@@ -13,6 +13,7 @@ import {
 } from "../../../packages/contract/src/index";
 import { selectRange } from "../../../packages/core/src/tasks";
 import { api, download, request } from "./api";
+import { RepeatInterval } from "./RepeatInterval";
 import { localKey, useLocal, useUnsavedProtection } from "./storage";
 import { taskApi } from "./task-api";
 
@@ -451,6 +452,12 @@ export function TaskEditor({
                   }
                 />
               </label>
+              <RepeatInterval
+                value={input.settings.repeatInterval}
+                onChange={(repeatInterval) =>
+                  patch({ settings: { ...input.settings, repeatInterval } })
+                }
+              />
               <label className="field">
                 基础写字间隔（秒）
                 <input

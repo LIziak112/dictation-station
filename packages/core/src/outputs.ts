@@ -13,6 +13,7 @@ export function worksheetRows(task: Task, attempt: Attempt | undefined, template
     })
     .map(({ item, index }) => ({
       number: index + 1,
+      hint: item.entry.hint,
       prompt:
         template === "pinyin"
           ? item.entry.pinyin || "（未提供拼音）"

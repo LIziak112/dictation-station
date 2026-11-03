@@ -10,7 +10,7 @@ test("本机落盘失败时保留编辑内容，不允许退出丢稿", async ({
     };
   });
   await page.getByRole("textbox", { name: "作业原文", exact: true }).fill("sun 太阳");
-  await page.getByText("账号", { exact: true }).click();
+  await page.getByLabel("账号", { exact: true }).click();
   await page.getByRole("button", { name: "退出登录" }).click();
   await expect(page.getByRole("textbox", { name: "作业原文", exact: true })).toHaveValue(
     "sun 太阳",
@@ -107,6 +107,7 @@ test("筛选空态能清除搜索，输入字号随浏览器字体放大，切�
 test("AI 提示词与核对词表的名称、年级、单元和来源字段一致", async ({ page }) => {
   await page.goto("./#library");
   await page.getByRole("button", { name: "新建听写", exact: true }).click();
+  await page.getByRole("tab", { name: "AI / JSON" }).click();
   await page.getByText("使用自己的 AI 整理", { exact: true }).click();
   const prompt = await page.getByRole("textbox", { name: "整理提示词", exact: true }).inputValue();
   for (const field of ["title", "grade", "unit", "textbook"])

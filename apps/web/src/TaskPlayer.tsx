@@ -12,8 +12,11 @@ import { Playback } from "../../../packages/core/src/player";
 import { AudioPreparation, type PreparedAudio } from "./AudioPreparation";
 import { ApiError, download, getDeviceId } from "./api";
 import { BrowserAudio } from "./audio";
+import { FullscreenButton } from "./FocusControls";
+import { RepeatInterval } from "./RepeatInterval";
 import { localKey, useLocal, useUnsavedProtection } from "./storage";
 import { taskApi } from "./task-api";
+import { useWakeLock } from "./useWakeLock";
 
 export function TaskPlayer({
   taskId,
@@ -303,6 +306,7 @@ export function TaskPlayer({
           task={data.task}
           attempt={data.attempt}
           accountId={accountId}
+          child={child}
           autoStart={justStarted}
           onSaved={(attempt) =>
             setData((previous) => (previous ? { ...previous, attempt } : previous))
@@ -323,6 +327,7 @@ function TaskSession({
   task,
   attempt,
   accountId,
+  child,
   autoStart = false,
   onSaved,
   onReview,
@@ -333,6 +338,7 @@ function TaskSession({
   task: TaskPlay;
   attempt: Attempt;
   accountId: string;
+  child: boolean;
   autoStart?: boolean;
   onSaved: (attempt: Attempt) => void;
   onReview: (id: string, stayInChild?: boolean) => void;
@@ -352,6 +358,8 @@ function TaskSession({
   const [message, setMessage] = useState("");
   const [takeoverNeeded, setTakeoverNeeded] = useState(false);
   const [withdrawn, setWithdrawn] = useState(false);
+  const [celebration, setCelebration] = useState<number | null>(null);
+  useWakeLock(current.phase === "player" && !withdrawn);
   const driverRef = useRef<BrowserAudio | null>(null);
   const playback = useRef<Playback | null>(null);
   const clock = useRef(new ActiveTime());
@@ -477,6 +485,7 @@ function TaskSession({
       },
       {
         intro,
+        preAlert: true,
         groupGuide: guidance ? "这组写完了，休息一下。" : undefined,
         onBreak: (next) => {
           clock.current.pause();
@@ -508,7 +517,28 @@ function TaskSession({
     const nextIndex = latest.current.index + 1;
     if (nextIndex >= task.items.length) {
       clock.current.pause();
-      await save({ phase: "review" });
+      if ((await save({ phase: "review" })) && child) {
+        try {
+          const key = localKey("student-checkin-days", accountId);
+          const today = new Date();
+          const dateKey = (date: Date) =>
+            `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+          const saved: unknown = JSON.parse(localStorage.getItem(key) ?? "[]");
+          const days = Array.isArray(saved)
+            ? saved.filter((day): day is string => typeof day === "string")
+            : [];
+          const unique = [...new Set([...days, dateKey(today)])].sort().slice(-366);
+          localStorage.setItem(key, JSON.stringify(unique));
+          let streak = 0;
+          while (unique.includes(dateKey(today))) {
+            streak++;
+            today.setDate(today.getDate() - 1);
+          }
+          setCelebration(streak);
+        } catch {
+          setCelebration(0);
+        }
+      }
       return;
     }
     if (!(await save({ index: nextIndex }))) return;
@@ -614,6 +644,24 @@ function TaskSession({
         )}
         {current.phase === "review" ? (
           <>
+            {celebration !== null && (
+              <div className="completion-cheer" role="status">
+                <div className="cheer-confetti" aria-hidden="true">
+                  {Array.from("abcdefghijklmnopqr", (piece, index) => (
+                    <i
+                      key={piece}
+                      style={{ left: `${index * 5.7}%`, animationDelay: `${(index % 6) * 0.08}s` }}
+                    />
+                  ))}
+                </div>
+                <strong>写完啦，你真棒！</strong>
+                <p>
+                  {celebration > 0
+                    ? `坚持小达人 · 本设备连续打卡 ${celebration} 天`
+                    : "今天的努力，值得一枚小勋章"}
+                </p>
+              </div>
+            )}
             <h2>
               {attempt.phase !== "review"
                 ? busy
@@ -674,11 +722,13 @@ function TaskSession({
                   ? ` · 第 ${Math.floor(current.index / liveSettings.groupSize) + 1} / ${Math.ceil(task.items.length / liveSettings.groupSize)} 组`
                   : ""}
               </span>
+              <FullscreenButton />
             </div>
             <progress value={current.index + 1} max={task.items.length} aria-label="任务进度" />
             <div className="prompt">
               <p className="eyebrow">{MODES[task.mode].description}</p>
               <h2 className="task-prompt">{item.prompt || "听一听，写下来"}</h2>
+              {item.hint && <p>语境：{item.hint}</p>}
               {item.reading && <p className="muted">读音：{item.reading}</p>}
             </div>
             <div className="play-controls">
@@ -763,6 +813,13 @@ function TaskSession({
                 ))}
               </select>
             </label>
+            <RepeatInterval
+              value={liveSettings.repeatInterval}
+              onChange={(repeatInterval) => {
+                playback.current?.stop();
+                setLiveSettings((prev) => ({ ...prev, repeatInterval }));
+              }}
+            />
             <label className="field">
               写字间隔（秒）
               <input

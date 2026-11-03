@@ -68,6 +68,8 @@ function isChildRouteAllowed(method: string, path: string) {
   if (method === "POST" && /^\/api\/attempts\/[^/]+\/complete$/.test(path)) return true;
   if (method === "POST" && /^\/api\/attempts\/[^/]+\/corrections$/.test(path)) return true;
   if (method === "POST" && path === "/api/pronunciation/preview") return true;
+  if (method === "POST" && path === "/api/auth/verify-password") return true;
+  if (method === "POST" && path === "/api/auth/unlock-pin") return true;
   if (method === "GET" && /^\/audio\/[^/]+$/.test(path)) return true;
   return false;
 }
@@ -129,6 +131,8 @@ export function createApp(store: Store, options: Options) {
         /* 合成接口测试没有网络连接。 */
       }
       const ip = options.trustProxy ? (c.req.header("x-real-ip") ?? remote) : remote;
+      if (c.req.path === "/api/auth/unlock-pin" && limited(`pin:${ip}`, 10, 60000))
+        return c.json({ error: "尝试次数过多，请稍后重试" }, 429);
       if (limited(`write:${ip}`, 120, 60000))
         return c.json({ error: "操作太频繁，请稍后重试" }, 429);
       if (c.req.path.includes("/ocr") && limited(`ocr:${ip}`, 40, 3600000))
@@ -176,6 +180,7 @@ export function createApp(store: Store, options: Options) {
       const path = c.req.path,
         method = c.req.method;
       const read = method === "GET" && /^\/api\/agent\/wordlists(?:\/[^/]+)?$/.test(path);
+      const readHistory = method === "GET" && /^\/api\/agent\/history(?:\/[^/]+)?$/.test(path);
       const writeDraft =
         method === "POST" && ["/api/agent/validate", "/api/agent/drafts"].includes(path);
       const schema = method === "GET" && path === "/api/agent/schema";
@@ -183,6 +188,7 @@ export function createApp(store: Store, options: Options) {
         !(
           schema ||
           (read && actor.scopes.includes("wordlists:read")) ||
+          (readHistory && actor.scopes.includes("history:read")) ||
           (writeDraft && actor.scopes.includes("drafts:write"))
         )
       )
@@ -194,7 +200,9 @@ export function createApp(store: Store, options: Options) {
     const headerChildToken =
       c.req.header("X-Child-Token") ?? (bearer.startsWith("ct_") ? bearer : "");
     const sessionAccount = auth.current(getCookie(c, "dictation_session") ?? "");
-    const cookieChildToken = !sessionAccount ? (getCookie(c, "dictation_child") ?? "") : "";
+    const cookieChildToken = !sessionAccount && c.req.header("X-Parent-Mode") !== "1"
+      ? (getCookie(c, "dictation_child") ?? "")
+      : "";
     const activeChildToken = headerChildToken || cookieChildToken;
     if (activeChildToken) {
       const childActor = tokens.authenticateChild(
@@ -272,6 +280,27 @@ export function createApp(store: Store, options: Options) {
     const input = passwordVerificationSchema.parse(await c.req.json());
     if (!(await auth.login(c.get("account").username, input.password)))
       return c.json({ error: "账号密码不正确" }, 400);
+    if (c.get("childMode")) setCookie(c, "dictation_session", auth.createSession(c.get("account").id), {
+      httpOnly: true, sameSite: "Lax", path: "/", maxAge: 30 * 86400,
+      secure: c.req.url.startsWith("https:") || (c.req.header("Origin") ?? "").startsWith("https:"),
+    });
+    return c.json({ ok: true });
+  });
+  const devicePinSchema = z.strictObject({ deviceId: z.string().regex(/^[a-f0-9]{32}$/), pin: z.string().regex(/^[0-9]{4}$/) });
+  app.post("/api/auth/device-pin", async (c) => {
+    const { deviceId, pin } = devicePinSchema.parse(await c.req.json());
+    await auth.setDevicePin(c.get("account").id, deviceId, pin);
+    return c.json({ ok: true });
+  });
+  app.post("/api/auth/unlock-pin", async (c) => {
+    const { deviceId, pin } = devicePinSchema.parse(await c.req.json());
+    const valid = await auth.verifyDevicePin(c.get("account").id, deviceId, pin);
+    if (valid === null) return c.json({ error: "请使用账号密码验证并重新设置本机口令" }, 409);
+    if (!valid) return c.json({ error: "口令不正确，请重试" }, 400);
+    setCookie(c, "dictation_session", auth.createSession(c.get("account").id), {
+      httpOnly: true, sameSite: "Lax", path: "/", maxAge: 30 * 86400,
+      secure: c.req.url.startsWith("https:") || (c.req.header("Origin") ?? "").startsWith("https:"),
+    });
     return c.json({ ok: true });
   });
   app.post("/api/auth/password", async (c) => {
@@ -480,6 +509,16 @@ export function createApp(store: Store, options: Options) {
   app.get("/api/agent/wordlists/:id", (c) => {
     const batch = store.get(c.get("account").id, c.req.param("id"));
     return batch ? c.json({ batch }) : c.json({ error: "词表不存在" }, 404);
+  });
+  app.get("/api/agent/history", (c) => c.json({ items: learning.history(c.get("account").id) }));
+  app.get("/api/agent/history/:id", (c) => {
+    const accountId = c.get("account").id;
+    const item = learning
+      .history(accountId)
+      .find(({ attempt }) => attempt.id === c.req.param("id"));
+    return item
+      ? c.json({ attempt: item.attempt, task: tasks.require(accountId, item.attempt.taskId) })
+      : c.json({ error: "听写记录不存在" }, 404);
   });
   app.post("/api/agent/drafts", async (c) =>
     c.json({ draft: drafts.create(c.get("account").id, await c.req.json()) }, 201),

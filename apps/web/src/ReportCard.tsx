@@ -65,13 +65,13 @@ export function ReportCard({ task, attempt }: { task: Task; attempt: Attempt }) 
     context.fillStyle = "#f8f7f3";
     context.fillRect(0, 0, element.width, element.height);
     context.fillStyle = "#28634e";
-    context.font = '600 32px "Microsoft YaHei", sans-serif';
+    context.font = '600 32px system-ui, "PingFang SC", "Microsoft YaHei", sans-serif';
     context.fillText("OwnClass · 听写小站", 72, 88);
     context.fillStyle = "#282f2b";
-    context.font = '700 52px "Microsoft YaHei", sans-serif';
+    context.font = '700 52px system-ui, "PingFang SC", "Microsoft YaHei", sans-serif';
     fitText(context, task.title, 72, 176, 936, 68, 2);
     context.fillStyle = "#606b63";
-    context.font = '30px "Microsoft YaHei", sans-serif';
+    context.font = '30px system-ui, "PingFang SC", "Microsoft YaHei", sans-serif';
     context.fillText(
       `${task.date} · ${summary.unchecked ? "听写已记录，仍有待核对项" : "本次核对已完成"}`,
       72,
@@ -82,19 +82,19 @@ export function ReportCard({ task, attempt }: { task: Task; attempt: Attempt }) 
     const columns = [
       [summary.total, "本次范围"],
       [summary.correct, "已通过"],
-      [summary.pending, "待巩固"],
+      [summary.pending, "需复习"],
     ] as const;
     columns.forEach(([value, label], index) => {
       const x = 110 + index * 308;
       context.fillStyle = "#28634e";
-      context.font = '700 76px "Microsoft YaHei", sans-serif';
+      context.font = '700 76px system-ui, "PingFang SC", "Microsoft YaHei", sans-serif';
       context.fillText(String(value), x, 480);
       context.fillStyle = "#606b63";
-      context.font = '30px "Microsoft YaHei", sans-serif';
-      context.fillText(`${label}（项）`, x, 555);
+      context.font = '30px system-ui, "PingFang SC", "Microsoft YaHei", sans-serif';
+      context.fillText(`${label}（项）`, x, 555, 260);
     });
     context.fillStyle = "#606b63";
-    context.font = '30px "Microsoft YaHei", sans-serif';
+    context.font = '30px system-ui, "PingFang SC", "Microsoft YaHei", sans-serif';
     context.fillText(`已订正 ${summary.corrected} 项 · 未核对 ${summary.unchecked} 项`, 72, 700);
     if (image) {
       const scale = Math.min(936 / image.naturalWidth, 560 / image.naturalHeight),
@@ -107,11 +107,19 @@ export function ReportCard({ task, attempt }: { task: Task; attempt: Attempt }) 
       context.fillText("可添加本次书写纸照片", 118, 812);
     }
     context.fillStyle = "#606b63";
-    context.font = '24px "Microsoft YaHei", sans-serif';
+    context.font = '24px system-ui, "PingFang SC", "Microsoft YaHei", sans-serif';
+    context.textAlign = "center";
     context.fillText(
       "结果由本人核对记录 · Your data. Your way. All for learning.",
-      72,
-      element.height - 56,
+      element.width / 2,
+      element.height - 76,
+      936,
+    );
+    context.fillText(
+      new URL(".", window.location.href).href,
+      element.width / 2,
+      element.height - 36,
+      936,
     );
   }, [task, attempt, image]);
   async function file() {
@@ -129,7 +137,7 @@ export function ReportCard({ task, attempt }: { task: Task; attempt: Attempt }) 
     <section className="panel report-card">
       <h2>本次打卡汇报卡</h2>
       <p>
-        {counts.total} 项 · 已通过 {counts.correct} 项 · 待巩固 {counts.pending} 项 · 未核对{" "}
+        {counts.total} 项 · 已通过 {counts.correct} 项 · 需复习 {counts.pending} 项 · 未核对{" "}
         {counts.unchecked} 项
       </p>
       <canvas ref={canvas} role="img" aria-label="听写打卡汇报卡预览" />

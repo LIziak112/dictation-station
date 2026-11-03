@@ -216,6 +216,7 @@ export const settingsSchema = z.strictObject({
   adaptiveInterval: z.boolean().default(true),
   guidance: z.boolean().default(false),
   repeat: z.number().int().min(1).max(5),
+  repeatInterval: z.number().min(0).max(10).multipleOf(0.5).default(1.5),
   interval: z.number().min(1).max(30),
   speed: z.number().min(0.5).max(2),
   auto: z.boolean(),
@@ -228,6 +229,7 @@ export const defaultSettings: Settings = {
   adaptiveInterval: true,
   guidance: false,
   repeat: 2,
+  repeatInterval: 1.5,
   interval: 4,
   speed: 1,
   auto: false,
@@ -376,6 +378,7 @@ export const taskPlaySchema = taskSummarySchema
         wordId: idSchema,
         audioKey: idSchema,
         prompt: z.string(),
+        hint: z.string().default(""),
         audioText: z.string(),
         lang: z.enum(["en", "zh"]).nullable(),
         kind: z.string(),
@@ -518,23 +521,23 @@ export const localAudioEntrySchema = z.strictObject({
   licenseUrl: z.url(),
 });
 export type LocalAudioEntry = z.infer<typeof localAudioEntrySchema>;
-export const tokenScopeSchema = z.enum(["wordlists:read", "drafts:write"]);
+export const tokenScopeSchema = z.enum(["wordlists:read", "drafts:write", "history:read"]);
 export type TokenScope = z.infer<typeof tokenScopeSchema>;
 export const tokenCreateSchema = z.strictObject({
   name: z.string().trim().min(1).max(60),
   scopes: z
     .array(tokenScopeSchema)
     .min(1)
-    .max(2)
+    .max(3)
     .refine((scopes) => new Set(scopes).size === scopes.length, "权限重复"),
-  expiresInDays: z.number().int().min(1).max(365).default(30),
+  expiresInDays: z.number().int().min(1).max(365).optional(),
 });
 export const tokenInfoSchema = z.object({
   id: idSchema,
   name: z.string(),
   scopes: z.array(tokenScopeSchema),
   createdAt: z.iso.datetime(),
-  expiresAt: z.iso.datetime(),
+  expiresAt: z.iso.datetime().nullable(),
 });
 export type TokenInfo = z.infer<typeof tokenInfoSchema>;
 export const tokenListSchema = z.object({ tokens: z.array(tokenInfoSchema) });

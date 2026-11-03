@@ -256,6 +256,10 @@ it("childToken 门禁、交卷前详情拦截、待考词界面提示与一键�
   expect(childToken.token).toMatch(/^ct_/);
 
   const childHeaders = { "X-Child-Token": childToken.token, "User-Agent": "iPad Safari" };
+  const childCookie = { Cookie: `dictation_child=${childToken.token}`, "User-Agent": "iPad Safari" };
+  expect((await app.request("/api/auth/me", { headers: childCookie })).status).toBe(200);
+  expect((await app.request("/api/auth/me", { headers: { ...childCookie, "X-Parent-Mode": "1" } })).status).toBe(401);
+  expect((await app.request("/api/batches", { headers: { ...childCookie, "X-Parent-Mode": "1" } })).status).toBe(401);
 
   // 2. 白名单拦截一切家长端管理接口
   for (const [method, url] of [

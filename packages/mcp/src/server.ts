@@ -71,6 +71,18 @@ export function createMcpServer(call: AgentCall, linkBase: string) {
     },
     async ({ id }) => call(id ? `wordlists/${encodeURIComponent(id)}` : "wordlists"),
   );
+  server.registerTool(
+    "list_dictation_history",
+    {
+      title: "查询听写记录",
+      description:
+        "查询当前账号已完成的听写与批改结果；填写 attemptId 可查看该次词条和判分详情。需要 history:read 权限。",
+      inputSchema: z.object({ attemptId: z.string().optional() }),
+      annotations: { readOnlyHint: true },
+    },
+    async ({ attemptId }) =>
+      call(attemptId ? `history/${encodeURIComponent(attemptId)}` : "history"),
+  );
   return server;
 }
 

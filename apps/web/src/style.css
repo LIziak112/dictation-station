@@ -1,25 +1,36 @@
 :root {
   font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "HarmonyOS Sans SC",
+    "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
   color: var(--text);
   background: var(--page);
-  --muted: #606b63;
-  --brand: #28634e;
-  --line: #d8ddd5;
-  --soft: #edf2e9;
-  --error: #a13229;
-  --radius: 20px;
-  --text: #282f2b;
-  --page: #f8f7f3;
-  --surface: #fffefa;
-  --control-border: #879488;
-  --control-text: #303d34;
-  --label: #455246;
-  --selected: #e5efdf;
-  --warning: #80511f;
+  --muted: #5d6862;
+  --brand: #1d6b52;
+  --brand-strong: #145340;
+  --brand-tint: #e3f1ea;
+  --accent: #b5651d;
+  --accent-tint: #fdf0e1;
+  --line: #e2e7e3;
+  --line-strong: #cfd7d1;
+  --soft: #eef4f0;
+  --error: #b42d23;
+  --radius: 18px;
+  --radius-sm: 12px;
+  --text: #1f2a24;
+  --page: #f4f6f3;
+  --surface: #ffffff;
+  --control-border: #87958c;
+  --control-text: #24332b;
+  --label: #3f4c45;
+  --selected: #dcefe5;
+  --warning: #8a4f12;
   --on-brand: #ffffff;
-  --hover: #edf2e9;
-  --brand-hover: #1f513e;
+  --hover: #eef4f0;
+  --brand-hover: #145340;
+  --shadow-sm: 0 1px 2px #1a2b2210, 0 1px 3px #1a2b220a;
+  --shadow-md: 0 1px 2px #1a2b220d, 0 8px 24px -8px #1a2b2224;
+  --shadow-lg: 0 2px 4px #1a2b220d, 0 20px 48px -16px #1a2b2233;
+  --header-h: 68px;
 }
 * {
   box-sizing: border-box;
@@ -63,9 +74,11 @@ button {
   min-height: 44px;
   padding: 10px 18px;
   border: 1px solid var(--control-border);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--control-text);
+  font-weight: 550;
+  line-height: 1.35;
   cursor: pointer;
   touch-action: manipulation;
   user-select: none;
@@ -80,6 +93,9 @@ button.primary {
   border-color: var(--brand);
   color: var(--on-brand);
   font-weight: 650;
+  box-shadow:
+    0 1px 2px #0f3a2b33,
+    0 4px 12px -4px #1d6b5266;
 }
 button.subtle {
   background: transparent;
@@ -105,9 +121,15 @@ select {
   min-height: 44px;
   padding: 10px 12px;
   border: 1px solid var(--control-border);
-  border-radius: 8px;
+  border-radius: 10px;
   color: inherit;
   background: var(--surface);
+}
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline-offset: 1px;
+  border-color: var(--brand);
 }
 textarea {
   resize: vertical;
@@ -1439,7 +1461,7 @@ code {
   display: block;
   width: min(100%, 420px);
   height: auto;
-  margin-block: 24px;
+  margin: 24px auto;
   border-radius: 12px;
 }
 .print-view {
@@ -1450,7 +1472,7 @@ code {
 }
 .print-sheet {
   width: min(100%, 210mm);
-  margin: 0 auto;
+  margin: 0 auto 20px;
   color: #1f2922;
   background: white;
   padding: 12mm 14mm;
@@ -1458,6 +1480,7 @@ code {
   border-radius: 6px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
 }
+.print-view > .print-sheet { margin: 0 auto 20px; }
 .print-header {
   display: flex;
   flex-wrap: wrap;
@@ -1488,10 +1511,25 @@ code {
   margin: 0;
   color: #2c3830;
 }
+.print-qr {
+  display: flex;
+  align-items: center;
+  gap: 2mm;
+  font-size: 8pt;
+  color: #222;
+}
+.print-qr img { width: 18mm; height: 18mm; }
+.worksheet-prompt, .worksheet-item > div:not(.writing-squares):not(.writing-line), .print-answers-grid {
+  font-family: STKaiti, KaiTi, "楷体", "Kaiti SC", serif;
+}
+.writing-squares { display: flex; flex: none; margin-top: 1mm; }
+.writing-squares svg { display: block; width: 14mm; height: 14mm; flex: 0 0 14mm; }
+.writing-english { display: block; width: 100%; height: 9mm; flex: none; margin-top: 1mm; }
 .worksheet {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px 18px;
+  align-content: start;
+  gap: 8px 2mm;
   list-style: none;
   padding: 0;
   margin: 0;
@@ -1500,9 +1538,12 @@ code {
   padding: 3px 0;
   break-inside: avoid;
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .worksheet-item.sentence-item {
-  grid-column: 1 / -1;
+  grid-column: auto;
 }
 .worksheet-prompt {
   display: flex;
@@ -1520,7 +1561,8 @@ code {
   flex-shrink: 0;
 }
 .writing-line {
-  height: 22px;
+  flex: 1 1 0;
+  min-height: 4mm;
   border-bottom: 1px solid #6b786f;
 }
 .print-answers {
@@ -1730,8 +1772,14 @@ a {
     border: 0;
     box-shadow: none;
     padding: 0;
+    margin: 0;
     font-size: 10.5pt;
+    height: auto;
+    min-height: 0;
+    break-before: page;
   }
+  .print-view > .print-sheet { margin: 0; }
+  .print-view > .print-sheet:first-of-type { break-before: auto; }
   .print-answers {
     margin-top: 14px;
   }
@@ -2293,7 +2341,6 @@ a {
   .print-sheet {
     padding: 16px;
   }
-  .worksheet,
   .print-answers-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2359,10 +2406,12 @@ main > section + section {
   }
 }
 @media print {
-  .worksheet {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
   .print-answers {
-    break-before: page;
+    break-before: auto;
   }
+  .print-sheet { padding: 0; }
+}
+@media screen {
+  .print-view { overflow-x: auto; }
+  .print-sheet { width: 210mm; min-width: 210mm; }
 }

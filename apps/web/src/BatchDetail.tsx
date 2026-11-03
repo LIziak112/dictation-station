@@ -15,6 +15,7 @@ import { selectRange } from "../../../packages/core/src/tasks";
 import { loadAudio } from "./AudioPreparation";
 import { api, exportBatch, request } from "./api";
 import { BrowserAudio } from "./audio";
+import { RepeatInterval } from "./RepeatInterval";
 import { taskApi } from "./task-api";
 
 interface Props {
@@ -237,6 +238,10 @@ export function BatchDetail({
                 ))}
               </select>
             </label>
+            <RepeatInterval
+              value={settings.repeatInterval}
+              onChange={(repeatInterval) => setSettings({ ...settings, repeatInterval })}
+            />
             <label className="field">
               写字间隔（秒）
               <input

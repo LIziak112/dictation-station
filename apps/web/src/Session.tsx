@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { z } from "zod";
 import { type Account, accountResponseSchema } from "../../../packages/contract/src/index";
 import { ApiError, api, captureChildTokenFromUrl, request } from "./api";
+import { ParentGate } from "./ParentGate";
 import { Portal } from "./Portal";
 
 export function Session() {
@@ -10,15 +11,29 @@ export function Session() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [allowRegistration, setAllowRegistration] = useState(false);
+  const child = new URLSearchParams(location.search).get("child") === "1";
+  const [returning, setReturning] = useState(
+    () => !child && sessionStorage.getItem("ownclass:from-child") === "1",
+  );
   useEffect(() => {
     captureChildTokenFromUrl();
-    Promise.all([
-      api.health(),
-      request("api/auth/me", accountResponseSchema).catch((e: unknown) => {
-        if (e instanceof ApiError && e.status === 401) return null;
-        throw e;
-      }),
-    ])
+    if (child) sessionStorage.setItem("ownclass:from-child", "1");
+    const prepare = child
+      ? fetch("api/auth/logout", { method: "POST" }).then((response) => {
+          if (!response.ok && response.status !== 401 && response.status !== 403)
+            throw new Error("无法退出家长账号，请检查连接后重试");
+        })
+      : Promise.resolve();
+    prepare
+      .then(() =>
+        Promise.all([
+          api.health(),
+          request("api/auth/me", accountResponseSchema).catch((e: unknown) => {
+            if (e instanceof ApiError && e.status === 401) return null;
+            throw e;
+          }),
+        ]),
+      )
       .then(([health, session]) => {
         setAllowRegistration(health.allowRegistration);
         setAccount(session?.account ?? null);
@@ -28,7 +43,7 @@ export function Session() {
     const expired = () => setAccount(null);
     window.addEventListener("dictation:session-expired", expired);
     return () => window.removeEventListener("dictation:session-expired", expired);
-  }, []);
+  }, [child]);
   async function logout() {
     try {
       await request("api/auth/logout", z.object({ ok: z.boolean() }), { method: "POST" });
@@ -53,10 +68,26 @@ export function Session() {
         </button>
       </main>
     );
-  return account ? (
+  return account && returning ? (
+    <ParentGate
+      account={account}
+      onUnlocked={() => {
+        sessionStorage.removeItem("ownclass:from-child");
+        setReturning(false);
+      }}
+      onCancel={() => {
+        location.search = "?child=1";
+      }}
+    />
+  ) : account ? (
     <Portal key={account.id} account={account} onLogout={() => void logout()} />
   ) : (
-    <Login allowRegistration={allowRegistration} onAccount={setAccount} />
+    <Login
+      allowRegistration={allowRegistration}
+      onAccount={(value) => {
+        setAccount(value);
+      }}
+    />
   );
 }
 

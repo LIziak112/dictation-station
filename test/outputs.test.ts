@@ -6,6 +6,7 @@ import {
   type Task,
 } from "../packages/contract/src/index";
 import { cardCounts, worksheetRows } from "../packages/core/src/outputs";
+import { projectTask } from "../packages/core/src/tasks";
 
 const task: Task = {
   id: "task",
@@ -68,4 +69,12 @@ it("汇报卡不把未核对项算正确，订正独立统计", () => {
     unchecked: 1,
     corrected: 1,
   });
+});
+it("任务投影和练习纸保留语境提示", () => {
+  const withHint = {
+    ...task,
+    items: [{ ...task.items[0], entry: { ...task.items[0].entry, hint: "太阳升起" } }],
+  };
+  expect(projectTask(withHint).items[0].hint).toBe("太阳升起");
+  expect(worksheetRows(withHint, undefined, "blank")[0].hint).toBe("太阳升起");
 });

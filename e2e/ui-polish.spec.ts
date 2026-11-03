@@ -65,7 +65,7 @@ test("任务读取失败提供重试，浏览器返回不会丢失未落盘草�
 
 test("深色控件的真实文字对比可读，主题切换不保留颜色过渡", async ({ page }) => {
   await page.goto("./");
-  await page.getByText("显示与专注", { exact: true }).click();
+  await page.locator(".user-menu > summary").click();
   await page.getByRole("button", { name: "切换深色" }).click();
   await page.screenshot({ path: test.info().outputPath("today-dark.png"), fullPage: true });
   const ratio = await page

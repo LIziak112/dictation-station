@@ -74,18 +74,20 @@ export function History({ onOpen }: { onOpen: (id: string) => void }) {
           <p>完成任务核对后，会在这里留下记录。</p>
         </section>
       )}
-      <div className="batch-grid">
+      <div className="record-list">
         {items.map(({ task, attempt }) => (
-          <article className="panel" key={attempt.id}>
-            <p className="eyebrow">
-              {task.date} · {MODES[task.mode].label}
-            </p>
-            <h2>{task.title}</h2>
-            <p>
-              {task.count} 项 ·{" "}
-              {Object.values(attempt.results).filter((result) => result === "wrong").length}{" "}
-              项待巩固 · 已订正 {attempt.corrections.length} 项
-            </p>
+          <article className="panel record-card" key={attempt.id}>
+            <div className="record-details">
+              <p className="small muted">
+                {task.date} · {MODES[task.mode].label}
+              </p>
+              <h2>{task.title}</h2>
+              <p>
+                {task.count} 项 ·{" "}
+                {Object.values(attempt.results).filter((result) => result === "wrong").length}{" "}
+                项未通过 · 已订正 {attempt.corrections.length} 项
+              </p>
+            </div>
             <button type="button" onClick={() => onOpen(attempt.id)}>
               查看核对与订正
             </button>

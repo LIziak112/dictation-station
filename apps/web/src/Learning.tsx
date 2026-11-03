@@ -1,3 +1,4 @@
+import { ChevronDown } from "lucide-react";
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import {
@@ -126,7 +127,7 @@ export function Learning({ onPublished }: { onPublished: (id: string) => void })
       <section className="panel">
         <div className="learning-toolbar">
           <div>
-            <h2>01 / 待巩固词条列表</h2>
+            <h2>待巩固词条列表</h2>
             <p className="small muted">按练法查看每项词语的独立通过次数与下次复习时间。</p>
           </div>
           <label className="field inline-field">
@@ -231,16 +232,16 @@ export function Learning({ onPublished }: { onPublished: (id: string) => void })
           <div className="empty">
             <h3>当前练法还没有待巩固记录</h3>
             <p className="muted">
-              完成一次听写任务并由家长核对后，标记为“再练一次”或“不确定”的词条会自动归集到这里。
+              完成一次听写任务并由家长核对后，标记为“未通过”或“待巩固”的词条会自动归集到这里。
             </p>
           </div>
         )}
       </section>
 
       <section className="panel">
-        <h2>02 / 阶段总复习（期中 / 期末考前汇总）</h2>
+        <h2>阶段总复习（期中 / 期末考前汇总）</h2>
         <p className="muted">
-          选择日期范围，一键汇总该阶段内练过但尚未完全掌握的词条（含不确定与未核对项），生成考前复习任务。
+          选择日期范围，一键汇总该阶段内练过但尚未完全掌握的词条（含待巩固与未核对项），生成考前复习任务。
         </p>
         <div className="exam-toolbar">
           <label className="field">
@@ -316,8 +317,14 @@ export function Learning({ onPublished }: { onPublished: (id: string) => void })
       </section>
 
       <section className="panel">
-        <details>
-          <summary>03 / 复习规则与偏好设置</summary>
+        <details className="review-preferences">
+          <summary>
+            <span>
+              <strong>复习规则与偏好设置</strong>
+              <span className="small muted">设置掌握标准、旧词数量和复习方式</span>
+            </span>
+            <ChevronDown size={20} aria-hidden="true" />
+          </summary>
           <form
             className="prefs-form"
             onSubmit={async (e) => {

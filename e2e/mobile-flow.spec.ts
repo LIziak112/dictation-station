@@ -119,9 +119,9 @@ for (const width of [320, 390]) {
     await expect(page.getByRole("heading", { name: "写完了，已交卷给家长批改" })).toBeVisible();
     const { attempt } = await (await page.request.get(`api/tasks/${task.id}/play`)).json();
     await page.goto(`./#review=${attempt.id}`);
-    await page.getByRole("button", { name: "再练一次", exact: true }).first().click();
+    await page.getByRole("button", { name: "未通过", exact: true }).first().click();
     await inspect("review");
-    await page.getByLabel("已全部核对，其余正确").check();
+    await page.getByLabel("已全部核对，其余未标记的题目均正确").check();
     await page.getByRole("button", { name: "保存核对并完成" }).click();
     await expect(page.getByRole("heading", { name: "本次核对记录" })).toBeVisible();
     await page.getByRole("button", { name: "打印练习纸", exact: true }).click();

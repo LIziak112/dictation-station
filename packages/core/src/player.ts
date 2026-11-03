@@ -8,6 +8,7 @@ export function createQueue(entries: Entry[], mode: Mode) {
     .map((entry) => ({
       entry,
       prompt: m.show ? entry[m.show] : "",
+      hint: entry.hint,
       answer: entry[m.answer],
       audioText: m.audio ? entry[m.audio] : "",
       lang: m.audio,
@@ -16,6 +17,7 @@ export function createQueue(entries: Entry[], mode: Mode) {
 export interface AudioDriver {
   speak(text: string, lang: "en" | "zh", speed: number, audioKey?: string): Promise<void>;
   cancel(): void;
+  chime?(): void;
 }
 export class Playback {
   private generation = 0;
@@ -30,11 +32,16 @@ export class Playback {
     this.state(false);
   }
   async play(
-    queue: { audioText: string; lang: "en" | "zh" | null; audioKey?: string }[],
+    queue: { audioText: string; lang: "en" | "zh" | null; audioKey?: string; hint?: string }[],
     start: number,
     settings: Settings,
     onIndex: (index: number) => unknown,
-    options?: { intro?: string; groupGuide?: string; onBreak?: (index: number) => void },
+    options?: {
+      intro?: string;
+      groupGuide?: string;
+      onBreak?: (index: number) => void;
+      preAlert?: boolean;
+    },
   ) {
     this.stop();
     const generation = this.generation;
@@ -52,8 +59,10 @@ export class Playback {
           if (!active()) return;
           if (q.lang) await this.driver.speak(q.audioText, q.lang, settings.speed, q.audioKey);
           if (!active()) return;
-          if (n < settings.repeat - 1) await this.wait(320);
+          if (n < settings.repeat - 1) await this.wait(settings.repeatInterval * 1000);
         }
+        if (q.hint && active()) await this.driver.speak(q.hint, "zh", settings.speed);
+        if (!active()) return;
         if (!settings.auto || index === queue.length - 1) break;
         if (settings.groupSize && (index + 1) % settings.groupSize === 0 && options?.onBreak) {
           await onIndex(index + 1);
@@ -63,11 +72,17 @@ export class Playback {
           options.onBreak(index + 1);
           break;
         }
-        await this.wait(
+        const delay =
           (settings.adaptiveInterval
             ? writingSeconds(q.audioText, q.lang, settings.interval)
-            : settings.interval) * 1000,
-        );
+            : settings.interval) * 1000;
+        const alertLead = options?.preAlert && this.driver.chime ? Math.min(1500, delay) : 0;
+        await this.wait(delay - alertLead);
+        if (!active()) return;
+        if (alertLead) {
+          this.driver.chime?.();
+          await this.wait(alertLead);
+        }
       }
     } catch (error) {
       if (active()) this.state(false, error instanceof Error ? error.message : "朗读失败，请重试");
