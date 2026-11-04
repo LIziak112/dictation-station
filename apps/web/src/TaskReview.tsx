@@ -129,6 +129,12 @@ function ReviewSession({
           <p>
             {task.title} · 已核对 {checked}/{task.items.length}
           </p>
+          {attempt.submission?.early && (
+            <p role="status">
+              提前交卷 · 交卷时停在第 {attempt.submission.index + 1}/{task.items.length}{" "}
+              项，请确认是否退回补写。
+            </p>
+          )}
         </div>
         <button type="button" onClick={onBack}>
           返回任务

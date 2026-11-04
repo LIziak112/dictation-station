@@ -61,7 +61,8 @@ test("手动推进五项后组间休息，可立即继续，并切换深色", as
       })
     ).json()
   ).task;
-  await page.goto(`./?child=1#task=${task.id}`);
+  const { token } = await (await page.request.post("api/child-token")).json();
+  await page.goto(`./?child=1&ct=${encodeURIComponent(token)}#task=${task.id}`);
   await page.getByRole("button", { name: "开始任务", exact: true }).click();
   for (let index = 0; index < 5; index++)
     await page.getByRole("button", { name: "我写好了，下一个", exact: true }).click();

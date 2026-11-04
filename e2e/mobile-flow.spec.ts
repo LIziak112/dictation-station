@@ -84,6 +84,7 @@ for (const width of [320, 390]) {
     await page.goto(`./?child=1&ct=${token}`);
     await expect(page.getByRole("button", { name: "准备开始" })).toBeVisible();
     await inspect("child");
+    await page.getByRole("tab", { name: "磨耳朵" }).click();
     await page.getByRole("button", { name: "纯听磨耳朵" }).click();
     await page.getByRole("button", { name: "开始播放" }).click();
     await expect
@@ -102,6 +103,7 @@ for (const width of [320, 390]) {
     await page.getByRole("button", { name: "我写好了，下一个" }).click();
     await page.getByRole("button", { name: "暂停练习", exact: true }).click();
     await page.getByRole("button", { name: "暂存并返回" }).click();
+    await page.getByRole("tab", { name: "今天" }).click();
     await page.getByRole("button", { name: "继续任务" }).click();
     await expect(page.getByText("第 2 / 2 项", { exact: true })).toBeVisible();
     await inspect("player");
@@ -119,6 +121,9 @@ for (const width of [320, 390]) {
     await expect(page.getByRole("heading", { name: "写完了，已交卷给家长批改" })).toBeVisible();
     const { attempt } = await (await page.request.get(`api/tasks/${task.id}/play`)).json();
     await page.goto(`./#review=${attempt.id}`);
+    await page.getByLabel("四位数字口令").fill("2468");
+    await page.getByLabel("账号密码（首次设置时验证）").fill("synthetic-password");
+    await page.getByRole("button", { name: "确认", exact: true }).click();
     await page.getByRole("button", { name: "未通过", exact: true }).first().click();
     await inspect("review");
     await page.getByLabel("已全部核对，其余未标记的题目均正确").check();

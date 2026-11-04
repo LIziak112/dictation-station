@@ -26,7 +26,7 @@ async function setup() {
   return { store, auth, tokens, account, app, cookie };
 }
 const sample = { title: "AI 草稿", entries: [{ en: "sun", zh: "太阳" }] };
-it("长期令牌可读取本账号已完成听写详情，权限及账号隔离生效", async () => {
+it("默认令牌可读取本账号已完成听写详情，权限及账号隔离生效", async () => {
   const { app, tokens, account, auth, store } = await setup();
   const other = await auth.register("other", "synthetic-password");
   if (!other) throw new Error("测试账号失败");
@@ -34,13 +34,14 @@ it("长期令牌可读取本账号已完成听写详情，权限及账号隔离�
   const batch = store.create(account.id, sample);
   const task = tasks.create(account.id, {
     title: "听写",
-    date: "2026-11-03",
+    date: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Shanghai" }),
     mode: "en2en",
     settings: defaultSettings,
     selections: [{ batchId: batch.id, entryIds: [batch.entries[0].id] }],
   });
-  const attempt = tasks.start(account.id, task.id, false);
+  const attempt = tasks.start(account.id, task.id, false, "device-test");
   const reviewing = tasks.save(account.id, attempt.id, {
+    deviceId: "device-test",
     revision: attempt.revision,
     index: 0,
     phase: "review",
@@ -48,7 +49,12 @@ it("长期令牌可读取本账号已完成听写详情，权限及账号隔离�
   });
   tasks.complete(account.id, attempt.id, reviewing.revision, true);
   const token = tokens.create(account.id, { name: "记录", scopes: ["history:read"] });
-  expect(token.info.expiresAt).toBeNull();
+  expect(new Date(token.info.expiresAt as string).getTime() - Date.now()).toBeGreaterThan(
+    89 * 86400000,
+  );
+  expect(new Date(token.info.expiresAt as string).getTime() - Date.now()).toBeLessThanOrEqual(
+    90 * 86400000,
+  );
   const headers = { Authorization: `Bearer ${token.token}` };
   expect((await (await app.request("/api/agent/history", { headers })).json()).items).toHaveLength(
     1,
@@ -73,7 +79,7 @@ it("长期令牌可读取本账号已完成听写详情，权限及账号隔离�
     ).status,
   ).toBe(403);
   vi.spyOn(Date, "now").mockReturnValue(Date.now() + 400 * 86400000);
-  expect((await app.request("/api/agent/history", { headers })).status).toBe(200);
+  expect((await app.request("/api/agent/history", { headers })).status).toBe(401);
   tokens.revoke(account.id, token.info.id);
   expect((await app.request("/api/agent/history", { headers })).status).toBe(401);
 });

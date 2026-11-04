@@ -325,6 +325,9 @@ export const taskSummarySchema = taskSchema.omit({ items: true, audio: true }).e
   count: z.number(),
   reviewCount: z.number(),
   progressIndex: z.number().int().nonnegative().optional(),
+  submission: z
+    .object({ early: z.boolean(), index: z.number().int().nonnegative(), at: z.iso.datetime() })
+    .optional(),
   activeAttemptId: idSchema.optional(),
   wrongCount: z.number().int().nonnegative().optional(),
   uncorrectedCount: z.number().int().nonnegative().optional(),
@@ -341,6 +344,7 @@ export const attemptUpdateSchema = z.strictObject({
   results: z.record(idSchema, resultSchema),
   deviceId: z.string().max(120).optional(),
   forceTakeover: z.boolean().optional(),
+  earlySubmission: z.boolean().optional(),
 });
 export const attemptSchema = z.object({
   id: idSchema,
@@ -348,7 +352,12 @@ export const attemptSchema = z.object({
   revision: z.number().int().positive(),
   index: z.number().int().nonnegative(),
   phase: z.enum(["player", "review"]),
+  submission: z
+    .object({ early: z.boolean(), index: z.number().int().nonnegative(), at: z.iso.datetime() })
+    .optional(),
   results: z.record(idSchema, resultSchema),
+  practiceDate: z.iso.date().optional(),
+  masteryThreshold: z.number().int().min(1).max(10).optional(),
   startedAt: z.iso.datetime(),
   completedAt: z.iso.datetime().nullable(),
   interruptedAt: z.iso.datetime().nullable().default(null),
@@ -365,6 +374,7 @@ export const taskPlaySchema = taskSummarySchema
     count: true,
     reviewCount: true,
     progressIndex: true,
+    submission: true,
     activeAttemptId: true,
     wrongCount: true,
     uncorrectedCount: true,
@@ -398,7 +408,7 @@ export const attemptCompleteSchema = z.strictObject({
 });
 export const startTaskSchema = z.strictObject({
   onlyHomework: z.boolean().default(false),
-  deviceId: z.string().max(120).default(""),
+  deviceId: z.string().trim().min(1).max(120),
   forceTakeover: z.boolean().default(false),
 });
 export const taskWithdrawSchema = z.strictObject({
@@ -551,7 +561,10 @@ export const serverDraftSchema = agentDraftInputSchema.extend({
   createdAt: z.iso.datetime(),
 });
 export type ServerDraft = z.infer<typeof serverDraftSchema>;
-export const serverDraftResponseSchema = z.object({ draft: serverDraftSchema });
+export const serverDraftResponseSchema = z.object({
+  draft: serverDraftSchema,
+  confirmUrl: z.url().optional(),
+});
 export const serverDraftListSchema = z.object({ drafts: z.array(serverDraftSchema) });
 export const agentValidationInputSchema = z.strictObject({ wordlist: z.unknown() });
 export const agentValidationSchema = z.object({

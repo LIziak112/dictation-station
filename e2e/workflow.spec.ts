@@ -30,14 +30,43 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("子路径完整流程：导入、草稿恢复、编辑、分享、播放、核对、重练与导出", async ({ page }) => {
+test("拼音依赖只在需要自动注音时加载", async ({ page }) => {
+  const pinyinRequests: string[] = [];
+  page.on("request", (request) => {
+    if (/\/assets\/esm-[^/]+\.js/.test(request.url())) pinyinRequests.push(request.url());
+  });
+  await page.goto("./#library");
+  await page.getByRole("button", { name: "新建听写", exact: true }).click();
+  const source = page.getByRole("textbox", { name: "作业原文", exact: true });
+  await source.fill("apple  苹果");
+  await page.getByRole("button", { name: "整理并预览词表" }).click();
+  await expect(page.getByText(/已整理 1 条词条/)).toBeVisible();
+  expect(pinyinRequests).toHaveLength(0);
+  await source.fill("荷花");
+  await page.getByRole("button", { name: "整理并预览词表" }).click();
+  await expect.poll(() => pinyinRequests.length).toBe(1);
+  await expect
+    .poll(() =>
+      page
+        .locator("input")
+        .evaluateAll((inputs) =>
+          inputs.some((input) => (input as HTMLInputElement).value === "hé huā"),
+        ),
+    )
+    .toBe(true);
+});
+
+test("子路径完整流程：导入、草稿恢复、编辑、分享、播放、核对、重练与导出", async ({
+  page,
+  baseURL,
+}) => {
   // 完整流程包含多次导航、滚动和下载，WebKit 触屏模拟需要独立的流程预算。
   test.slow();
   const errors: string[] = [];
   const external: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("request", (r) => {
-    if (!r.url().startsWith("http://127.0.0.1:8898")) external.push(r.url());
+    if (!r.url().startsWith(new URL(baseURL ?? "http://127.0.0.1").origin)) external.push(r.url());
   });
   await page.goto("./#library");
   await page.getByRole("button", { name: "新建听写", exact: true }).click();
@@ -51,6 +80,7 @@ test("子路径完整流程：导入、草稿恢复、编辑、分享、播放�
   );
   await page.getByRole("button", { name: "整理并预览词表" }).click();
   const title = `浏览器回归 ${test.info().project.name}`;
+  await expect(page.getByText(/已整理 2 条词条/)).toBeVisible();
   await page.getByLabel("词表名称").fill(title);
   await page.screenshot({ path: test.info().outputPath("editor.png"), fullPage: true });
   await page.getByRole("button", { name: "保存词表", exact: true }).click();
@@ -74,6 +104,7 @@ test("子路径完整流程：导入、草稿恢复、编辑、分享、播放�
   expect(content.title).toBe(`${title} 已修改`);
   expect(content.entries).toHaveLength(2);
   await page.getByRole("button", { name: /读英语写英语/ }).click();
+  page.once("dialog", (dialog) => void dialog.accept());
   await page.getByRole("button", { name: "派发到孩子听写区", exact: true }).click();
   await expect(page.getByAltText("孩子区入口二维码")).toBeVisible();
   const childUrl = await page.getByLabel("孩子区独立链接").inputValue();
@@ -93,6 +124,9 @@ test("子路径完整流程：导入、草稿恢复、编辑、分享、播放�
   await expect(page.getByRole("heading", { name: "写完了，已交卷给家长批改" })).toBeVisible();
   await page.getByRole("button", { name: "返回任务列表", exact: true }).click();
   await page.goto("./#today");
+  await page.getByLabel("四位数字口令").fill("2468");
+  await page.getByLabel("账号密码（首次设置时验证）").fill("synthetic-password");
+  await page.getByRole("button", { name: "确认", exact: true }).click();
   await page.getByRole("button", { name: "立即批改" }).first().click();
   await page.getByRole("button", { name: "未通过", exact: true }).first().click();
   await page.getByLabel("已全部核对，其余未标记的题目均正确").check();
@@ -163,6 +197,7 @@ test("网络失败保留编辑草稿，错误可重试；拼音模式不朗读",
   await page.unroute("**/api/batches/*");
   await page.goto(`./#batch=${batch.id}`);
   await page.getByRole("button", { name: /看拼音写词语/ }).click();
+  page.once("dialog", (dialog) => void dialog.accept());
   await page.getByRole("button", { name: "派发到孩子听写区", exact: true }).click();
   const childPinyinUrl = await page.getByLabel("孩子区独立链接").inputValue();
   await page.getByRole("button", { name: "关闭", exact: true }).click();

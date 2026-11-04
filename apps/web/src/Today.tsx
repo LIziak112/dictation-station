@@ -316,6 +316,8 @@ export function Today({
                   <strong>{task.title}</strong>
                   <span>
                     {task.date} · {task.count} 项
+                    {task.submission?.early &&
+                      ` · 提前交卷，停在第 ${task.submission.index + 1}/${task.count} 项`}
                   </span>
                 </div>
                 <button
@@ -374,6 +376,11 @@ export function Today({
                       <span className={`status-pill status-${task.status}`}>{statusLabel}</span>
                     </div>
                     <h2>{task.title}</h2>
+                    {task.status === "submitted" && task.submission?.early && (
+                      <p>
+                        提前交卷 · 交卷时停在第 {task.submission.index + 1}/{task.count} 项
+                      </p>
+                    )}
                     <p className="task-meta">
                       {task.count - task.reviewCount} 项作业
                       {task.reviewCount ? ` + ${task.reviewCount} 项复习` : ""} ·{" "}
@@ -578,7 +585,9 @@ export function Today({
                     <article key={item.attemptId} className="task-source">
                       <div className="row between">
                         <strong>
-                          {item.taskTitle}（{item.taskDate} · {MODES[item.mode].label}）
+                          {item.taskTitle}（{item.taskDate} · {MODES[item.mode].label} ·{" "}
+                          {new Date(item.completedAt).toLocaleString("zh-CN")} ·{" "}
+                          {item.attemptId.slice(-6)}）
                         </strong>
                         <span className="status-pill status-completed">
                           答对 {item.correctCount}/{item.totalCount} · 待订正{" "}

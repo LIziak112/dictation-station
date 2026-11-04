@@ -12,12 +12,7 @@ import {
   voiceResponseSchema,
 } from "../../../packages/contract/src/index";
 import { editEntry } from "../../../packages/core/src/edit";
-import {
-  buildAgentPrompt,
-  htmlToLines,
-  parseList,
-  validateEntries,
-} from "../../../packages/core/src/import";
+import { buildAgentPrompt, htmlToLines, validateEntries } from "../../../packages/core/src/import";
 import { loadAudio } from "./AudioPreparation";
 import { api, download, request } from "./api";
 import { BrowserAudio } from "./audio";
@@ -190,21 +185,47 @@ export function Editor({
     });
   }
 
-  function parse() {
+  async function parse() {
+    setBusy(true);
+    const source = draft.input || draft.raw;
     try {
-      const parsed = parseList(draft.input || draft.raw);
+      const { parseList } = await import("../../../packages/core/src/parse-list");
+      const plainSource = source.trim().replace(/^```(?:json)?\s*/i, "");
+      let parsed = parseList(source);
+      const needsPinyin =
+        !plainSource.startsWith("{") &&
+        !plainSource.startsWith("[") &&
+        parsed.entries.some(
+          (entry) => !entry.en && !entry.pinyin && /^[\u4e00-\u9fff]+$/.test(entry.zh),
+        );
+      const toPinyin = needsPinyin ? (await import("pinyin-pro")).pinyin : undefined;
+      if (!mounted.current) return;
+      const latest = current.current;
+      if (
+        latest.raw !== draft.raw ||
+        latest.input !== draft.input ||
+        latest.entries !== draft.entries
+      ) {
+        setMessage("内容已修改，请重新整理词条");
+        return;
+      }
+      if (toPinyin) parsed = parseList(source, toPinyin);
       const nextMeta = {
-        title: parsed.meta.title || draft.title,
-        grade: parsed.meta.grade || draft.grade,
-        unit: parsed.meta.unit || draft.unit,
-        stage: parsed.meta.stage || draft.stage,
-        textbook: parsed.meta.textbook || draft.textbook,
+        title: latest.title,
+        grade: latest.grade,
+        unit: latest.unit,
+        stage: latest.stage,
+        textbook: latest.textbook,
       };
+      for (const key of ["title", "grade", "unit", "stage", "textbook"] as const)
+        if (latest[key] === draft[key]) nextMeta[key] = parsed.meta[key] || latest[key];
       patch({ ...nextMeta, entries: parsed.entries });
       setMessage(`已整理 ${parsed.entries.length} 条词条，正在检查读音状态，请核对后保存`);
       void checkPronunciations(parsed.entries);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "解析失败，请检查原文");
+    } finally {
+      if (mounted.current) setBusy(false);
     }
   }
 
@@ -560,7 +581,7 @@ export function Editor({
                   type="button"
                   className={entries.length ? undefined : "primary"}
                   disabled={busy}
-                  onClick={parse}
+                  onClick={() => void parse()}
                 >
                   整理并预览词表
                 </button>

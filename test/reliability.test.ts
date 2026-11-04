@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { readLocal } from "../apps/web/src/storage";
 import { draftSchema, normalizeEntry, progressSchema } from "../packages/contract/src/index";
 import { editEntry } from "../packages/core/src/edit";
-import { parseList } from "../packages/core/src/import";
+import { parseList } from "../packages/core/src/parse-list";
 import { mergeReview } from "../packages/core/src/review";
 
 afterEach(() => vi.unstubAllGlobals());

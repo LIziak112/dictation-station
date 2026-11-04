@@ -6,6 +6,8 @@
       "**",
       "!schema",
       "!dist",
+      "!deploy",
+      "!downloads",
       "!apps/server/drizzle",
       "!playwright-report",
       "!test-results"

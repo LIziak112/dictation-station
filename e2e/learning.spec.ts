@@ -29,10 +29,20 @@ test("核对进入待巩固，生成阶段复习与记录周报，订正不增�
     ).json()
   ).task;
   const attempt = (
-    await (await page.request.post(`api/tasks/${task.id}/start`, { data: {} })).json()
+    await (
+      await page.request.post(`api/tasks/${task.id}/start`, {
+        data: { deviceId: "fixture-device" },
+      })
+    ).json()
   ).attempt;
   const reviewing = await page.request.put(`api/attempts/${attempt.id}`, {
-    data: { revision: 1, index: 0, phase: "review", results: { [task.items[0].wordId]: "wrong" } },
+    data: {
+      deviceId: "fixture-device",
+      revision: 1,
+      index: 0,
+      phase: "review",
+      results: { [task.items[0].wordId]: "wrong" },
+    },
   });
   expect(reviewing.status()).toBe(200);
   expect(

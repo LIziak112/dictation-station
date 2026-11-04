@@ -19,7 +19,8 @@ AI 只负责材料整理。网站不代调用模型，不扩展图片识别入�
       "type": "http",
       "url": "https://www.example.com/tingxie/mcp",
       "headers": {
-        "Authorization": "Bearer 在本机填写你的令牌"
+        "Authorization": "Bearer 在本机填写你的令牌",
+        "X-Dictation-Site-Url": "https://www.example.com/tingxie/"
       }
     }
   }
@@ -47,7 +48,7 @@ AI 只负责材料整理。网站不代调用模型，不扩展图片识别入�
 }
 ```
 
-DICTATION_URL 是网站服务地址，必须包含真实子路径；根路径部署用 http://127.0.0.1:8083/。客户端不需要共享网站 Cookie。stdout 保留给 MCP 协议，不通过 pnpm 脚本横插日志。
+DICTATION_URL 是网站完整服务地址，包含真实子路径；根路径部署例如 `https://dictation.example.org/`，子路径部署例如 `https://www.example.com/tingxie/`。网页会自动生成该地址；桥接会将它传给服务端用于确认链接，反代剥离前缀也不会丢失路径。客户端不需要共享网站 Cookie。stdout 保留给 MCP 协议，不通过 pnpm 脚本横插日志。
 
 五项工具：
 
@@ -72,6 +73,8 @@ DICTATION_URL 是网站服务地址，必须包含真实子路径；根路径部
 - GET api/agent/history、GET api/agent/history/:id：history:read，后者的 id 为听写记录中的 attempt.id。
 
 Agent 入口按路径和操作明确放行，没有匹配到允许范围的请求返回 403；不会把一个全站口令转成任意接口权限。草稿发布和保存是同一数据库事务，失效确认链接不会再次复制正式词表。无效内容仍保留原草稿。
+
+创建草稿返回 `{ "draft": {...}, "confirmUrl": "https://www.example.com/tingxie/#draft=..." }`。AI 应原样使用 `confirmUrl`，不要自行省略路径或拼接主域名。网页生成的 HTTP 配置通过 `X-Dictation-Site-Url` 自动传递当前入口，stdio 自动传递 `DICTATION_URL`；自建 REST 客户端也应发送该请求头，域名及端口须与请求的公网主机一致。无需硬编码任何特定站点。服务端还支持可信反代地址信息，以及可选的 `PUBLIC_URL` 固定覆盖；详见部署文档。
 
 ## 验证与依赖
 

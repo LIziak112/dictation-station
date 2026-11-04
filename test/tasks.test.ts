@@ -30,7 +30,7 @@ async function setup() {
   });
   const input = {
     title: "今天作业",
-    date: "2026-11-03",
+    date: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Shanghai" }),
     mode: "en2en",
     settings: { ...defaultSettings, auto: false },
     selections: [{ batchId: batch.id, entryIds: batch.entries.slice(1).map((e) => e.id) }],
@@ -70,9 +70,10 @@ it("发布固定范围与原顺序，编辑词表不改变快照，其他账号�
 it("同任务只创建一个进行中会话，接力使用 revision，不覆盖陈旧进度", async () => {
   const { account, tasks, input } = await setup();
   const task = tasks.create(account.id, input);
-  const attempt = tasks.start(account.id, task.id, false);
-  expect(tasks.start(account.id, task.id, false).id).toBe(attempt.id);
+  const attempt = tasks.start(account.id, task.id, false, "device-test");
+  expect(tasks.start(account.id, task.id, false, "device-test").id).toBe(attempt.id);
   const next = tasks.save(account.id, attempt.id, {
+    deviceId: "device-test",
     revision: attempt.revision,
     index: 1,
     phase: "player",
@@ -81,6 +82,7 @@ it("同任务只创建一个进行中会话，接力使用 revision，不覆盖�
   expect(next.index).toBe(1);
   expect(() =>
     tasks.save(account.id, attempt.id, {
+      deviceId: "device-test",
       revision: attempt.revision,
       index: 0,
       phase: "player",
@@ -89,6 +91,7 @@ it("同任务只创建一个进行中会话，接力使用 revision，不覆盖�
   ).toThrow("版本");
   expect(() =>
     tasks.save(account.id, attempt.id, {
+      deviceId: "device-test",
       revision: next.revision,
       index: 99,
       phase: "player",
@@ -115,7 +118,7 @@ it("任务开始前可改范围，开始后复制新任务，不覆盖旧快照"
   const task = tasks.create(account.id, input);
   const changed = tasks.update(account.id, task.id, 1, { ...input, title: "修改任务" });
   expect(changed.revision).toBe(2);
-  tasks.start(account.id, task.id, false);
+  tasks.start(account.id, task.id, false, "device-test");
   expect(() => tasks.update(account.id, task.id, 3, input)).toThrow("复制");
   const copy = tasks.create(account.id, {
     ...input,
@@ -128,8 +131,9 @@ it("任务开始前可改范围，开始后复制新任务，不覆盖旧快照"
 it("完成请求重复执行不写第二次结果，核对后不能回到未揭示答案的练习阶段", async () => {
   const { account, tasks, input } = await setup();
   const task = tasks.create(account.id, input);
-  const attempt = tasks.start(account.id, task.id, false);
+  const attempt = tasks.start(account.id, task.id, false, "device-test");
   const reviewing = tasks.save(account.id, attempt.id, {
+    deviceId: "device-test",
     revision: 1,
     index: 1,
     phase: "review",
@@ -137,6 +141,7 @@ it("完成请求重复执行不写第二次结果，核对后不能回到未揭�
   });
   expect(() =>
     tasks.save(account.id, attempt.id, {
+      deviceId: "device-test",
       revision: reviewing.revision,
       index: 0,
       phase: "player",
@@ -334,26 +339,34 @@ it("childToken 门禁、交卷前详情拦截、待考词界面提示与一键�
 it("退回不产生两个进行中任务，继续补写保留位置并清除旧批改，完成后不能重开原任务", async () => {
   const { account, tasks, input } = await setup();
   const task = tasks.create(account.id, input);
-  const attempt = tasks.start(account.id, task.id, false);
+  const attempt = tasks.start(account.id, task.id, false, "device-test");
   expect(() => tasks.returnForRedo(account.id, attempt.id, attempt.revision)).toThrow("待批改");
   const submitted = tasks.save(account.id, attempt.id, {
+    deviceId: "device-test",
     revision: attempt.revision,
     index: 1,
     phase: "review",
     results: { [task.items[0].wordId]: "wrong" },
+    earlySubmission: true,
   });
-  expect(() => tasks.start(account.id, task.id, false)).toThrow("已交卷");
+  expect(submitted.submission).toMatchObject({ early: true, index: 1 });
+  expect(tasks.summarize(account.id).find((item) => item.id === task.id)?.submission).toMatchObject(
+    { early: true, index: 1 },
+  );
+  expect(() => tasks.start(account.id, task.id, false, "device-test")).toThrow("已交卷");
   const other = tasks.create(account.id, input);
-  tasks.start(account.id, other.id, false);
+  tasks.start(account.id, other.id, false, "device-test");
   expect(() => tasks.returnForRedo(account.id, attempt.id, submitted.revision, false)).toThrow(
     "请先完成",
   );
   expect(tasks.require(account.id, task.id).status).toBe("submitted");
   tasks.withdraw(account.id, other.id);
   const returned = tasks.returnForRedo(account.id, attempt.id, submitted.revision, false);
+  expect(returned.submission).toBeUndefined();
   expect(returned.index).toBe(1);
   expect(returned.results).toEqual({});
   const resubmitted = tasks.save(account.id, attempt.id, {
+    deviceId: "device-test",
     revision: returned.revision,
     index: 1,
     phase: "review",
@@ -361,7 +374,7 @@ it("退回不产生两个进行中任务，继续补写保留位置并清除旧�
   });
   const completed = tasks.complete(account.id, attempt.id, resubmitted.revision, true);
   expect(Object.values(completed.results)).toEqual(["correct", "correct"]);
-  expect(() => tasks.start(account.id, task.id, false)).toThrow("复制新任务");
+  expect(() => tasks.start(account.id, task.id, false, "device-test")).toThrow("复制新任务");
   expect(tasks.require(account.id, task.id).status).toBe("completed");
   expect(tasks.attempt(account.id, attempt.id)).toEqual(completed);
 });
@@ -373,8 +386,9 @@ it("孩子自评抽查从正确项中选择，最多两项且不重复", async (
     allowSelfReview: true,
     selections: [{ batchId: batch.id, entryIds: batch.entries.map((entry) => entry.id) }],
   });
-  const attempt = tasks.start(account.id, task.id, false);
+  const attempt = tasks.start(account.id, task.id, false, "device-test");
   const submitted = tasks.save(account.id, attempt.id, {
+    deviceId: "device-test",
     revision: attempt.revision,
     index: 2,
     phase: "review",
