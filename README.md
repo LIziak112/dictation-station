@@ -64,6 +64,8 @@ pnpm start
 
 ## 验证
 
+开发、提交与协作请先读 [开发与交付流程](CONTRIBUTING.md)；AI 代理须遵守 [AGENTS.md](AGENTS.md)。每项独立任务默认完成验证、提交、推送和 PR，多对话并行使用独立 worktree；合并与线上部署分别确认状态。
+
 ```sh
 pnpm lint
 pnpm typecheck

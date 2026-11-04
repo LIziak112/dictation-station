@@ -13,21 +13,51 @@ jobs:
   check:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    env:
+      EVENT_NAME: ${{ github.event_name }}
+      BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: pnpm
+      - name: Detect documentation-only changes
+        id: scope
+        run: |
+          node .github/scripts/ci-scope.mjs --test
+          node .github/scripts/ci-scope.mjs
       - run: pnpm install --frozen-lockfile
+      - name: Check changed documentation
+        if: steps.scope.outputs.docs_only == 'true'
+        env:
+          DOC_FILES: ${{ steps.scope.outputs.files }}
+        run: |
+          git diff --check "$BASE_SHA" HEAD
+          node --input-type=module <<'JS'
+          import { execFileSync } from 'node:child_process';
+          const files = JSON.parse(process.env.DOC_FILES);
+          if (files.length) {
+            execFileSync('pnpm', ['exec', 'biome', 'check', ...files.map(file => `./${file}`)], { stdio: 'inherit' });
+          }
+          JS
       - run: pnpm lint
+        if: steps.scope.outputs.docs_only != 'true'
       - run: pnpm typecheck
+        if: steps.scope.outputs.docs_only != 'true'
       - run: pnpm test
+        if: steps.scope.outputs.docs_only != 'true'
       - run: pnpm schema:export && git diff --exit-code -- schema
+        if: steps.scope.outputs.docs_only != 'true'
       - run: pnpm build
+        if: steps.scope.outputs.docs_only != 'true'
       - run: pnpm exec playwright install --with-deps chromium webkit
+        if: steps.scope.outputs.docs_only != 'true'
       - run: pnpm e2e
+        if: steps.scope.outputs.docs_only != 'true'
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
