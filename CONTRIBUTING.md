@@ -29,7 +29,7 @@ git fetch origin
 - 在任务说明或 PR 中记录目标、分支、涉及模块、依赖 PR。两个任务都需要改同一接口／模型时，先合并公共前置改动，再让后续任务同步。
 - 必须提前依赖另一个未合并 PR 时，显式把该 PR 分支作为 base，并在说明中写清依赖；前置 PR 合并后调整 base 为 main，核对 diff 并重新验证。
 
-worktree 隔离源码，不自动隔离端口和外部数据。每个工作区独立安装依赖；开发实例使用独立端口和 `DATA_DIR`，前后端代理地址须一致。当前浏览器测试默认占用 8898，未配置独立端口前串行运行。不得同时操作生产数据库或终止别的对话使用的服务。
+worktree 隔离源码，不自动隔离端口和外部数据。每个工作区独立安装依赖；开发实例使用独立端口和 `DATA_DIR`，前后端代理地址须一致。浏览器测试默认占用 8898，可通过 `E2E_PORT` 为各工作区指定独立端口，未配置独立端口前串行运行。不得同时操作生产数据库或终止别的对话使用的服务。
 
 ## 3. 命名规范
 
@@ -67,9 +67,9 @@ scope 尽量使用稳定模块名，如 `web`、`server`、`tasks`、`player`、
 | 页面交互／API 流程／权限   | 以上检查，加相关 Playwright 用例；跨模块流程运行完整 `pnpm e2e`                                                               |
 | 音频／手机／打印           | 相关自动化加目标设备人工验收，记录设备、结果及未验证的边界                                                                    |
 
-首次运行浏览器测试前执行 `pnpm exec playwright install chromium webkit`。本地可用 `pnpm exec playwright test e2e/tasks.spec.ts` 跑相关用例；完整 CI 仍须通过，不用局部测试替代合并门槛。
+首次运行浏览器测试前执行 `pnpm exec playwright install chromium webkit`。本地可用 `pnpm exec playwright test e2e/tasks.spec.ts` 跑相关用例；应用变更的完整 CI 仍须通过，不用局部测试替代合并门槛。
 
-现有 [.github/workflows/ci.yml](.github/workflows/ci.yml) 在 PR、main 推送或手动触发时执行 lint、类型检查、单元／接口测试、schema 一致性、构建以及 Chromium／WebKit E2E。CI 的 schema 一致性命令为 `pnpm schema:export && git diff --exit-code -- schema`；本地修改契约后应先生成并审查 schema，再提交。
+[.github/workflows/ci.yml](.github/workflows/ci.yml) 在 PR 和 main 推送时按完整 diff 分流，保留统一的 `check` 状态。只有全部变更为根目录 Markdown、`docs/` 下 Markdown 或 `.github/pull_request_template.md` 时，仅执行变更文档的 Biome 检查和 `git diff --check`，不安装浏览器或运行应用测试。删除文档也按文档变更处理；重命名同时检查旧、新路径，避免代码改名后绕过验证。任何代码、测试、依赖、其他配置或 CI 本身的变更，都执行 lint、类型检查、单元／接口测试、schema 一致性、构建以及 Chromium／WebKit E2E。手动触发始终完整验证；无法确定基线或没有变更时也默认完整验证。CI 的 schema 一致性命令为 `pnpm schema:export && git diff --exit-code -- schema`；本地修改契约后应先生成并审查 schema，再提交。
 
 每次验证记录实际命令和结果。失败区分本次回归、已有问题、环境限制，保留复现信息；不靠删测试、改断言或无理由重跑掩盖失败。验证后的代码又改变时，补跑受影响检查。
 
@@ -140,4 +140,4 @@ git ls-remote origin refs/heads/codex/docs-development-workflow
 - 分支名、commit SHA、PR 链接及当前 CI 状态。
 - 是否已合并、是否已部署，以及剩余阻塞或风险。
 
-本规范和模板是工作约定，不能替代 GitHub 分支保护。若要服务器强制执行，可在仓库 Rulesets／分支保护中要求 main 通过 PR 合并、`check` 状态通过并禁止强推；评审人数按实际协作人数设置。本次文档不代表这些远端保护已启用。
+本规范和模板是工作约定，不能替代 GitHub 分支保护。若要服务器强制执行，可在仓库 Rulesets／分支保护中要求 main 通过 PR 合并、`check` 状态通过并禁止强推；评审人数按实际协作人数设置。这些规范不代表远端保护已启用。
