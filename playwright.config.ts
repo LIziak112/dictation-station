@@ -4,13 +4,14 @@ import { join } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
 const data = mkdtempSync(join(tmpdir(), "dictation-e2e-"));
+const port = process.env.E2E_PORT ?? "8898";
 export default defineConfig({
   testDir: "e2e",
   fullyParallel: false,
   workers: 1,
   timeout: 30000,
   use: {
-    baseURL: "http://127.0.0.1:8898/tingxie/",
+    baseURL: `http://127.0.0.1:${port}/tingxie/`,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
@@ -27,11 +28,11 @@ export default defineConfig({
   ],
   webServer: {
     command: "node server.js",
-    url: "http://127.0.0.1:8898/tingxie/api/health",
+    url: `http://127.0.0.1:${port}/tingxie/api/health`,
     reuseExistingServer: false,
     timeout: 15000,
     env: {
-      PORT: "8898",
+      PORT: port,
       BASE_PATH: "/tingxie/",
       DATA_DIR: data,
       ALLOW_REGISTRATION: "true",

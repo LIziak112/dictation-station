@@ -19,6 +19,7 @@ pnpm start
 | PORT / HOST                           | 8083 / 127.0.0.1                                 |
 | DATA_DIR                              | 根目录 data；可使用绝对路径                      |
 | BASE_PATH                             | `/`；保留前缀转发时设 `/tingxie/`                |
+| PUBLIC_URL                            | 可选固定公网入口，含子路径；覆盖自动获取的地址   |
 | ALLOW_REGISTRATION                    | true；设 false 关闭注册，已有账号仍可登录        |
 | TRUST_PROXY                           | false；仅当可信反代覆盖 x-real-ip 时启用         |
 | PADDLEOCR_TOKEN                       | 留空不启用图片识别                               |
@@ -33,19 +34,30 @@ pnpm start
 
 两种配置择一：nginx 将 `/tingxie/` 剥离后转发到上游 `/` 时，应用设 `BASE_PATH=/`（兼容旧配置）；保留前缀时设 `BASE_PATH=/tingxie/`。
 
+`BASE_PATH` 只控制内部路由，不用来猜测已被反代删除的公网路径。网页生成的 HTTP MCP 配置会自动携带 `X-Dictation-Site-Url`（浏览器中的完整入口）；stdio 根据 `DICTATION_URL` 自动发送相同信息。因此使用网页生成的配置时，独立域名、根路径和反代剥离子路径部署均无需另填 `PUBLIC_URL`。升级后重新复制 HTTP 配置；stdio 需使用新构建。
+
+自建 REST 客户端也可发送该头，例如 `X-Dictation-Site-Url: https://dictation.example.org/practice/`，域名及端口必须与服务请求的公网主机一致。客户端未提供入口时，应用按请求地址与 `BASE_PATH` 生成链接；启用 `TRUST_PROXY` 后，也可从反代覆盖的 `X-Forwarded-Host`、`X-Forwarded-Proto`、`X-Forwarded-Prefix` 还原公网入口。`X-Forwarded-Prefix` 应为完整公网前缀（如 `/practice/`），不会与 `BASE_PATH` 重复拼接。
+
+可选设置 `PUBLIC_URL=https://dictation.example.org/practice/`，明确固定所有确认链接的入口；它优先于客户端及反代信息，支持公网与内部主机不同的部署。公网路径被删除且客户端、可信反代和 `PUBLIC_URL` 均未提供它时，后端没有信息可以还原该路径。
+
 保留前缀示例：
 
 ```nginx
 location /tingxie/ {
     proxy_pass http://127.0.0.1:8083;
-    proxy_set_header Host $host;
+    proxy_set_header Host $http_host;
     proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host $http_host;
+    proxy_set_header X-Forwarded-Prefix /tingxie/;
     client_max_body_size 29m;
     proxy_read_timeout 240s;
 }
 ```
 
-要启用 TRUST_PROXY，反代必须覆盖用户提供的 x-real-ip。多用户部署应在反代另设 IP 限流、连接数/超时及磁盘配额；应用不信任客户端任意转发头。
+要启用 TRUST_PROXY，反代必须覆盖用户提供的 x-real-ip 和 x-forwarded-proto，并覆盖或清除 x-forwarded-host、x-forwarded-prefix；应用才会在 HTTPS 响应上发送 HSTS，并信任这些公网地址信息。示例使用 `$http_host` 保留非标准公网端口；前缀按实际公网路径设置。多用户部署应在反代另设 IP 限流、连接数/超时及磁盘配额；未启用 TRUST_PROXY 时忽略上述转发头。新版本部署时应保留旧哈希资源，直到可能仍打开的旧页面关闭，避免按需加载旧文件时出现 404。认证限流保存在进程内，多进程部署需在反代增加共享限流。
+
+新 AI 令牌默认有效期为 90 天，接口允许设置 1–365 天。已有长期令牌不会自动失效，请在 AI 连接页面创建新令牌、更新客户端配置后撤销旧令牌。
 
 远程 MCP 端点与网站同域：根路径部署为 `/mcp`，保留前缀时为 `/tingxie/mcp`，沿用现有 location 转发即可；客户端用「AI 连接」页生成的 Bearer 配置连接，不需要额外端口或 CORS 设置。
 
@@ -55,7 +67,9 @@ location /tingxie/ {
 
 本版本不提供旧记录迁移。使用新的空 DATA_DIR；旧数据由部署者自行保留，不自动删除或分配给新账号。不要直接把已有词表的旧数据库作为账号版本的数据目录。
 
-首次启动保持 ALLOW_REGISTRATION=true，在页面创建账号；需要限制注册时之后改为 false 并重启。网页使用同源 Cookie，生产部署采用 HTTPS。会话有效期 30 天；修改密码会退出该账号全部设备。一个站点实例建议独立主机名，避免和另一套同名 Cookie 冲突。
+首次启动保持 ALLOW_REGISTRATION=true，在页面创建账号；需要限制注册时之后改为 false 并重启。网页使用同源 Cookie，生产部署采用 HTTPS。会话有效期 30 天；修改或重设密码会撤销全部家长会话和设备 PIN，需要用新密码重新登录、绑定 PIN。孩子链接和 AI 令牌独立管理，需要时分别重置或撤销。一个站点实例建议独立主机名，避免和另一套同名 Cookie 冲突。
+
+学习记录新增交卷时固化的练习日期与批改时的掌握阈值，均存于现有 JSON 载荷，无需新增数据库表。已有学习状态作为计算基线保留，不自动重算旧记录；旧记录已有交卷时间时优先使用，缺失时沿用批改日期口径。手动掌握／恢复建立新的计算基线，之前已交卷的迟批结果不会覆盖该操作，同一任务退回后重新交卷仍计为新一轮练习。
 
 忘记密码时，在同一 DATA_DIR、同一 .env 下执行（PowerShell）：
 

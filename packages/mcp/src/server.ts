@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
+import { parseSiteUrl } from "../../core/src/site-url";
 
 export type AgentCall = (
   path: string,
@@ -11,7 +12,7 @@ export type AgentCall = (
 }>;
 
 export function createMcpServer(call: AgentCall, linkBase: string) {
-  const base = new URL(linkBase.endsWith("/") ? linkBase : `${linkBase}/`);
+  const base = parseSiteUrl(linkBase);
   const server = new McpServer({ name: "ownclass-dictation", version: "0.1.0" });
   server.registerTool(
     "get_wordlist_schema",
@@ -47,7 +48,7 @@ export function createMcpServer(call: AgentCall, linkBase: string) {
       const result = await call("drafts", { wordlist, notes });
       if (result.isError) return result;
       const parsed = z
-        .object({ draft: z.object({ id: z.string() }) })
+        .object({ draft: z.object({ id: z.string() }), confirmUrl: z.url().optional() })
         .parse(result.structuredContent);
       const link = new URL(base);
       link.hash = `draft=${parsed.draft.id}`;
@@ -55,7 +56,7 @@ export function createMcpServer(call: AgentCall, linkBase: string) {
         ...result,
         content: [
           ...result.content,
-          { type: "text" as const, text: `请在网页核对确认：${link.href}` },
+          { type: "text" as const, text: `请在网页核对确认：${parsed.confirmUrl ?? link.href}` },
         ],
       };
     },
@@ -87,12 +88,16 @@ export function createMcpServer(call: AgentCall, linkBase: string) {
 }
 
 export function createBridge(baseUrl: string, token: string) {
-  const base = new URL(baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`);
+  const base = parseSiteUrl(baseUrl);
   const call: AgentCall = async (path, body) => {
     try {
       const response = await fetch(new URL(`api/agent/${path}`, base), {
         method: body === undefined ? "GET" : "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "X-Dictation-Site-Url": base.href,
+        },
         body: body === undefined ? undefined : JSON.stringify(body),
         signal: AbortSignal.timeout(15000),
       });

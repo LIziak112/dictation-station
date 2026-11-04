@@ -30,9 +30,7 @@ export class Tokens {
       name: input.name,
       scopes: input.scopes,
       createdAt: new Date().toISOString(),
-      expiresAt: input.expiresInDays
-        ? new Date(Date.now() + input.expiresInDays * 86400000).toISOString()
-        : null,
+      expiresAt: new Date(Date.now() + (input.expiresInDays ?? 90) * 86400000).toISOString(),
     };
     this.store.db
       .insert(apiTokens)

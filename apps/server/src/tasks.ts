@@ -26,6 +26,27 @@ const LEASE_TIMEOUT_MS = 30_000;
 
 export class Tasks {
   constructor(readonly store: Store) {}
+  private expire(accountId: string, task: Task, today: string): Task {
+    if (task.status !== "pending" || today <= addDays(task.date, 1)) return task;
+    return this.store.db.transaction(() => {
+      const row = this.store.db
+        .select()
+        .from(tasks)
+        .where(and(eq(tasks.accountId, accountId), eq(tasks.id, task.id)))
+        .get();
+      const current = row ? taskSchema.parse(JSON.parse(row.payload)) : task;
+      if (current.status !== "pending" || today <= addDays(current.date, 1)) return current;
+      const expired: Task = { ...current, status: "expired", revision: current.revision + 1 };
+      this.write(accountId, expired);
+      this.store.logAudit(
+        accountId,
+        "task.expired",
+        `任务跨日未开始自动过期：${current.title}`,
+        "system",
+      );
+      return expired;
+    });
+  }
   list(accountId: string) {
     const preferences = new Learning(this.store).preferences(accountId);
     const today = localDate(new Date(), preferences.timezone);
@@ -34,21 +55,7 @@ export class Tasks {
       .from(tasks)
       .where(eq(tasks.accountId, accountId))
       .all()
-      .map((row) => {
-        const parsed = taskSchema.parse(JSON.parse(row.payload));
-        if (parsed.status === "pending" && today > addDays(parsed.date, 1)) {
-          const expired: Task = { ...parsed, status: "expired", revision: parsed.revision + 1 };
-          this.write(accountId, expired);
-          this.store.logAudit(
-            accountId,
-            "task.expired",
-            `任务跨日未开始自动过期：${parsed.title}`,
-            "system",
-          );
-          return expired;
-        }
-        return parsed;
-      })
+      .map((row) => this.expire(accountId, taskSchema.parse(JSON.parse(row.payload)), today))
       .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
   }
   summarize(accountId: string): TaskSummary[] {
@@ -89,6 +96,7 @@ export class Tasks {
           : latestInterrupted
             ? latestInterrupted.index
             : undefined,
+        submission: active?.submission ?? latestCompleted?.submission,
         activeAttemptId: (active ?? latestCompleted ?? latestInterrupted)?.id,
         wrongCount,
         uncorrectedCount,
@@ -102,7 +110,11 @@ export class Tasks {
       .from(tasks)
       .where(and(eq(tasks.accountId, accountId), eq(tasks.id, taskId)))
       .get();
-    return row ? taskSchema.parse(JSON.parse(row.payload)) : undefined;
+    if (!row) return undefined;
+    const task = taskSchema.parse(JSON.parse(row.payload));
+    if (task.status !== "pending") return task;
+    const preferences = new Learning(this.store).preferences(accountId);
+    return this.expire(accountId, task, localDate(new Date(), preferences.timezone));
   }
   require(accountId: string, taskId: string) {
     const task = this.get(accountId, taskId);
@@ -296,10 +308,14 @@ export class Tasks {
     accountId: string,
     taskId: string,
     onlyHomework: boolean,
-    deviceId = "",
+    deviceId: string,
     forceTakeover = false,
     isChildMode = false,
   ) {
+    if (!deviceId.trim() || deviceId.length > 120)
+      throw new HTTPException(400, { message: "开始听写需要有效的设备标识" });
+    // Commit expiry before a rejected start rolls back its own transaction.
+    this.require(accountId, taskId);
     return this.store.db.transaction(() => {
       const task = this.require(accountId, taskId);
       if (task.status === "withdrawn")
@@ -334,6 +350,7 @@ export class Tasks {
         if (deviceId && (active.activeDeviceId !== deviceId || forceTakeover)) {
           const taken: Attempt = {
             ...active,
+            revision: active.revision + 1,
             activeDeviceId: deviceId,
             heartbeatAt: new Date().toISOString(),
           };
@@ -388,6 +405,9 @@ export class Tasks {
       const task = this.require(accountId, previous.taskId);
       if (task.status === "withdrawn" || previous.interruptedAt)
         throw new Conflict("家长已撤回该任务，本次练习已停止");
+      if (previous.revision !== input.revision) throw new Conflict();
+      if (previous.phase === "player" && !input.deviceId?.trim())
+        throw new HTTPException(400, { message: "保存听写进度需要有效的设备标识" });
       if (
         previous.phase === "player" &&
         input.deviceId &&
@@ -399,7 +419,6 @@ export class Tasks {
         if (Date.now() - lastBeat < LEASE_TIMEOUT_MS)
           throw new Conflict("该任务已在另一台设备接管，当前设备已暂停");
       }
-      if (previous.revision !== input.revision) throw new Conflict();
       if (previous.phase === "review" && input.phase === "player")
         throw new HTTPException(400, { message: "核对后请新建一次练习" });
       if (previous.completedAt) throw new HTTPException(400, { message: "已完成的记录不能覆盖" });
@@ -411,10 +430,21 @@ export class Tasks {
       )
         throw new HTTPException(400, { message: "核对内容或进度不属于本任务" });
       const now = new Date().toISOString();
+      const submitting = previous.phase === "player" && input.phase === "review";
       const attempt: Attempt = {
         ...previous,
         index: input.index,
         phase: input.phase,
+        practiceDate: submitting
+          ? localDate(new Date(now), new Learning(this.store).preferences(accountId).timezone)
+          : previous.practiceDate,
+        submission: submitting
+          ? {
+              early: input.earlySubmission ?? input.index < task.items.length - 1,
+              index: input.index,
+              at: now,
+            }
+          : previous.submission,
         results: isChildMode && !task.allowSelfReview ? previous.results : input.results,
         activeDeviceId: input.deviceId || previous.activeDeviceId,
         heartbeatAt: now,
@@ -457,6 +487,8 @@ export class Tasks {
         ...attempt,
         phase: "player",
         index: resetIndex ? 0 : attempt.index,
+        submission: undefined,
+        practiceDate: undefined,
         results: {},
         activeDeviceId: "",
         heartbeatAt: new Date().toISOString(),
@@ -509,6 +541,7 @@ export class Tasks {
         }
       }
       attempt.completedAt = new Date().toISOString();
+      attempt.masteryThreshold = new Learning(this.store).preferences(accountId).masteryThreshold;
       attempt.revision++;
       new Learning(this.store).apply(accountId, task, attempt);
       this.writeAttempt(accountId, attempt);
@@ -535,6 +568,8 @@ export class Tasks {
       const task = this.require(accountId, attempt.taskId);
       if (wordIds.some((wordId) => !task.items.some((item) => item.wordId === wordId)))
         throw new HTTPException(400, { message: "订正内容不属于本任务" });
+      if (wordIds.some((wordId) => !["wrong", "uncertain"].includes(attempt.results[wordId])))
+        throw new HTTPException(400, { message: "只能标记错词或不确定项已订正" });
       if (wordIds.every((wordId) => attempt.corrections.includes(wordId))) return attempt;
       if (attempt.revision !== revision) throw new Conflict();
       const next = {
@@ -566,8 +601,9 @@ export class Tasks {
       throw new HTTPException(400, { message: "本次听写没有错词或待确认项，无需重派" });
     const preferences = new Learning(this.store).preferences(accountId);
     const today = localDate(new Date(), preferences.timezone);
+    const suffix = " · 错词复练";
     return this.create(accountId, {
-      title: `${task.title} · 错词复练`,
+      title: `${task.title.slice(0, 80 - suffix.length)}${suffix}`,
       date: today,
       mode: task.mode,
       settings: task.settings,
@@ -653,7 +689,10 @@ export class Tasks {
     }));
     return {
       tasks: sortedTasks,
-      corrections: corrections.slice(0, 15),
+      corrections: [
+        ...corrections.filter((item) => item.words.some((word) => !word.corrected)),
+        ...corrections.filter((item) => item.words.every((word) => word.corrected)).slice(0, 15),
+      ],
       batches,
     };
   }

@@ -203,7 +203,7 @@ function Login({
                   required
                   minLength={2}
                   maxLength={40}
-                  pattern="[A-Za-z0-9_-]+"
+                  pattern="[A-Za-z0-9_\-]+"
                 />
                 <span id="auth-username-help" className="field-help">
                   2–40 个字符，只能使用字母、数字、下划线或短横线

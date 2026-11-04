@@ -9,3 +9,8 @@ playwright-report/
 *.tsbuildinfo
 .env.*
 !.env.example
+
+# 本机部署资料、服务器信息与发布包，不提交到 Git。
+/deploy/
+# 本机下载的词典与音频参考资料。
+/downloads/

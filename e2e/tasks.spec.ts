@@ -45,8 +45,9 @@ test("选择今日范围、孩子区独立入口与听写、跨设备接力与�
   try {
     await childPage.goto(childLink);
     // ct 参数在加载后立即通过 replaceState 从地址栏抹除
-    await expect(childPage).toHaveURL(/\?child=1/);
-    expect(childPage.url()).not.toContain("ct=");
+    await expect(childPage).toHaveURL(
+      (url) => url.searchParams.get("child") === "1" && !url.searchParams.has("ct"),
+    );
     await expect(childPage.getByRole("button", { name: "词库", exact: true })).toHaveCount(0);
 
     // 孩子区三大板块展示，且磨耳朵词表显示待考词盲听保护徽章
@@ -60,6 +61,17 @@ test("选择今日范围、孩子区独立入口与听写、跨设备接力与�
 
     await childPage.getByRole("button", { name: "准备开始" }).click();
     await childPage.getByRole("button", { name: "开始任务", exact: true }).click();
+    await expect(childPage.getByText("第 1 / 2 项", { exact: true })).toBeVisible();
+    childPage.once("dialog", (dialog) => void dialog.accept());
+    await childPage.getByRole("button", { name: "提前交卷", exact: true }).click();
+    await page.goto("./#today");
+    await expect(page.getByText("提前交卷，停在第 1/2 项", { exact: false }).first()).toBeVisible();
+    await page.getByRole("button", { name: "立即批改" }).first().click();
+    await expect(page.getByText("提前交卷 · 交卷时停在第 1/2 项", { exact: false })).toBeVisible();
+    await page.getByText("退回给孩子继续听写").click();
+    page.once("dialog", (dialog) => void dialog.accept());
+    await page.getByRole("button", { name: "确认退回任务" }).click();
+    await childPage.reload();
     await expect(childPage.getByText("第 1 / 2 项", { exact: true })).toBeVisible();
     await expect(childPage.getByText("月亮", { exact: true })).toHaveCount(0);
     await childPage.getByRole("button", { name: "我写好了，下一个", exact: true }).click();
@@ -86,6 +98,7 @@ test("选择今日范围、孩子区独立入口与听写、跨设备接力与�
 
     // 家长端看板收到已交卷待批改提醒并完成批改
     await page.goto("./#today");
+    await page.reload();
     await expect(
       page.getByRole("region", { name: "待批改任务提醒" }).getByText("今天的听写"),
     ).toBeVisible();

@@ -436,7 +436,11 @@ function TaskSession({
     setBusy(true);
     setMessage("");
     try {
-      const { attempt: saved } = await taskApi.save(next.id, { ...next, forceTakeover });
+      const { attempt: saved } = await taskApi.save(next.id, {
+        ...next,
+        forceTakeover,
+        earlySubmission: next.submission?.early,
+      });
       latest.current = saved;
       onSaved(saved);
       local.write(null);
@@ -517,7 +521,13 @@ function TaskSession({
     const nextIndex = latest.current.index + 1;
     if (nextIndex >= task.items.length) {
       clock.current.pause();
-      if ((await save({ phase: "review" })) && child) {
+      if (
+        (await save({
+          phase: "review",
+          submission: { early: false, index: latest.current.index, at: new Date().toISOString() },
+        })) &&
+        child
+      ) {
         try {
           const key = localKey("student-checkin-days", accountId);
           const today = new Date();
@@ -784,7 +794,14 @@ function TaskSession({
                   if (!confirm("还没写完，要提前交卷给家长吗？")) return;
                   playback.current?.stop();
                   clock.current.pause();
-                  void save({ phase: "review" });
+                  void save({
+                    phase: "review",
+                    submission: {
+                      early: true,
+                      index: latest.current.index,
+                      at: new Date().toISOString(),
+                    },
+                  });
                 }}
               >
                 提前交卷

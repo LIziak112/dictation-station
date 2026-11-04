@@ -44,7 +44,10 @@ export const taskApi = {
       method: "POST",
       body: JSON.stringify({ onlyHomework, deviceId: getDeviceId(), forceTakeover }),
     }),
-  save: (id: string, { revision, index, phase, results, forceTakeover }: AttemptUpdate) =>
+  save: (
+    id: string,
+    { revision, index, phase, results, forceTakeover, earlySubmission }: AttemptUpdate,
+  ) =>
     request(`api/attempts/${id}`, attemptResponseSchema, {
       method: "PUT",
       body: JSON.stringify({
@@ -54,6 +57,7 @@ export const taskApi = {
         results,
         deviceId: getDeviceId(),
         forceTakeover,
+        earlySubmission,
       }),
     }),
   returnForRedo: (id: string, revision: number, resetIndex = false) =>

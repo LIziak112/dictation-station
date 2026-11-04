@@ -1,6 +1,45 @@
 import { expect } from "@playwright/test";
 import { test } from "./fixtures";
 
+for (const edit of ["title", "source"] as const) {
+  test(`整理模块加载期间修改 ${edit}，保留新输入并正确处理解析结果`, async ({ page }) => {
+    await page.goto("./#library");
+    await page.getByRole("button", { name: "新建听写", exact: true }).click();
+    const source = page.getByRole("textbox", { name: "作业原文", exact: true });
+    await source.fill("apple  苹果\nmoon  月亮");
+    let release = () => {};
+    let observed = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const requested = new Promise<void>((resolve) => {
+      observed = resolve;
+    });
+    await page.route("**/assets/parse-list-*.js", async (route) => {
+      observed();
+      await gate;
+      await route.continue();
+    });
+    try {
+      await page.getByRole("button", { name: "整理并预览词表" }).click();
+      await requested;
+      if (edit === "title") await page.getByLabel("词表名称").fill("整理途中命名");
+      else await source.fill("sun  太阳");
+      release();
+      if (edit === "title") {
+        await expect(page.getByRole("heading", { name: "核对词表 2 词" })).toBeVisible();
+        await expect(page.getByLabel("词表名称")).toHaveValue("整理途中命名");
+      } else {
+        await expect(page.getByText("内容已修改，请重新整理词条", { exact: true })).toBeVisible();
+        await expect(source).toHaveValue("sun  太阳");
+        await expect(page.getByRole("heading", { name: "核对词表 0 词" })).toBeVisible();
+      }
+    } finally {
+      release();
+    }
+  });
+}
+
 test("本机落盘失败时保留编辑内容，不允许退出丢稿", async ({ page }) => {
   await page.goto("./#library");
   await page.getByRole("button", { name: "新建听写", exact: true }).click();

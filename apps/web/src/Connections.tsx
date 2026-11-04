@@ -53,7 +53,10 @@ export function Connections({ onDraft }: { onDraft: (id: string) => void }) {
         "ownclass-dictation": {
           type: "http",
           url: mcpUrl,
-          headers: { Authorization: `Bearer ${tokenPlaceholder}` },
+          headers: {
+            Authorization: `Bearer ${tokenPlaceholder}`,
+            "X-Dictation-Site-Url": serverUrl,
+          },
         },
       },
     },
@@ -100,8 +103,8 @@ export function Connections({ onDraft }: { onDraft: (id: string) => void }) {
         <section className="panel">
           <h2>01 / 创建 AI 令牌</h2>
           <p className="muted">
-            令牌对应当前账号，默认可读取词表、听写记录和创建待确认草稿，不能修改听写任务、记录或掌握状态。令牌长期有效，可随时撤销。创建后将自动填入右侧
-            MCP 配置。
+            令牌对应当前账号，默认可读取词表、听写记录和创建待确认草稿，不能修改听写任务、记录或掌握状态。新令牌有效期为
+            90 天，可随时撤销。创建后将自动填入右侧 MCP 配置。
           </p>
           <form
             onSubmit={async (event) => {

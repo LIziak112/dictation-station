@@ -31,6 +31,7 @@ import {
   ttsRequestSchema,
 } from "../../../packages/contract/src/index";
 import { validateEntries } from "../../../packages/core/src/import";
+import { parseSiteUrl } from "../../../packages/core/src/site-url";
 import { projectTask } from "../../../packages/core/src/tasks";
 import { createMcpServer } from "../../../packages/mcp/src/server";
 import { Auth } from "./auth";
@@ -51,6 +52,7 @@ interface Options {
   tts?: (item: TtsInput) => Promise<string>;
   trustProxy?: boolean;
   basePath?: string;
+  publicUrl?: string;
 }
 
 function isChildRouteAllowed(method: string, path: string) {
@@ -75,7 +77,48 @@ function isChildRouteAllowed(method: string, path: string) {
 }
 
 export function createApp(store: Store, options: Options) {
-  const app = new Hono<{ Variables: { account: Account; childMode: boolean } }>();
+  const publicUrl = options.publicUrl ? parseSiteUrl(options.publicUrl) : undefined;
+  function siteBase(request: Request) {
+    if (publicUrl) return publicUrl.href;
+    const url = new URL(request.url);
+    let prefix = options.basePath ?? "";
+    if (options.trustProxy) {
+      const protocol = request.headers.get("x-forwarded-proto");
+      if (protocol === "http" || protocol === "https") url.protocol = `${protocol}:`;
+      const host = request.headers.get("x-forwarded-host");
+      if (host) {
+        try {
+          const forwarded = parseSiteUrl(`${url.protocol}//${host}`);
+          if (/[\\/?#\s]/.test(host) || forwarded.pathname !== "/") throw new Error();
+          url.host = forwarded.host;
+          url.port = forwarded.port;
+        } catch {
+          throw new HTTPException(400, { message: "反代网站域名无效" });
+        }
+      }
+      const forwardedPrefix = request.headers.get("x-forwarded-prefix");
+      if (forwardedPrefix) {
+        if (!/^\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]*$/.test(forwardedPrefix))
+          throw new HTTPException(400, { message: "反代网站路径无效" });
+        prefix = forwardedPrefix;
+      }
+    }
+    const clientSite = request.headers.get("x-dictation-site-url");
+    if (clientSite) {
+      try {
+        const site = parseSiteUrl(clientSite);
+        if (site.host !== url.host) throw new Error();
+        return site.href;
+      } catch {
+        throw new HTTPException(400, { message: "客户端网站入口无效或与服务域名不一致" });
+      }
+    }
+    url.pathname = `${prefix.replace(/\/$/, "")}/`;
+    url.search = "";
+    url.hash = "";
+    return url.href;
+  }
+  const app = new Hono<{ Variables: { account: Account; childMode: boolean; clientIp: string } }>();
   const auth = new Auth(store);
   const tokens = new Tokens(store);
   const drafts = new Drafts(store);
@@ -89,6 +132,24 @@ export function createApp(store: Store, options: Options) {
       tts: options.tts,
     });
   const buckets = new Map<string, { count: number; expires: number }>();
+  const failures = new Map<string, { count: number; expires: number }>();
+  function failureBlocked(key: string) {
+    const value = failures.get(key);
+    if (value && value.expires <= Date.now()) failures.delete(key);
+    return (failures.get(key)?.count ?? 0) >= 5;
+  }
+  function recordFailure(key: string) {
+    const now = Date.now();
+    const value = failures.get(key);
+    failures.set(
+      key,
+      value && value.expires > now
+        ? { ...value, count: value.count + 1 }
+        : { count: 1, expires: now + 900000 },
+    );
+    if (failures.size > 5000)
+      for (const [k, v] of failures) if (v.expires <= now) failures.delete(k);
+  }
   function limited(key: string, limit: number, ms: number) {
     const now = Date.now();
     let entry = buckets.get(key);
@@ -107,6 +168,16 @@ export function createApp(store: Store, options: Options) {
     }
     c.header("X-Content-Type-Options", "nosniff");
     c.header("Referrer-Policy", "no-referrer");
+    c.header("X-Frame-Options", "DENY");
+    c.header(
+      "Content-Security-Policy",
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+    );
+    if (
+      new URL(c.req.url).protocol === "https:" ||
+      (options.trustProxy && c.req.header("x-forwarded-proto") === "https")
+    )
+      c.header("Strict-Transport-Security", "max-age=86400");
     c.header("Cache-Control", "no-store");
     if (!["GET", "HEAD", "OPTIONS"].includes(c.req.method)) {
       const origin = c.req.header("Origin");
@@ -131,6 +202,16 @@ export function createApp(store: Store, options: Options) {
         /* 合成接口测试没有网络连接。 */
       }
       const ip = options.trustProxy ? (c.req.header("x-real-ip") ?? remote) : remote;
+      c.set("clientIp", ip);
+      if (
+        ["/api/auth/login", "/api/auth/verify-password", "/api/auth/register"].includes(
+          c.req.path,
+        ) &&
+        limited(`auth:${c.req.path}:${ip}`, 10, 60000)
+      ) {
+        c.header("Retry-After", "60");
+        return c.json({ error: "尝试次数过多，请稍后重试" }, 429);
+      }
       if (c.req.path === "/api/auth/unlock-pin" && limited(`pin:${ip}`, 10, 60000))
         return c.json({ error: "尝试次数过多，请稍后重试" }, 429);
       if (limited(`write:${ip}`, 120, 60000))
@@ -141,6 +222,12 @@ export function createApp(store: Store, options: Options) {
         return c.json({ error: "语音准备次数过多，请稍后重试" }, 429);
     }
     await next();
+    if (
+      c.res.status === 200 &&
+      ["GET", "HEAD"].includes(c.req.method) &&
+      /^\/assets\/[A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8,}\.(?:js|css)$/.test(c.req.path)
+    )
+      c.header("Cache-Control", "public, max-age=31536000, immutable");
   });
   app.use(
     "/api/*",
@@ -164,7 +251,12 @@ export function createApp(store: Store, options: Options) {
     console.error("[dictation]", error instanceof Error ? error.message : "未知错误");
     return c.json({ error: "服务暂时不可用，请保留草稿后重试" }, 500);
   });
-  const publicPaths = new Set(["/api/health", "/api/auth/register", "/api/auth/login"]);
+  const publicPaths = new Set([
+    "/api/health",
+    "/api/auth/register",
+    "/api/auth/login",
+    "/api/auth/logout",
+  ]);
   app.use("*", async (c, next) => {
     c.set("childMode", false);
     if (
@@ -259,8 +351,17 @@ export function createApp(store: Store, options: Options) {
   });
   app.post("/api/auth/login", async (c) => {
     const input = credentialsSchema.parse(await c.req.json());
+    const key = `password:${c.get("clientIp")}:${input.username}`;
+    if (failureBlocked(key)) {
+      c.header("Retry-After", "900");
+      return c.json({ error: "尝试次数过多，请稍后重试" }, 429);
+    }
     const account = await auth.login(input.username, input.password);
-    if (!account) return c.json({ error: "用户名或密码不正确" }, 401);
+    if (!account) {
+      recordFailure(key);
+      return c.json({ error: "用户名或密码不正确" }, 401);
+    }
+    failures.delete(key);
     setCookie(c, "dictation_session", auth.createSession(account.id), {
       httpOnly: true,
       sameSite: "Lax",
@@ -272,15 +373,25 @@ export function createApp(store: Store, options: Options) {
   });
   app.get("/api/auth/me", (c) => c.json({ account: c.get("account") }));
   app.post("/api/auth/logout", (c) => {
-    auth.logout(getCookie(c, "dictation_session") ?? "");
+    const session = getCookie(c, "dictation_session") ?? "";
+    const hadParentSession = !!auth.current(session);
+    auth.logout(session);
     deleteCookie(c, "dictation_session", { path: "/" });
-    deleteCookie(c, "dictation_child", { path: "/" });
+    if (hadParentSession) deleteCookie(c, "dictation_child", { path: "/" });
     return c.json({ ok: true });
   });
   app.post("/api/auth/verify-password", async (c) => {
     const input = passwordVerificationSchema.parse(await c.req.json());
-    if (!(await auth.login(c.get("account").username, input.password)))
+    const key = `password:${c.get("clientIp")}:${c.get("account").username}`;
+    if (failureBlocked(key)) {
+      c.header("Retry-After", "900");
+      return c.json({ error: "尝试次数过多，请稍后重试" }, 429);
+    }
+    if (!(await auth.login(c.get("account").username, input.password))) {
+      recordFailure(key);
       return c.json({ error: "账号密码不正确" }, 400);
+    }
+    failures.delete(key);
     if (c.get("childMode"))
       setCookie(c, "dictation_session", auth.createSession(c.get("account").id), {
         httpOnly: true,
@@ -298,15 +409,17 @@ export function createApp(store: Store, options: Options) {
   });
   app.post("/api/auth/device-pin", async (c) => {
     const { deviceId, pin } = devicePinSchema.parse(await c.req.json());
+    if (auth.current(getCookie(c, "dictation_session") ?? "")?.id !== c.get("account").id)
+      return c.json({ error: "登录已失效，请重新登录后设置口令" }, 401);
     await auth.setDevicePin(c.get("account").id, deviceId, pin);
     return c.json({ ok: true });
   });
   app.post("/api/auth/unlock-pin", async (c) => {
     const { deviceId, pin } = devicePinSchema.parse(await c.req.json());
-    const valid = await auth.verifyDevicePin(c.get("account").id, deviceId, pin);
-    if (valid === null) return c.json({ error: "请使用账号密码验证并重新设置本机口令" }, 409);
-    if (!valid) return c.json({ error: "口令不正确，请重试" }, 400);
-    setCookie(c, "dictation_session", auth.createSession(c.get("account").id), {
+    const session = await auth.unlockDevicePin(c.get("account").id, deviceId, pin);
+    if (session === null) return c.json({ error: "请使用账号密码验证并重新设置本机口令" }, 409);
+    if (!session) return c.json({ error: "口令不正确，请重试" }, 400);
+    setCookie(c, "dictation_session", session, {
       httpOnly: true,
       sameSite: "Lax",
       path: "/",
@@ -532,22 +645,22 @@ export function createApp(store: Store, options: Options) {
       ? c.json({ attempt: item.attempt, task: tasks.require(accountId, item.attempt.taskId) })
       : c.json({ error: "听写记录不存在" }, 404);
   });
-  app.post("/api/agent/drafts", async (c) =>
-    c.json({ draft: drafts.create(c.get("account").id, await c.req.json()) }, 201),
-  );
+  app.post("/api/agent/drafts", async (c) => {
+    const link = new URL(siteBase(c.req.raw));
+    const draft = drafts.create(c.get("account").id, await c.req.json());
+    link.hash = `draft=${draft.id}`;
+    return c.json({ draft, confirmUrl: link.href }, 201);
+  });
   app.all("/mcp", async (c) => {
     const token = (c.req.header("Authorization") ?? "").replace(/^Bearer /, "");
     if (!tokens.authenticate(token)) return c.json({ error: "AI 令牌无效或已过期" }, 401);
-    const requestUrl = new URL(c.req.url);
-    const origin =
-      c.req.header("Origin") ??
-      `${c.req.header("x-forwarded-proto") ?? requestUrl.protocol.slice(0, -1)}://${requestUrl.host}`;
-    const linkBase = `${origin}${options.basePath ?? ""}/`;
+    const linkBase = siteBase(c.req.raw);
     const server = createMcpServer(async (path, body) => {
       const headers = new Headers({ Authorization: `Bearer ${token}` });
+      headers.set("X-Dictation-Site-Url", linkBase);
       if (body !== undefined) headers.set("Content-Type", "application/json");
       const response = await app.fetch(
-        new Request(new URL(`/api/agent/${path}`, "http://internal"), {
+        new Request(new URL(`/api/agent/${path}`, linkBase), {
           method: body === undefined ? "GET" : "POST",
           headers,
           body: body === undefined ? undefined : JSON.stringify(body),
