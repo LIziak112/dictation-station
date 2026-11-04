@@ -737,9 +737,17 @@ function TaskSession({
             <progress value={current.index + 1} max={task.items.length} aria-label="任务进度" />
             <div className="prompt">
               <p className="eyebrow">{MODES[task.mode].description}</p>
-              <h2 className="task-prompt">{item.prompt || "听一听，写下来"}</h2>
-              {item.hint && <p>语境：{item.hint}</p>}
-              {item.reading && <p className="muted">读音：{item.reading}</p>}
+              <h2
+                className="task-prompt exercise-text"
+                data-long={item.kind === "sentence" || (item.prompt?.length ?? 0) > 24}
+                data-placeholder={!item.prompt}
+              >
+                {item.prompt || "听一听，写下来"}
+              </h2>
+              {item.hint && <p className="exercise-note">语境：{item.hint}</p>}
+              {item.reading && (
+                <p className="muted exercise-note reading-text">读音：{item.reading}</p>
+              )}
             </div>
             <div className="play-controls">
               <button
@@ -770,7 +778,9 @@ function TaskSession({
               </button>
             </div>
             {!item.audioText && (
-              <p className="muted center">此模式看拼音默写，不播放语音，写完后点击下一项。</p>
+              <p className="muted center instruction">
+                此模式看拼音默写，不播放语音，写完后点击下一项。
+              </p>
             )}
             <div className="row center">
               <button

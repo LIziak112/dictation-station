@@ -295,9 +295,15 @@ export function ListeningPractice({
           <p className="player-count" aria-live="polite">
             {queue.length ? `${index + 1} / ${queue.length}` : "0 / 0"}
           </p>
-          <h2 className="practice-word">{hidden ? "待考词 · 只听声音" : current?.audioText}</h2>
+          <h2
+            className="practice-word exercise-text"
+            data-long={current?.entry.kind === "sentence" || (current?.audioText.length ?? 0) > 24}
+            data-placeholder={hidden}
+          >
+            {hidden ? "待考词 · 只听声音" : current?.audioText}
+          </h2>
           {hidden && (
-            <p className="small muted practice-lock-note">
+            <p className="small muted practice-lock-note instruction">
               批改后可以查看文字，当前可正常听示范或跟读。
             </p>
           )}

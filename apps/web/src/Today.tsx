@@ -404,7 +404,9 @@ export function Today({
                       </p>
                     )}
                     {queuedBehindActive ? (
-                      <p className="small muted">排队中：请先完成上方正在进行的听写任务</p>
+                      <p className="small muted instruction">
+                        排队中：请先完成上方正在进行的听写任务
+                      </p>
                     ) : (
                       <p className="small muted">
                         约{" "}
@@ -573,12 +575,12 @@ export function Today({
             <section className="panel" aria-labelledby="child-corrections-heading">
               <div className="section-head">
                 <h2 id="child-corrections-heading">错词订正</h2>
-                <p className="small muted">
+                <p className="small muted instruction">
                   先在纸上订正，再点“我已订正”。以后再独立听写，逐步巩固。
                 </p>
               </div>
               {!overview.corrections.length ? (
-                <p className="small muted">目前没有待订正的错词，继续保持！</p>
+                <p className="small muted instruction">目前没有待订正的错词，继续保持！</p>
               ) : (
                 <div className="editor-stack">
                   {overview.corrections.map((item) => (
@@ -603,7 +605,9 @@ export function Today({
                                 {word.entry.en ? word.entry.zh : word.entry.pinyin}
                               </span>
                               {word.entry.en && word.entry.pinyin && (
-                                <span className="small muted">{word.entry.pinyin}</span>
+                                <span className="small muted reading-text">
+                                  {word.entry.pinyin}
+                                </span>
                               )}
                             </div>
                             <div className="learning-meta">
@@ -658,12 +662,12 @@ export function Today({
             <section className="panel" aria-labelledby="child-listen-heading">
               <div className="section-head">
                 <h2 id="child-listen-heading">自主磨耳朵</h2>
-                <p className="small muted">
+                <p className="small muted instruction">
                   听示范，也可以录音跟读。这些练习不计入掌握次数，待考词暂时隐藏文字。
                 </p>
               </div>
               {!overview.batches.length ? (
-                <p className="small muted">词库中还没有词表。</p>
+                <p className="small muted instruction">词库中还没有词表。</p>
               ) : (
                 <div className="batch-grid">
                   {overview.batches.map((b) => (
@@ -705,7 +709,7 @@ export function Today({
             <p className="small muted">做过的听写都在这里，点开可以回看批改结果。</p>
           </div>
           {!historyTasks.length ? (
-            <p className="small muted">还没有完成的听写。</p>
+            <p className="small muted instruction">还没有完成的听写。</p>
           ) : (
             <ul className="history-list">
               {historyTasks.map((task) => (

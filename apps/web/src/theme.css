@@ -7,12 +7,12 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 h1 {
-  font-weight: 750;
-  letter-spacing: -0.02em;
+  font-weight: 700;
+  letter-spacing: 0;
 }
 h2,
 h3 {
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 /* 顶栏 */
@@ -40,10 +40,10 @@ h3 {
 }
 :where(.brand) strong {
   font-size: 1.125rem;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 .brand-sub {
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
 }
 
 /* 主导航：桌面为顶栏分段，窄屏为底部标签栏 */
@@ -230,7 +230,7 @@ main {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   margin-bottom: 8px;
 }
 .section-head {
@@ -382,7 +382,7 @@ section.notice .row {
 .task-card .eyebrow {
   color: var(--muted);
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
 }
 .task-card h2,
 .task-card h3 {
@@ -609,7 +609,6 @@ progress::-moz-progress-bar {
 }
 .task-prompt {
   margin-block: 8px;
-  font-weight: 700;
   color: var(--text);
 }
 .play-controls {
@@ -901,11 +900,11 @@ footer {
   background: var(--brand-tint);
   color: var(--brand);
   font-size: 0.8125rem;
-  font-weight: 650;
+  font-weight: 600;
 }
 .player-card-head h1 {
   font-size: 1.125rem;
-  font-weight: 650;
+  font-weight: 600;
   color: var(--label);
 }
 .player-stage {
@@ -930,8 +929,6 @@ footer {
 }
 .player-stage .practice-word {
   margin: 0;
-  font-size: clamp(2rem, 8vw, 3rem);
-  line-height: 1.3;
   color: #ffffff;
 }
 .player-stage .practice-lock-note,
@@ -1020,7 +1017,7 @@ footer {
   border-radius: 999px;
   border-color: var(--accent);
   color: var(--accent);
-  font-weight: 650;
+  font-weight: 600;
 }
 .record-btn.is-recording {
   background: #c2410c;
@@ -1242,7 +1239,7 @@ footer {
   border-radius: 12px;
   background: transparent;
   color: var(--muted);
-  font-weight: 650;
+  font-weight: 600;
 }
 .child-tabs button[aria-selected="true"] {
   background: var(--brand);
@@ -1314,7 +1311,7 @@ footer {
   background: var(--selected);
   color: var(--brand-strong);
   font-size: 0.8125rem;
-  font-weight: 650;
+  font-weight: 600;
   white-space: nowrap;
 }
 .history-score.has-wrong {
@@ -1384,7 +1381,7 @@ footer {
 .user-menu .account-name {
   padding: 4px 6px 10px;
   border-bottom: 1px solid var(--line);
-  font-weight: 650;
+  font-weight: 600;
 }
 .user-menu .focus-menu {
   display: grid;
@@ -1407,7 +1404,7 @@ footer {
   list-style: none;
   min-height: 40px;
   padding-inline: 18px;
-  font-weight: 550;
+  font-weight: 600;
   font-size: 0.9375rem;
 }
 .password-disclosure > summary::-webkit-details-marker {
@@ -1627,7 +1624,7 @@ footer {
 .review-index {
   color: var(--muted);
   font-size: 0.8125rem;
-  font-weight: 650;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 .review-word {
@@ -1657,7 +1654,7 @@ footer {
   padding: 1px 6px;
   border-radius: 6px;
   background: var(--soft);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
 }
 .review-marks {
   display: flex;
@@ -1674,7 +1671,7 @@ footer {
 }
 .review-result {
   font-size: 0.8125rem;
-  font-weight: 650;
+  font-weight: 600;
   color: var(--label);
 }
 .review-row-actions {
@@ -1777,7 +1774,8 @@ footer {
     text-align: left;
   }
   .review-word {
-    gap: 8px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
   }
   .review-marks {
     flex-wrap: wrap;
@@ -1996,7 +1994,7 @@ input[type="file"]::file-selector-button:hover {
   select option:checked {
     background: var(--brand-tint);
     color: var(--brand);
-    font-weight: 650;
+    font-weight: 600;
   }
   select option::checkmark {
     order: 1;
@@ -2091,4 +2089,53 @@ input[type="file"]::file-selector-button:hover {
   .cheer-confetti {
     display: none;
   }
+}
+
+/* 学习内容与界面标题分别定级，避免播放器通用 h2 规则覆盖。 */
+.prompt .exercise-text,
+.player-stage .exercise-text {
+  min-width: 0;
+  max-inline-size: 100%;
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0;
+  word-break: normal;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+.prompt .exercise-text[data-long="true"],
+.player-stage .exercise-text[data-long="true"] {
+  font-size: clamp(1.5rem, 3.5vw, 2rem);
+  line-height: 1.5;
+}
+.prompt .exercise-text[data-placeholder="true"],
+.player-stage .exercise-text[data-placeholder="true"] {
+  font-size: clamp(1.25rem, 3vw, 1.5rem);
+  font-weight: 600;
+  line-height: 1.5;
+}
+.prompt .exercise-note {
+  font-size: 1rem;
+  line-height: 1.6;
+}
+.instruction {
+  line-height: 1.6;
+}
+:root[data-side="child"] .instruction,
+:root[data-side="child"] .reading-text {
+  font-size: 1rem;
+  line-height: 1.6;
+}
+:root[data-side="child"] .review-word h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+:root[data-side="child"] .review-meaning {
+  font-size: 1rem;
+}
+:root[data-side="child"] .review-extra {
+  font-size: 0.9375rem;
+  line-height: 1.6;
 }
