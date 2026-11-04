@@ -37,19 +37,19 @@ worktree 隔离源码，不自动隔离端口和外部数据。每个工作区�
 
 提交与 PR 标题：`<type>(<scope>): <说明>`，scope 可省略，冒号后一个空格。说明可用中文，直接描述结果，不写“修改代码”“更新一下”或无意义的 `wip`。
 
-| type | 用途 | 示例 |
-| --- | --- | --- |
-| feat | 新能力 | `feat(tasks): 支持错词重新派发` |
-| fix | 缺陷修复 | `fix(player): 保留交卷失败后的进度` |
-| docs | 文档与规范 | `docs(workflow): 规范提交与并行开发流程` |
-| refactor | 不改变行为的重构 | `refactor(auth): 合并重复会话校验` |
-| test | 测试 | `test(tasks): 覆盖重复交卷` |
-| perf | 性能改进 | `perf(audio): 复用重复音频请求` |
-| style | 不改变行为的代码格式调整 | `style(server): 统一导入格式` |
-| build | 构建或依赖 | `build(deps): 更新构建依赖` |
-| ci | 持续集成 | `ci: 补充 schema 一致性检查` |
-| chore | 其他维护 | `chore: 清理过期配置` |
-| revert | 回退 | `revert(player): 回退自动跳词改动` |
+| type     | 用途                     | 示例                                     |
+| -------- | ------------------------ | ---------------------------------------- |
+| feat     | 新能力                   | `feat(tasks): 支持错词重新派发`          |
+| fix      | 缺陷修复                 | `fix(player): 保留交卷失败后的进度`      |
+| docs     | 文档与规范               | `docs(workflow): 规范提交与并行开发流程` |
+| refactor | 不改变行为的重构         | `refactor(auth): 合并重复会话校验`       |
+| test     | 测试                     | `test(tasks): 覆盖重复交卷`              |
+| perf     | 性能改进                 | `perf(audio): 复用重复音频请求`          |
+| style    | 不改变行为的代码格式调整 | `style(server): 统一导入格式`            |
+| build    | 构建或依赖               | `build(deps): 更新构建依赖`              |
+| ci       | 持续集成                 | `ci: 补充 schema 一致性检查`             |
+| chore    | 其他维护                 | `chore: 清理过期配置`                    |
+| revert   | 回退                     | `revert(player): 回退自动跳词改动`       |
 
 scope 尽量使用稳定模块名，如 `web`、`server`、`tasks`、`player`、`audio`、`auth`、`mcp`、`contract`、`workflow`。破坏兼容的修改使用 `feat(contract)!: ...` 等形式，并在提交正文和 PR 中写清兼容影响、迁移及回退方法。Git 自动生成的 merge 提交标题无需改写。
 
@@ -59,13 +59,13 @@ scope 尽量使用稳定模块名，如 `web`、`server`、`tasks`、`player`、
 
 工具版本以 `.nvmrc`、`package.json` 和锁文件为准：当前 Node.js 24+、pnpm 12.6.0，安装执行 `pnpm install --frozen-lockfile`。只有有意变更依赖时才更新锁文件。
 
-| 改动 | 本地验证要求 |
-| --- | --- |
-| 仅 Markdown／PR 模板 | 核对内容、相对链接、示例命令，执行 `git diff --check`；说明不跑应用测试的原因 |
-| 应用／共享代码、配置或依赖 | `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`，按影响补充回归用例 |
-| 数据契约／交换 schema | 以上检查，加 `pnpm schema:export`，核对并提交 `schema/` 中预期变更 |
-| 页面交互／API 流程／权限 | 以上检查，加相关 Playwright 用例；跨模块流程运行完整 `pnpm e2e` |
-| 音频／手机／打印 | 相关自动化加目标设备人工验收，记录设备、结果及未验证的边界 |
+| 改动                       | 本地验证要求                                                                                                                  |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 仅 Markdown／PR 模板       | 核对内容、相对链接、示例命令，执行 `git diff --check` 和所改文件的 `pnpm exec biome check <文件列表>`；说明不跑应用测试的原因 |
+| 应用／共享代码、配置或依赖 | `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`，按影响补充回归用例                                                  |
+| 数据契约／交换 schema      | 以上检查，加 `pnpm schema:export`，核对并提交 `schema/` 中预期变更                                                            |
+| 页面交互／API 流程／权限   | 以上检查，加相关 Playwright 用例；跨模块流程运行完整 `pnpm e2e`                                                               |
+| 音频／手机／打印           | 相关自动化加目标设备人工验收，记录设备、结果及未验证的边界                                                                    |
 
 首次运行浏览器测试前执行 `pnpm exec playwright install chromium webkit`。本地可用 `pnpm exec playwright test e2e/tasks.spec.ts` 跑相关用例；完整 CI 仍须通过，不用局部测试替代合并门槛。
 
@@ -106,11 +106,11 @@ git ls-remote origin refs/heads/codex/docs-development-workflow
 
 三个状态分别记录：
 
-| 状态 | 含义 | 获取方式 |
-| --- | --- | --- |
-| 已推送任务分支 | GitHub 有这项未合并工作 | 其他环境 fetch 后检出该分支／提交 |
-| 已合并 main | 代码已进入团队集成基线 | 干净 main 工作区执行 `git pull --ff-only origin main` |
-| 已部署线上 | 服务器已运行指定版本并验收 | 按 DEPLOY 发布并记录实际版本与健康检查 |
+| 状态           | 含义                       | 获取方式                                              |
+| -------------- | -------------------------- | ----------------------------------------------------- |
+| 已推送任务分支 | GitHub 有这项未合并工作    | 其他环境 fetch 后检出该分支／提交                     |
+| 已合并 main    | 代码已进入团队集成基线     | 干净 main 工作区执行 `git pull --ff-only origin main` |
+| 已部署线上     | 服务器已运行指定版本并验收 | 按 DEPLOY 发布并记录实际版本与健康检查                |
 
 不在云端编辑器重新实现同一份修改。未合并工作只能从它的远端分支获得；main 不会自动包含所有 PR。当前 CI 没有自动部署步骤，push 或合并都不能报告为“线上已更新”。
 

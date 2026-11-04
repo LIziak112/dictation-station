@@ -15,7 +15,7 @@
 - 保持改动聚焦，修复根因，复用现有结构。不要夹带无关重构、全仓格式化或依赖升级。
 - 运行时基线为 Node.js 24+、pnpm 12.6.0；安装使用 `pnpm install --frozen-lockfile`。脚本以 `package.json` 为准。
 - 代码改动运行 `pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`；根据影响运行相关 E2E。契约变更执行 `pnpm schema:export`，检查并提交对应生成文件。合并前完整 CI 必须通过。
-- 纯 Markdown / PR 模板修改可只核对内容、链接、命令和 `git diff --check`，在 PR 中说明未跑应用测试的原因；不因此跳过现有 CI。
+- 纯 Markdown / PR 模板修改核对内容、链接、命令，执行 `git diff --check` 和所改文件的 `pnpm exec biome check <文件列表>`；在 PR 中说明未跑应用测试的原因，不因此跳过现有 CI。
 - 非平凡逻辑和 bug 修复补充有意义的回归验证。UI、音频、打印和手机行为按影响执行浏览器或真机验收；模拟语音通过不能写成真机发音通过。
 - worktree 中的依赖、构建产物、测试数据库和开发端口各自隔离。当前 E2E 默认使用 8898 端口；未完成端口隔离前串行运行，不杀其他任务的进程。
 - 不提交 `.env`、真实密钥、用户数据库、录音、日志、构建产物或临时测试输出。部署与数据处理遵守 [DEPLOY.md](DEPLOY.md)。
