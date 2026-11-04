@@ -444,7 +444,7 @@ function ReviewSession({
         <section className="panel review-completion" aria-labelledby="review-completion-title">
           <div className="review-completion-heading">
             <h2 id="review-completion-title">完成核对</h2>
-            <p className="small muted">确认纸面结果后，保存本次批改。</p>
+            <p className="small muted instruction">确认纸面结果后，保存本次批改。</p>
           </div>
           <div className="review-completion-confirm">
             <label className="check">
@@ -455,7 +455,7 @@ function ReviewSession({
               />
               已全部核对，其余未标记的题目均正确
             </label>
-            <p className="small muted">不勾选时，未标记的题目保留为“未核对”。</p>
+            <p className="small muted instruction">不勾选时，未标记的题目保留为“未核对”。</p>
           </div>
           <button
             className="primary"
@@ -500,7 +500,7 @@ function ReviewSession({
           {!child && (
             <details className="review-return">
               <summary>退回给孩子继续听写</summary>
-              <p className="small muted">
+              <p className="small muted instruction">
                 退回的是整份任务，不是只重做错题；本次所有批改标记都会清除。
               </p>
               <fieldset className="review-return-options">

@@ -312,8 +312,14 @@ export function Player({
         <progress value={progress.index + 1} max={queue.length} aria-label="听写进度" />
         <div className="prompt">
           <p className="eyebrow">{MODES[progress.mode].description}</p>
-          <h2>{q.prompt || "听一听，写下来"}</h2>
-          {q.entry.hint && <p>语境：{q.entry.hint}</p>}
+          <h2
+            className="exercise-text"
+            data-long={q.entry.kind === "sentence" || (q.prompt?.length ?? 0) > 24}
+            data-placeholder={!q.prompt}
+          >
+            {q.prompt || "听一听，写下来"}
+          </h2>
+          {q.entry.hint && <p className="exercise-note">语境：{q.entry.hint}</p>}
           {reveal && <p className="answer">{q.answer}</p>}
         </div>
         <div className="play-controls">

@@ -66,12 +66,18 @@ test("自动生成可下载汇报卡，打印拼音纸默认不包含答案", as
   await page.screenshot({ path: test.info().outputPath("review-empty.png") });
   await page.getByRole("button", { name: "查看全部 2 项" }).click();
   await expect(page.locator(".review-row")).toHaveCount(2);
-  for (const width of [1024, 390]) {
+  for (const width of [1024, 390, 320]) {
     await page.setViewportSize({ width, height: 800 });
     const answer = await page.locator(".review-word h2").first().boundingBox();
     const meaning = await page.locator(".review-meaning").first().boundingBox();
-    expect(answer && meaning && meaning.x > answer.x).toBeTruthy();
-    expect(Math.abs((answer?.y ?? 0) - (meaning?.y ?? 0))).toBeLessThan(8);
+    expect(answer && meaning).toBeTruthy();
+    if (width > 580) {
+      expect(meaning?.x).toBeGreaterThan(answer?.x ?? 0);
+      expect(Math.abs((answer?.y ?? 0) - (meaning?.y ?? 0))).toBeLessThan(8);
+    } else {
+      expect(meaning?.y).toBeGreaterThanOrEqual((answer?.y ?? 0) + (answer?.height ?? 0));
+      expect(Math.abs((answer?.x ?? 0) - (meaning?.x ?? 0))).toBeLessThan(1);
+    }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
