@@ -42,7 +42,6 @@ const NAV_ITEMS = [
   { key: "library", label: "词库", icon: Library },
   { key: "learning", label: "待巩固", icon: Target },
   { key: "history", label: "记录", icon: BarChart3 },
-  { key: "connections", label: "AI 连接", icon: Sparkles },
 ] as const;
 
 type Panel =
@@ -199,12 +198,13 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
   }
 
   function navigate(next: Panel) {
-    if (!canLeave()) return;
+    if (!canLeave()) return false;
     setChildShare(null);
     if (next === "library") location.hash = "library";
     else if (next === "today") location.hash = "";
     else if (["history", "learning", "connections"].includes(next)) location.hash = next;
     setPanel(next);
+    return true;
   }
 
   async function openChildShare(targetTaskId?: string, forceRotate = false) {
@@ -271,7 +271,12 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
       </button>
       <header className="site-header">
         <div className="header-inner">
-          <button className="brand subtle" type="button" onClick={() => navigate("today")}>
+          <button
+            className="brand subtle"
+            type="button"
+            aria-label={child ? "OwnClass 孩子听写区" : "OwnClass 听写小站"}
+            onClick={() => navigate("today")}
+          >
             <span className="brand-mark">
               <Headphones size={20} aria-hidden="true" />
             </span>
@@ -337,6 +342,17 @@ export function Portal({ account, onLogout }: { account: Account; onLogout: () =
                 {!child && (
                   <>
                     <ParentPinSettings account={account} />
+                    <button
+                      type="button"
+                      className="subtle"
+                      onClick={(event) => {
+                        if (navigate("connections"))
+                          event.currentTarget.closest("details")?.removeAttribute("open");
+                      }}
+                    >
+                      <Sparkles size={16} aria-hidden="true" />
+                      AI 连接
+                    </button>
                     <details className="password-disclosure">
                       <summary>
                         <LockKeyhole size={16} aria-hidden="true" />

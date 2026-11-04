@@ -1,6 +1,27 @@
 import { randomBytes } from "node:crypto";
 import { expect, test } from "@playwright/test";
 
+test("用户名输入在浏览器中校验合法字符", async ({ page }) => {
+  const assets: Array<{ url: string; cache: string | undefined }> = [];
+  page.on("response", async (response) => {
+    if (/\/assets\/[^/]+-[A-Za-z0-9_-]{8,}\.(js|css)$/.test(response.url())) {
+      assets.push({ url: response.url(), cache: (await response.allHeaders())["cache-control"] });
+    }
+  });
+  await page.goto("./");
+  const input = page.getByLabel("用户名", { exact: true });
+  await input.fill("name-1_");
+  expect(
+    await input.evaluate((element: HTMLInputElement) => element.validity.patternMismatch),
+  ).toBe(false);
+  await input.fill("name!1");
+  expect(
+    await input.evaluate((element: HTMLInputElement) => element.validity.patternMismatch),
+  ).toBe(true);
+  await expect.poll(() => assets.length).toBeGreaterThanOrEqual(2);
+  expect(assets.every((asset) => asset.cache === "public, max-age=31536000, immutable")).toBe(true);
+});
+
 test("注册、同账号跨设备读取、不同账号隔离及本机草稿隔离", async ({ page, browser, baseURL }) => {
   const username = `parent_${randomBytes(8).toString("hex")}`;
   const password = "synthetic-password";

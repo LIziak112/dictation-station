@@ -141,14 +141,18 @@ export function ReportCard({ task, attempt }: { task: Task; attempt: Attempt }) 
         {counts.unchecked} 项
       </p>
       <canvas ref={canvas} role="img" aria-label="听写打卡汇报卡预览" />
-      <label className="field">
-        添加书写纸照片（仅本机）
-        <input
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          onChange={(e) => setPhoto(e.target.files?.[0])}
-        />
-      </label>
+      <div className="field">
+        <span>添加书写纸照片（仅本机）</span>
+        <label className="report-photo-picker">
+          <span>选择照片</span>
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            onChange={(e) => setPhoto(e.target.files?.[0])}
+          />
+        </label>
+        <span className="small muted">{photo?.name ?? "尚未选择照片"}</span>
+      </div>
       <p className="small muted">
         照片只用于这张卡片，不上传；刷新后需重新选择。保存图片后可手动转发到老师群。
       </p>

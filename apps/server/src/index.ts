@@ -30,6 +30,7 @@ const api = createApp(store, {
   ocr: process.env.PADDLEOCR_TOKEN ? paddleOcr : undefined,
   tts,
   basePath: base,
+  publicUrl: process.env.PUBLIC_URL,
 });
 const app = new Hono();
 api.get("*", serveStatic({ root: "dist/web" }));

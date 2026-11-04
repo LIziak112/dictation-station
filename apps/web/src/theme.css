@@ -147,6 +147,10 @@ h3 {
   }
 }
 @media (max-width: 900px) {
+  .site-header {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
   .header-inner {
     padding: 8px 16px;
     min-height: 60px;
@@ -165,7 +169,7 @@ h3 {
     backdrop-filter: saturate(1.6) blur(14px);
     -webkit-backdrop-filter: saturate(1.6) blur(14px);
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     width: auto;
   }
   .header-inner > nav.main-nav button {
@@ -1910,11 +1914,31 @@ input[type="file"] {
   border-radius: 10px;
   background: var(--surface);
   color: var(--muted);
-  font-size: 0.875rem;
+  font-size: 1rem;
   cursor: pointer;
 }
 input[type="file"]:hover {
   border-color: var(--brand);
+}
+.report-photo-picker {
+  position: relative;
+  display: inline-flex;
+  align-self: start;
+  padding: 8px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.report-photo-picker:focus-within {
+  outline: 3px solid var(--brand-tint);
+}
+.report-photo-picker input[type="file"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
 }
 input[type="file"]::file-selector-button {
   margin-right: 12px;

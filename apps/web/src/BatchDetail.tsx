@@ -96,6 +96,12 @@ export function BatchDetail({
         onNotice("所选范围内没有支持当前练法的词条，请调整范围或练法");
         return;
       }
+      if (
+        !confirm(
+          `确认派发「${batch.title}」？\n范围：${range || "全部"} · ${validEntries.length} 项作业 · ${MODES[mode].label}\n最多加入 ${reviewCount} 项复习 · ${allowSelfReview ? "允许" : "不允许"}孩子自主核对`,
+        )
+      )
+        return;
       const today = localDate(new Date(), "Asia/Shanghai");
       const { task } = await taskApi.create({
         title: batch.title,

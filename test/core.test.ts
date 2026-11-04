@@ -1,8 +1,12 @@
+import { pinyin } from "pinyin-pro";
 import { describe, expect, it } from "vitest";
 import { batchInputSchema, defaultSettings, normalizeEntry } from "../packages/contract/src/index";
-import { buildAgentPrompt, parseList, validateEntries } from "../packages/core/src/import";
+import { buildAgentPrompt, validateEntries } from "../packages/core/src/import";
+import { parseList as parse } from "../packages/core/src/parse-list";
 import { createQueue, Playback } from "../packages/core/src/player";
 import samples from "../public/samples.json";
+
+const parseList = (source: string) => parse(source, pinyin);
 
 describe("词表契约与导入", () => {
   it("旧示例全部兼容，纯文本超限和重复 ID 显式报错", () => {

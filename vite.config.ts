@@ -7,7 +7,7 @@ export default defineConfig({
   base: "./",
   plugins: [react()],
   publicDir: resolve("public/assets"),
-  build: { outDir: resolve("dist/web"), emptyOutDir: true },
+  build: { outDir: resolve("dist/web"), emptyOutDir: false },
   server: {
     port: 5198,
     strictPort: true,

@@ -1,6 +1,7 @@
 import { createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, sql } from "drizzle-orm";
+import { HTTPException } from "hono/http-exception";
 import { accounts, metadata, sessions } from "./schema";
 import type { Store } from "./store";
 
@@ -20,17 +21,28 @@ export class Auth {
   constructor(private store: Store) {}
   async setDevicePin(accountId: string, deviceId: string, pin: string) {
     const key = `parent-pin:${accountId}:${deviceId}`;
+    const account = this.store.db.select().from(accounts).where(eq(accounts.id, accountId)).get();
     const value = await hashPassword(pin);
-    this.store.db
-      .insert(metadata)
-      .values({ key, value })
-      .onConflictDoUpdate({ target: metadata.key, set: { value } })
-      .run();
+    this.store.db.transaction((tx) => {
+      const current = tx.select().from(accounts).where(eq(accounts.id, accountId)).get();
+      if (!account || current?.passwordHash !== account.passwordHash)
+        throw new HTTPException(409, { message: "密码已变化，请重新登录后设置口令" });
+      tx.insert(metadata)
+        .values({ key, value })
+        .onConflictDoUpdate({ target: metadata.key, set: { value } })
+        .run();
+    });
   }
-  async verifyDevicePin(accountId: string, deviceId: string, pin: string) {
+  async unlockDevicePin(accountId: string, deviceId: string, pin: string) {
     const key = `parent-pin:${accountId}:${deviceId}`;
     const record = this.store.db.select().from(metadata).where(eq(metadata.key, key)).get();
-    return record ? await matches(pin, record.value) : null;
+    if (!record) return null;
+    const valid = await matches(pin, record.value);
+    return this.store.db.transaction((tx) => {
+      const current = tx.select().from(metadata).where(eq(metadata.key, key)).get();
+      if (current?.value !== record.value) return null;
+      return valid ? this.createSession(accountId) : false;
+    });
   }
   async register(username: string, password: string) {
     const passwordHash = await hashPassword(password);
@@ -97,6 +109,10 @@ export class Auth {
         .get();
       if (!account) return false;
       tx.delete(sessions).where(eq(sessions.accountId, account.id)).run();
+      const prefix = `parent-pin:${account.id}:`;
+      tx.delete(metadata)
+        .where(sql`substr(${metadata.key}, 1, ${prefix.length}) = ${prefix}`)
+        .run();
       return true;
     });
   }

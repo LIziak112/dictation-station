@@ -32,10 +32,20 @@ test("自动生成可下载汇报卡，打印拼音纸默认不包含答案", as
     ).json()
   ).task;
   const attempt = (
-    await (await page.request.post(`api/tasks/${task.id}/start`, { data: {} })).json()
+    await (
+      await page.request.post(`api/tasks/${task.id}/start`, {
+        data: { deviceId: "fixture-device" },
+      })
+    ).json()
   ).attempt;
   await page.request.put(`api/attempts/${attempt.id}`, {
-    data: { revision: 1, index: 1, phase: "review", results: { [task.items[0].wordId]: "wrong" } },
+    data: {
+      deviceId: "fixture-device",
+      revision: 1,
+      index: 1,
+      phase: "review",
+      results: { [task.items[0].wordId]: "wrong" },
+    },
   });
   await page.request.post(`api/attempts/${attempt.id}/complete`, {
     data: { revision: 2, confirmRemaining: true },
@@ -102,7 +112,7 @@ test("自动生成可下载汇报卡，打印拼音纸默认不包含答案", as
   await expect(page.getByRole("heading", { name: "本次核对记录" })).toBeVisible();
 });
 
-test("练习纸自动分页并保留编号", async ({ page }) => {
+test("练习纸自动分页并保留编号", async ({ page, browserName }) => {
   const batch = (
     await (
       await page.request.post("api/batches", {
@@ -149,17 +159,21 @@ test("练习纸自动分页并保留编号", async ({ page }) => {
   await expect(page.locator(".print-sheet").last()).not.toContainText("姓名");
   await expect(page.locator(".print-sheet").last()).toContainText("第 2 / 2 页");
   await page.emulateMedia({ media: "print" });
-  const pdf = await page.pdf({
-    path: test.info().outputPath("worksheet.pdf"),
-    preferCSSPageSize: true,
-  });
-  expect(pdf.toString("latin1").match(/\/Type\s*\/Page\b/g)).toHaveLength(2);
+  if (browserName === "chromium") {
+    const pdf = await page.pdf({
+      path: test.info().outputPath("worksheet.pdf"),
+      preferCSSPageSize: true,
+    });
+    expect(pdf.toString("latin1").match(/\/Type\s*\/Page\b/g)).toHaveLength(2);
+  }
   await page.emulateMedia({ media: "screen" });
   await page.getByLabel("书写格线").selectOption("tian");
   await expect(page.locator(".worksheet-item").first().locator(".writing-squares")).toHaveCount(2);
   await expect(page.locator(".writing-squares").first().locator("svg")).toHaveCount(4);
   await page.emulateMedia({ media: "print" });
   const squarePages = await page.locator(".print-sheet").count();
-  const squarePdf = await page.pdf({ preferCSSPageSize: true });
-  expect(squarePdf.toString("latin1").match(/\/Type\s*\/Page\b/g)).toHaveLength(squarePages);
+  if (browserName === "chromium") {
+    const squarePdf = await page.pdf({ preferCSSPageSize: true });
+    expect(squarePdf.toString("latin1").match(/\/Type\s*\/Page\b/g)).toHaveLength(squarePages);
+  }
 });

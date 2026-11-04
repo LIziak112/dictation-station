@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
+import { z } from "zod";
 import {
   type Attempt,
   accountPreferencesSchema,
@@ -14,8 +15,21 @@ import {
   taskSchema,
 } from "../../../packages/contract/src/index";
 import { addDays, advanceLearning, localDate } from "../../../packages/core/src/scheduling";
-import { accounts, attempts, learningStates, tasks, words } from "./schema";
+import { accounts, attempts, learningStates, metadata, tasks, words } from "./schema";
 import type { Store } from "./store";
+
+const checkpointSchema = z.object({
+  state: learningStateSchema.nullable(),
+  ignoredSubmissions: z.array(z.string()),
+});
+const checkpointKey = (accountId: string, wordId: string, mode: Mode) =>
+  `learning-checkpoint:${accountId}:${wordId}:${mode}`;
+const practiceTime = (attempt: Attempt) =>
+  attempt.submission?.at ?? (attempt.completedAt as string);
+const practiceDate = (attempt: Attempt, timezone: string) =>
+  attempt.practiceDate ?? localDate(new Date(practiceTime(attempt)), timezone);
+const submissionKey = (attempt: Attempt) =>
+  `${attempt.id}:${attempt.submission?.at ?? attempt.startedAt}`;
 
 export class Learning {
   constructor(readonly store: Store) {}
@@ -64,7 +78,7 @@ export class Learning {
   }
   apply(accountId: string, task: Task, attempt: Attempt) {
     const preferences = this.preferences(accountId);
-    const date = localDate(new Date(attempt.completedAt as string), preferences.timezone);
+    const history = this.history(accountId).filter((item) => item.task.mode === task.mode);
     for (const item of task.items) {
       const row = this.store.db
         .select()
@@ -78,19 +92,51 @@ export class Learning {
         )
         .get();
       const previous = row ? learningStateSchema.parse(JSON.parse(row.payload)) : null;
-      const next = advanceLearning(
-        previous,
-        attempt.results[item.wordId] ?? "unchecked",
-        date,
-        preferences.masteryThreshold,
-      );
-      if (next)
-        this.write(accountId, {
-          ...next,
-          wordId: item.wordId,
-          mode: task.mode,
-          lastPracticedAt: attempt.completedAt as string,
-        });
+      const key = checkpointKey(accountId, item.wordId, task.mode);
+      const stored = this.store.db.select().from(metadata).where(eq(metadata.key, key)).get();
+      // Preserve existing learning data; replay only grades recorded after this checkpoint.
+      const checkpoint = stored
+        ? checkpointSchema.parse(JSON.parse(stored.value))
+        : {
+            state: previous,
+            ignoredSubmissions: history.map(({ attempt }) => submissionKey(attempt)),
+          };
+      if (!stored)
+        this.store.db
+          .insert(metadata)
+          .values({ key, value: JSON.stringify(checkpoint) })
+          .run();
+      const ignored = new Set(checkpoint.ignoredSubmissions);
+      const records = [...history.map(({ attempt }) => attempt), attempt]
+        .filter(
+          (record) =>
+            !ignored.has(submissionKey(record)) && Object.hasOwn(record.results, item.wordId),
+        )
+        .sort(
+          (a, b) =>
+            practiceDate(a, preferences.timezone).localeCompare(
+              practiceDate(b, preferences.timezone),
+            ) ||
+            practiceTime(a).localeCompare(practiceTime(b)) ||
+            a.id.localeCompare(b.id),
+        );
+      let state: LearningState | null = checkpoint.state;
+      for (const record of records) {
+        const next = advanceLearning(
+          state,
+          record.results[item.wordId],
+          practiceDate(record, preferences.timezone),
+          record.masteryThreshold ?? preferences.masteryThreshold,
+        );
+        if (next)
+          state = {
+            ...next,
+            wordId: item.wordId,
+            mode: task.mode,
+            lastPracticedAt: practiceTime(record),
+          };
+      }
+      if (state) this.write(accountId, state);
     }
   }
   due(accountId: string, mode: Mode, date: string, excluded: Set<string>, limit: number) {
@@ -112,21 +158,33 @@ export class Learning {
       .slice(0, limit);
   }
   manual(accountId: string, wordId: string, mode: Mode, status: "pending" | "mastered") {
-    const item = this.list(accountId).find(
-      ({ state }) => state.wordId === wordId && state.mode === mode,
-    );
-    if (!item) throw new HTTPException(404, { message: "待巩固记录不存在" });
-    const date = localDate(new Date(), this.preferences(accountId).timezone);
-    const state = {
-      ...item.state,
-      status,
-      manual: true,
-      ...(status === "pending" ? { streak: 0, dueDate: date } : { dueDate: null }),
-    };
-    this.write(accountId, state);
-    return state;
+    return this.store.db.transaction(() => {
+      const item = this.list(accountId).find(
+        ({ state }) => state.wordId === wordId && state.mode === mode,
+      );
+      if (!item) throw new HTTPException(404, { message: "待巩固记录不存在" });
+      const date = localDate(new Date(), this.preferences(accountId).timezone);
+      const state = {
+        ...item.state,
+        status,
+        manual: true,
+        ...(status === "pending" ? { streak: 0, dueDate: date } : { dueDate: null }),
+      };
+      this.write(accountId, state);
+      const key = checkpointKey(accountId, wordId, mode);
+      const ignoredSubmissions = this.records(accountId)
+        .filter((record) => record.task.mode === mode && record.attempt.phase === "review")
+        .map((record) => submissionKey(record.attempt));
+      const value = JSON.stringify({ state, ignoredSubmissions });
+      this.store.db
+        .insert(metadata)
+        .values({ key, value })
+        .onConflictDoUpdate({ target: metadata.key, set: { value } })
+        .run();
+      return state;
+    });
   }
-  history(accountId: string) {
+  private records(accountId: string) {
     return this.store.db
       .select({ attempt: attempts.payload, task: tasks.payload })
       .from(attempts)
@@ -143,7 +201,10 @@ export class Learning {
           },
           attempt: attemptSchema.parse(JSON.parse(row.attempt)),
         };
-      })
+      });
+  }
+  history(accountId: string) {
+    return this.records(accountId)
       .filter(({ attempt }) => attempt.completedAt)
       .sort((a, b) => (b.attempt.completedAt ?? "").localeCompare(a.attempt.completedAt ?? ""));
   }
@@ -151,7 +212,7 @@ export class Learning {
     const preferences = this.preferences(accountId),
       latest = new Map<string, string>();
     for (const { task, attempt } of this.history(accountId)) {
-      const date = localDate(new Date(attempt.completedAt as string), preferences.timezone);
+      const date = practiceDate(attempt, preferences.timezone);
       if (task.mode === mode && date >= from && date <= to) {
         for (const [wordId, result] of Object.entries(attempt.results))
           if (!latest.has(wordId)) latest.set(wordId, result);
@@ -185,7 +246,7 @@ export class Learning {
     const day = new Date(`${today}T00:00:00Z`).getUTCDay(),
       from = addDays(today, -((day + 6) % 7));
     const completed = this.history(accountId).filter(({ attempt }) => {
-      const date = localDate(new Date(attempt.completedAt as string), preferences.timezone);
+      const date = practiceDate(attempt, preferences.timezone);
       return date >= from && date <= today;
     }).length;
     const pending = this.list(accountId).filter(({ state }) => state.status === "pending");

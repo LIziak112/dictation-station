@@ -62,8 +62,9 @@ it("完成核对原子写学习状态，重复请求不计数，练法与账号�
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-11-01T04:00:00Z"));
   const task = tasks.create(account.id, input),
-    attempt = tasks.start(account.id, task.id, false);
+    attempt = tasks.start(account.id, task.id, false, "device-test");
   const next = tasks.save(account.id, attempt.id, {
+    deviceId: "device-test",
     revision: 1,
     index: 0,
     phase: "review",
@@ -73,8 +74,9 @@ it("完成核对原子写学习状态，重复请求不计数，练法与账号�
   expect(learning.list(account.id)[0].state.streak).toBe(0);
   vi.setSystemTime(new Date("2026-11-02T04:00:00Z"));
   const later = tasks.create(account.id, { ...input, date: "2026-11-02" }),
-    practice = tasks.start(account.id, later.id, false);
+    practice = tasks.start(account.id, later.id, false, "device-test");
   const checked = tasks.save(account.id, practice.id, {
+    deviceId: "device-test",
     revision: 1,
     index: 0,
     phase: "review",
@@ -118,8 +120,9 @@ it("到期复习排除今日已有项，只作业入口不改变历史任务范�
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-11-01T04:00:00Z"));
   const original = tasks.create(account.id, input),
-    attempt = tasks.start(account.id, original.id, false);
+    attempt = tasks.start(account.id, original.id, false, "device-test");
   tasks.save(account.id, attempt.id, {
+    deviceId: "device-test",
     revision: 1,
     index: 0,
     phase: "review",
@@ -134,7 +137,7 @@ it("到期复习排除今日已有项，只作业入口不改变历史任务范�
     reviewCount: 3,
   });
   expect(withReview.items.map((item) => item.entry.en)).toEqual(["moon", "sun"]);
-  tasks.start(account.id, withReview.id, true);
+  tasks.start(account.id, withReview.id, true, "device-test");
   expect(tasks.require(account.id, withReview.id).items.map((item) => item.entry.en)).toEqual([
     "moon",
   ]);
@@ -165,8 +168,9 @@ it("首次全对不额外入复习池，阶段包保留未核对项，修改阈�
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-11-03T04:00:00Z"));
   const task = tasks.create(account.id, input),
-    attempt = tasks.start(account.id, task.id, false);
+    attempt = tasks.start(account.id, task.id, false, "device-test");
   tasks.save(account.id, attempt.id, {
+    deviceId: "device-test",
     revision: 1,
     index: 1,
     phase: "review",

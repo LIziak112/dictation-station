@@ -149,7 +149,8 @@ for (const source of ["missing", "ready", "broken", "slow"] as const) {
         await route.fulfill({ contentType: "audio/wav", body: "synthetic audio" });
       });
     }
-    await page.goto(`./?child=1#task=${task.id}`);
+    const { token } = await (await page.request.post("api/child-token")).json();
+    await page.goto(`./?child=1&ct=${encodeURIComponent(token)}#task=${task.id}`);
     await expect(page.getByRole("button", { name: "开始任务", exact: true })).toBeEnabled();
     await expect(page.getByRole("heading", { name: "准备声音", exact: true })).toHaveCount(0);
     expect(fileRequests).toBe(0);
